@@ -8,8 +8,9 @@ type User struct {
 	TgID       int64
 	Username   string
 	Lang       string
-	ReferrerID int64 // 0, если абонент пришёл сам
-	Balance    int64 // копейки, кэш суммы истории денег
+	ReferrerID int64  // 0, если абонент пришёл сам
+	RefCode    string // код личной реферальной ссылки
+	Balance    int64  // копейки, кэш суммы истории денег
 	TrialUsed  bool
 	BannedAt   time.Time // нулевое время, если бана нет
 	CreatedAt  time.Time
@@ -27,6 +28,36 @@ type Tariff struct {
 	Sort         int
 	Periods      []Period
 	CreatedAt    time.Time
+}
+
+// PromoKind это вид промокода.
+type PromoKind string
+
+const (
+	PromoMoney PromoKind = "money" // сумма на баланс, Value в копейках
+	PromoDays  PromoKind = "days"  // дни к подписке, Value в днях
+)
+
+// Promo это промокод.
+type Promo struct {
+	ID        int64
+	Code      string
+	Kind      PromoKind
+	Value     int64
+	TariffID  int64 // тариф для кода на дни, если у абонента нет подписки
+	MaxUses   int   // 0 значит без лимита
+	Uses      int
+	NewOnly   bool
+	ExpiresAt time.Time // нулевое время значит бессрочно
+	Active    bool
+	CreatedAt time.Time
+}
+
+// RefStats это цифры приглашений абонента.
+type RefStats struct {
+	Invited int
+	Bought  int
+	Earned  int64 // копейки
 }
 
 // Period это срок тарифа и его цена.

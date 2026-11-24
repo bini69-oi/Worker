@@ -30,6 +30,12 @@ func move(tx Tx, now time.Time, e LedgerEntry) (LedgerEntry, error) {
 
 // Register находит абонента по Telegram ID или создаёт нового. Повторный вызов отдаёт того же абонента.
 func (c *Core) Register(ctx context.Context, tgID int64, username, lang string) (User, error) {
+	return c.RegisterRef(ctx, tgID, username, lang, "")
+}
+
+// RegisterRef как Register, но новый абонент запоминает пригласившего по коду из реферальной ссылки.
+// Существующий абонент пригласившего не меняет.
+func (c *Core) RegisterRef(ctx context.Context, tgID int64, username, lang, refCode string) (User, error) {
 	if tgID <= 0 {
 		return User{}, ErrInvalid
 	}
@@ -46,12 +52,8 @@ func (c *Core) Register(ctx context.Context, tgID int64, username, lang string) 
 		if !errors.Is(err, ErrNotFound) {
 			return err
 		}
-		u = User{TgID: tgID, Username: username, Lang: lang, CreatedAt: c.clock.Now()}
-		if u.ID, err = tx.CreateUser(u); err != nil {
-			return err
-		}
-		out = u
-		return nil
+		out, err = c.registerTx(tx, tgID, username, lang, refCode, c.clock.Now())
+		return err
 	})
 	return out, err
 }

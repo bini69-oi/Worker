@@ -66,6 +66,17 @@ var (
 	ErrRefundFailed   = newErr("E4005", "err.refund_failed", "касса отказала в возврате")
 )
 
+// Промокоды и рефералка
+var (
+	ErrPromoNotFound  = newErr("E5001", "err.promo_not_found", "такого кода нет")
+	ErrPromoUsed      = newErr("E5002", "err.promo_used", "этот код уже активирован")
+	ErrPromoExpired   = newErr("E5003", "err.promo_expired", "код истёк")
+	ErrPromoExhausted = newErr("E5004", "err.promo_exhausted", "код больше не действует")
+	ErrPromoNewOnly   = newErr("E5005", "err.promo_new_only", "код только для новых абонентов")
+	ErrPromoNeedSub   = newErr("E5006", "err.promo_need_sub", "код продлевает подписку, а её нет")
+	ErrTooManyTries   = newErr("E5007", "err.too_many_tries", "слишком много попыток, попробуйте позже")
+)
+
 // ErrDuplicate значит, что событие с этой ссылкой уже было проведено.
 // Это не ошибка для абонента: ядро трактует её как «уже сделано».
 var ErrDuplicate = errors.New("событие уже проведено")

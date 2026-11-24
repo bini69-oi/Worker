@@ -28,6 +28,7 @@ type Store interface {
 	// Tariffs отдаёт тарифы в порядке админа. onlyActive оставляет только те, что продаются.
 	Tariffs(ctx context.Context, onlyActive bool) ([]Tariff, error)
 	SubByUser(ctx context.Context, userID int64) (Subscription, error)
+	RefStats(ctx context.Context, userID int64) (RefStats, error)
 	// SubsInPanel отдаёт подписки, у которых уже есть абонент в панели. Нужно для сверки.
 	SubsInPanel(ctx context.Context) ([]Subscription, error)
 
@@ -47,7 +48,9 @@ type Store interface {
 type Tx interface {
 	User(id int64) (User, error)
 	UserByTg(tgID int64) (User, error)
+	// CreateUser создаёт абонента. Повтор Telegram ID или реферального кода даёт ErrDuplicate.
 	CreateUser(u User) (int64, error)
+	UserByRef(code string) (User, error)
 	// AddLedger пишет строку истории и меняет кэш баланса. Повтор пары (RefType, RefID) даёт ErrDuplicate,
 	// уход в минус даёт ErrNotEnoughMoney.
 	AddLedger(e LedgerEntry) (int64, error)
@@ -79,6 +82,16 @@ type Tx interface {
 	// MarkPaid переводит платёж из «ожидает» в «оплачен». false значит, что платёж уже не ожидал.
 	// Пустой externalID оставляет прежний номер.
 	MarkPaid(id int64, externalID string, at time.Time) (bool, error)
+	// Promo ищет промокод без учёта регистра.
+	Promo(code string) (Promo, error)
+	SavePromo(p Promo) (int64, error)
+	// UsePromo отмечает активацию: повтор того же абонента даёт ErrDuplicate, исчерпанный лимит ErrPromoExhausted.
+	UsePromo(promoID, userID int64, at time.Time) error
+
+	// Limit читает счётчик попыток по ключу (например promo:42). Нет счётчика: 0 и нулевое время.
+	Limit(key string) (count int, until time.Time, err error)
+	SetLimit(key string, count int, until time.Time) error
+
 	SetPendingBuy(pb PendingBuy) error
 	// PendingBuy отдаёт запомненный выбор абонента. Нет выбора: ErrNotFound.
 	PendingBuy(userID int64) (PendingBuy, error)

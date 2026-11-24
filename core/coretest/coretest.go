@@ -59,7 +59,11 @@ type state struct {
 	notices map[string]bool
 	pays    map[int64]core.Payment
 	carts   map[int64]core.PendingBuy
+	promos  map[int64]core.Promo
+	limits  map[string]limitRow
 	nextID  int64
+
+	promoUses map[[2]int64]bool
 }
 
 func (s *state) clone() *state {
@@ -73,7 +77,11 @@ func (s *state) clone() *state {
 		notices: maps.Clone(s.notices),
 		pays:    maps.Clone(s.pays),
 		carts:   maps.Clone(s.carts),
-		nextID:  s.nextID,
+		promos:  maps.Clone(s.promos),
+		limits:  maps.Clone(s.limits),
+
+		promoUses: maps.Clone(s.promoUses),
+		nextID:    s.nextID,
 	}
 }
 
@@ -93,7 +101,8 @@ func NewStore() *Store {
 	return &Store{st: &state{
 		users: map[int64]core.User{}, refs: map[refKey]bool{}, tariffs: map[int64]core.Tariff{},
 		subs: map[int64]core.Subscription{}, notices: map[string]bool{}, pays: map[int64]core.Payment{},
-		carts: map[int64]core.PendingBuy{},
+		carts: map[int64]core.PendingBuy{}, promos: map[int64]core.Promo{}, limits: map[string]limitRow{},
+		promoUses: map[[2]int64]bool{},
 	}}
 }
 
@@ -154,6 +163,9 @@ func (t *tx) UserByTg(tgID int64) (core.User, error) {
 
 func (t *tx) CreateUser(u core.User) (int64, error) {
 	if _, err := t.UserByTg(u.TgID); err == nil {
+		return 0, core.ErrDuplicate
+	}
+	if _, err := t.UserByRef(u.RefCode); err == nil || u.RefCode == "" {
 		return 0, core.ErrDuplicate
 	}
 	u.ID = t.st.id()

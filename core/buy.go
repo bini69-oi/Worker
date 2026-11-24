@@ -24,7 +24,8 @@ func (c *Core) Buy(ctx context.Context, userID, tariffID int64, days int) (Subsc
 
 // buyTx это покупка внутри уже открытой транзакции. Её зовут Buy и списание автоподписки Stars.
 func (c *Core) buyTx(tx Tx, userID, tariffID int64, days int, now time.Time) (Subscription, error) {
-	if _, err := activeUser(tx, userID); err != nil {
+	buyer, err := activeUser(tx, userID)
+	if err != nil {
 		return Subscription{}, err
 	}
 	t, err := tx.Tariff(tariffID)
@@ -52,8 +53,12 @@ func (c *Core) buyTx(tx Tx, userID, tariffID int64, days int, now time.Time) (Su
 	}
 
 	if p.Price > 0 {
-		if _, err := move(tx, now, LedgerEntry{UserID: userID, Amount: -p.Price, Reason: ReasonBuy, RefType: "tariff", Comment: t.Name}); err != nil {
+		buy, err := move(tx, now, LedgerEntry{UserID: userID, Amount: -p.Price, Reason: ReasonBuy, RefType: "tariff", Comment: t.Name})
+		if err != nil {
 			return Subscription{}, needMoney(tx, userID, p.Price, err)
+		}
+		if err := c.referralBonus(tx, buyer, buy, p.Price, now); err != nil {
+			return Subscription{}, err
 		}
 	}
 

@@ -78,7 +78,7 @@ type coreTx struct {
 	q   querier
 }
 
-const userCols = `id, tg_id, username, lang, referrer_id, balance, trial_used, banned_at, created_at`
+const userCols = `id, tg_id, username, lang, referrer_id, ref_code, balance, trial_used, banned_at, created_at`
 
 func (t *coreTx) User(id int64) (core.User, error) {
 	return scanUser(t.q.QueryRowContext(t.ctx, "SELECT "+userCols+" FROM users WHERE id = ?", id))
@@ -88,11 +88,15 @@ func (t *coreTx) UserByTg(tgID int64) (core.User, error) {
 	return scanUser(t.q.QueryRowContext(t.ctx, "SELECT "+userCols+" FROM users WHERE tg_id = ?", tgID))
 }
 
+func (t *coreTx) UserByRef(code string) (core.User, error) {
+	return scanUser(t.q.QueryRowContext(t.ctx, "SELECT "+userCols+" FROM users WHERE ref_code = ? AND ref_code <> ''", code))
+}
+
 func scanUser(row *sql.Row) (core.User, error) {
 	var u core.User
 	var referrer, banned sql.NullInt64
 	var created int64
-	err := row.Scan(&u.ID, &u.TgID, &u.Username, &u.Lang, &referrer, &u.Balance, &u.TrialUsed, &banned, &created)
+	err := row.Scan(&u.ID, &u.TgID, &u.Username, &u.Lang, &referrer, &u.RefCode, &u.Balance, &u.TrialUsed, &banned, &created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return u, core.ErrNotFound
 	}
@@ -109,8 +113,8 @@ func scanUser(row *sql.Row) (core.User, error) {
 
 func (t *coreTx) CreateUser(u core.User) (int64, error) {
 	res, err := t.q.ExecContext(t.ctx,
-		`INSERT INTO users (tg_id, username, lang, referrer_id, created_at) VALUES (?, ?, ?, ?, ?)`,
-		u.TgID, u.Username, u.Lang, nullID(u.ReferrerID), u.CreatedAt.Unix())
+		`INSERT INTO users (tg_id, username, lang, referrer_id, ref_code, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		u.TgID, u.Username, u.Lang, nullID(u.ReferrerID), u.RefCode, u.CreatedAt.Unix())
 	if err != nil {
 		return 0, mapErr(err)
 	}
