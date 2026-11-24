@@ -244,3 +244,21 @@ func TestDevicesBeforePanel(t *testing.T) {
 		t.Fatalf("подписка ещё в очереди: ждали ErrPanelPending, получили %v", err)
 	}
 }
+
+func TestReconcileBannedNoDiff(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	e.bought(t)
+	u := e.user
+	u.BannedAt = t0
+	e.st.SetUser(u)
+	sub, _ := e.c.Sub(ctx, e.user.ID)
+	if err := e.c.SyncSub(ctx, sub.ID); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if n, err := e.c.Reconcile(ctx); err != nil || n != 0 {
+			t.Fatalf("забаненный абонент считается расхождением: %d (%v)", n, err)
+		}
+	}
+}

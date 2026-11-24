@@ -61,10 +61,9 @@ func (c *Core) buyFromCart(ctx context.Context, userID int64) {
 		return enqueueNotify(tx, NotifyTask{UserID: userID, Key: "notify.bought",
 			Vars: map[string]string{"days": strconv.Itoa(pb.Days), "until": sub.ExpiresAt.Format("02.01.2006")}}, now)
 	})
-	switch {
-	case err == nil, errors.Is(err, ErrNotEnoughMoney):
-	default:
-		c.log.Warn("умная корзина не купила", "user", userID, "err", err)
+	if permanent(err) {
+		// Этот выбор уже не купить. Остальные ошибки (нехватка денег, сбой базы) оставляют выбор до следующего раза.
+		c.log.Warn("умная корзина: выбор больше не купить", "user", userID, "err", err)
 		_ = c.tx(ctx, func(tx Tx) error { return tx.DeletePendingBuy(userID) })
 	}
 }
@@ -79,14 +78,36 @@ func (c *Core) SetAutoRenew(ctx context.Context, userID int64, on bool) error {
 		if s.Trial {
 			return ErrInvalid
 		}
+		if on {
+			// Продлевать можно только тем сроком, который у тарифа есть (подписка с промокода могла быть на 7 дней).
+			t, err := tx.Tariff(s.TariffID)
+			if err != nil {
+				return err
+			}
+			if _, ok := t.period(s.PeriodDays); !ok {
+				return ErrNoPeriod
+			}
+		}
 		s.AutoRenew, s.UpdatedAt = on, c.clock.Now()
 		_, err = tx.SaveSub(s)
 		return err
 	})
 }
 
+// permanent говорит, что ошибка покупки не пройдёт сама: тариф удалён или скрыт, срока нет, бан, другой тариф.
+func permanent(err error) bool {
+	for _, e := range []error{ErrNoPeriod, ErrNotFound, ErrTariffHidden, ErrOtherTariff, ErrBanned} {
+		if errors.Is(err, e) {
+			return true
+		}
+	}
+	return false
+}
+
 // AutoRenewDue продлевает с баланса подписки с автопродлением за autorenew.days_before дней до окончания
-// тем же сроком, что куплен в прошлый раз. Не хватает денег: абонент один раз получает сумму, которой не хватает.
+// тем же сроком, что куплен в прошлый раз. Окно не больше половины срока подписки, поэтому одна подписка
+// не продлится дважды подряд. Не хватает денег: абонент один раз получает сумму, которой не хватает,
+// а попытки идут дальше, и после пополнения продление пройдёт.
 func (c *Core) AutoRenewDue(ctx context.Context) (int, error) {
 	now := c.clock.Now()
 	before := time.Duration(c.cfg.Int("autorenew.days_before")) * day
@@ -100,7 +121,8 @@ func (c *Core) AutoRenewDue(ctx context.Context) (int, error) {
 	}
 	renewed := 0
 	for _, s := range subs {
-		if !s.AutoRenew || s.Trial || !s.ExpiresAt.After(now) {
+		window := min(before, time.Duration(s.PeriodDays)*day/2)
+		if !s.AutoRenew || s.Trial || !s.ExpiresAt.After(now) || s.ExpiresAt.Sub(now) > window {
 			continue
 		}
 		ok, err := c.renewOne(ctx, s, now)
@@ -115,27 +137,46 @@ func (c *Core) AutoRenewDue(ctx context.Context) (int, error) {
 	return renewed, nil
 }
 
-// renewOne продлевает одну подписку. Одна попытка на дату окончания: после продления дата другая.
+// renewOne продлевает одну подписку. После продления дата окончания уходит за окно, повтора нет.
 func (c *Core) renewOne(ctx context.Context, s Subscription, now time.Time) (bool, error) {
-	renewed := false
+	var sub Subscription
 	err := c.tx(ctx, func(tx Tx) error {
-		fresh, err := tx.AddNotice(s.UserID, "autorenew", fmt.Sprintf("%d:%d", s.ID, s.ExpiresAt.Unix()), now)
-		if err != nil || !fresh {
-			return err
-		}
-		sub, err := c.buyTx(tx, s.UserID, s.TariffID, s.PeriodDays, now)
-		var need *NeedMoney
-		if errors.As(err, &need) {
-			// Деньги не списаны: move отказал до записи. Сообщаем, сколько не хватает.
-			return enqueueNotify(tx, NotifyTask{UserID: s.UserID, Key: "notify.autorenew_fail",
-				Vars: map[string]string{"missing": strconv.FormatInt(need.Missing, 10)}}, now)
-		}
+		var err error
+		sub, err = c.buyTx(tx, s.UserID, s.TariffID, s.PeriodDays, now)
 		if err != nil {
 			return err
 		}
-		renewed = true
 		return enqueueNotify(tx, NotifyTask{UserID: s.UserID, Key: "notify.autorenew_ok",
 			Vars: map[string]string{"until": sub.ExpiresAt.Format("02.01.2006")}}, now)
 	})
-	return renewed, err
+	if err == nil {
+		return true, nil
+	}
+	var need *NeedMoney
+	switch {
+	case errors.As(err, &need):
+		// Сообщаем один раз на дату окончания, а пробовать будем и дальше.
+		return false, c.tx(ctx, func(tx Tx) error {
+			fresh, err := tx.AddNotice(s.UserID, "autorenew_fail", fmt.Sprintf("%d:%d", s.ID, s.ExpiresAt.Unix()), now)
+			if err != nil || !fresh {
+				return err
+			}
+			return enqueueNotify(tx, NotifyTask{UserID: s.UserID, Key: "notify.autorenew_fail",
+				Vars: map[string]string{"missing": strconv.FormatInt(need.Missing, 10)}}, now)
+		})
+	case permanent(err):
+		// Продлить этим сроком больше нельзя: выключаем автопродление и говорим абоненту.
+		return false, c.tx(ctx, func(tx Tx) error {
+			cur, err := tx.Sub(s.ID)
+			if err != nil {
+				return err
+			}
+			cur.AutoRenew, cur.UpdatedAt = false, now
+			if _, err := tx.SaveSub(cur); err != nil {
+				return err
+			}
+			return enqueueNotify(tx, NotifyTask{UserID: s.UserID, Key: "notify.autorenew_off"}, now)
+		})
+	}
+	return false, err
 }

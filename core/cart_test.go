@@ -2,6 +2,7 @@ package core_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -152,5 +153,92 @@ func TestAutoRenewOffByDefault(t *testing.T) {
 	e.clock.Add(29 * 24 * time.Hour)
 	if n, _ := e.c.AutoRenewDue(context.Background()); n != 0 {
 		t.Fatalf("продлено без включённого автопродления: %d", n)
+	}
+}
+
+func TestAutoRenewRetriesAfterTopup(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	tr := e.tariff(t, "Месяц", core.Period{Days: 30, Price: 15000})
+	e.topup(t, 15000)
+	if _, err := e.c.Buy(ctx, e.user.ID, tr.ID, 30); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.c.SetAutoRenew(ctx, e.user.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	e.clock.Add(29 * 24 * time.Hour)
+	if n, _ := e.c.AutoRenewDue(ctx); n != 0 {
+		t.Fatal("продлено без денег")
+	}
+	e.topup(t, 15000)
+	e.clock.Add(10 * time.Minute)
+	if n, _ := e.c.AutoRenewDue(ctx); n != 1 {
+		t.Fatal("после пополнения автопродление не повторилось")
+	}
+}
+
+func TestAutoRenewWindowNotTwice(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	if err := e.cfg.Set("autorenew.days_before", "3"); err != nil {
+		t.Fatal(err)
+	}
+	tr := e.tariff(t, "День", core.Period{Days: 1, Price: 100})
+	e.topup(t, 10000)
+	if _, err := e.c.Buy(ctx, e.user.ID, tr.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.c.SetAutoRenew(ctx, e.user.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	e.clock.Add(13 * time.Hour) // осталось 11 часов, окно половина дня
+	for range 5 {
+		if _, err := e.c.AutoRenewDue(ctx); err != nil {
+			t.Fatal(err)
+		}
+		e.clock.Add(10 * time.Minute)
+	}
+	if b := balance(t, e.st, e.user.ID); b != 10000-100-100 {
+		t.Fatalf("подписка на день продлилась несколько раз подряд: баланс %d", b)
+	}
+}
+
+func TestAutoRenewOffOnPermanentError(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	tr := e.tariff(t, "Месяц", core.Period{Days: 30, Price: 100})
+	e.topup(t, 1000)
+	if _, err := e.c.Buy(ctx, e.user.ID, tr.ID, 30); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.c.SetAutoRenew(ctx, e.user.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	tr.Periods = []core.Period{{Days: 90, Price: 300}} // срок 30 дней убрали
+	if _, err := e.c.SaveTariff(ctx, tr); err != nil {
+		t.Fatal(err)
+	}
+	e.clock.Add(29 * 24 * time.Hour)
+	if _, err := e.c.AutoRenewDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	sub, _ := e.c.Sub(ctx, e.user.ID)
+	e.process(t)
+	if sub.AutoRenew || notified(e, "notify.autorenew_off") != 1 {
+		t.Fatalf("автопродление не выключено или абонент не знает: %+v %+v", sub, e.notes.ToUsers)
+	}
+}
+
+func TestPromoSubCannotAutoRenewWithoutPeriod(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	tr := e.tariff(t, "Месяц", core.Period{Days: 30, Price: 100})
+	e.promo(t, core.Promo{Code: "FREE7", Kind: core.PromoDays, Value: 7, TariffID: tr.ID})
+	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "FREE7"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.c.SetAutoRenew(ctx, e.user.ID, true); !errors.Is(err, core.ErrNoPeriod) {
+		t.Fatalf("автопродление на 7 дней без такого срока: ждали ErrNoPeriod, получили %v", err)
 	}
 }

@@ -22,7 +22,11 @@ func (c *Core) Reconcile(ctx context.Context) (int, error) {
 			c.log.Warn("сверка: панель не ответила", "sub", s.ID, "err", err)
 			continue
 		}
-		if differs(s, got, now) {
+		u, err := c.store.User(ctx, s.UserID)
+		if err != nil {
+			return 0, err
+		}
+		if differs(s, got, !u.BannedAt.IsZero(), now) {
 			c.log.Warn("сверка: панель расходится с базой", "sub", s.ID,
 				"db_expire", s.ExpiresAt, "panel_expire", got.ExpireAt, "panel_enabled", got.Enabled)
 			diff = append(diff, s.ID)
@@ -43,10 +47,10 @@ func (c *Core) Reconcile(ctx context.Context) (int, error) {
 	return len(diff), err
 }
 
-// differs говорит, что панель не совпадает с базой. Срок сравнивается только у живой подписки:
-// у отключённой панель может сдвигать срок из прошлого вперёд.
-func differs(s Subscription, got PanelResult, now time.Time) bool {
-	want := s.Status == SubActive && s.ExpiresAt.After(now)
+// differs говорит, что панель не совпадает с базой. Забаненный абонент в панели выключен.
+// Срок сравнивается только у живой подписки: у отключённой панель может сдвигать срок из прошлого вперёд.
+func differs(s Subscription, got PanelResult, banned bool, now time.Time) bool {
+	want := s.Status == SubActive && s.ExpiresAt.After(now) && !banned
 	if got.Enabled != want {
 		return true
 	}
