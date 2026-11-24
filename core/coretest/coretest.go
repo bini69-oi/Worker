@@ -58,6 +58,7 @@ type state struct {
 	tasks   []taskRow
 	notices map[string]bool
 	pays    map[int64]core.Payment
+	carts   map[int64]core.PendingBuy
 	nextID  int64
 }
 
@@ -71,6 +72,7 @@ func (s *state) clone() *state {
 		tasks:   slices.Clone(s.tasks),
 		notices: maps.Clone(s.notices),
 		pays:    maps.Clone(s.pays),
+		carts:   maps.Clone(s.carts),
 		nextID:  s.nextID,
 	}
 }
@@ -91,6 +93,7 @@ func NewStore() *Store {
 	return &Store{st: &state{
 		users: map[int64]core.User{}, refs: map[refKey]bool{}, tariffs: map[int64]core.Tariff{},
 		subs: map[int64]core.Subscription{}, notices: map[string]bool{}, pays: map[int64]core.Payment{},
+		carts: map[int64]core.PendingBuy{},
 	}}
 }
 

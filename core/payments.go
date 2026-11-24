@@ -146,6 +146,7 @@ func (c *Core) Credit(ctx context.Context, gateway string, ev GatewayEvent) erro
 	}
 	if err == nil && credited.ID != 0 {
 		c.log.Info("платёж зачислен", "payment", credited.ID, "gateway", gateway, "amount", credited.Amount)
+		c.buyFromCart(ctx, credited.UserID)
 	}
 	return err
 }
@@ -164,7 +165,7 @@ func findPayment(tx Tx, gateway string, ev GatewayEvent) (Payment, error) {
 	return tx.PaymentByExt(gateway, ev.ExternalID)
 }
 
-// afterTopup сообщает абоненту и админам о пополнении. Покупку из умной корзины добавит группа 8.
+// afterTopup сообщает абоненту и админам о пополнении.
 func (c *Core) afterTopup(tx Tx, p Payment, now time.Time) error {
 	amount := strconv.FormatInt(p.Amount, 10)
 	if err := enqueueNotify(tx, NotifyTask{UserID: p.UserID, Key: "notify.topup", Vars: map[string]string{"amount": amount}}, now); err != nil {

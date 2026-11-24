@@ -69,3 +69,31 @@ func TestNoticeOnce(t *testing.T) {
 		return err
 	})
 }
+
+func TestPendingBuyReplace(t *testing.T) {
+	s, uid := newCoreStore(t)
+	var tid int64
+	tx(t, s, func(tx core.Tx) error {
+		var err error
+		tid, err = tx.SaveTariff(core.Tariff{Name: "Т", Reset: "NO_RESET", CreatedAt: tNow, Periods: []core.Period{{Days: 30, Price: 1}, {Days: 90, Price: 2}}})
+		return err
+	})
+	tx(t, s, func(tx core.Tx) error {
+		return tx.SetPendingBuy(core.PendingBuy{UserID: uid, TariffID: tid, Days: 30, CreatedAt: tNow})
+	})
+	tx(t, s, func(tx core.Tx) error {
+		return tx.SetPendingBuy(core.PendingBuy{UserID: uid, TariffID: tid, Days: 90, CreatedAt: tNow})
+	})
+	tx(t, s, func(tx core.Tx) error {
+		pb, err := tx.PendingBuy(uid)
+		if err == nil && (pb.Days != 90 || !pb.CreatedAt.Equal(tNow)) {
+			t.Errorf("выбор не заменился: %+v", pb)
+		}
+		return err
+	})
+	tx(t, s, func(tx core.Tx) error { return tx.DeletePendingBuy(uid) })
+	err := s.Tx(context.Background(), func(tx core.Tx) error { _, err := tx.PendingBuy(uid); return err })
+	if !errors.Is(err, core.ErrNotFound) {
+		t.Fatalf("после удаления ждали ErrNotFound, получили %v", err)
+	}
+}

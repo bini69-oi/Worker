@@ -89,6 +89,8 @@ var base = []Def{
 		Desc: "Сколько устройств можно подключить в пробный период"},
 	{Key: "trial.squads", Kind: KindString, Default: "", Group: "trial",
 		Desc: "Сквады пробного периода через запятую (UUID групп серверов в Remnawave)"},
+	{Key: "autorenew.days_before", Kind: KindInt, Default: "1", Group: "notify",
+		Desc: "За сколько дней до окончания продлевать подписку с баланса"},
 	{Key: "remind.days", Kind: KindString, Default: "3,1", Group: "notify",
 		Desc: "За сколько дней до окончания напоминать, через запятую"},
 	{Key: "stars.rate", Kind: KindMoney, Default: "150", Group: "pay",

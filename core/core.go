@@ -79,6 +79,11 @@ type Tx interface {
 	// MarkPaid переводит платёж из «ожидает» в «оплачен». false значит, что платёж уже не ожидал.
 	// Пустой externalID оставляет прежний номер.
 	MarkPaid(id int64, externalID string, at time.Time) (bool, error)
+	SetPendingBuy(pb PendingBuy) error
+	// PendingBuy отдаёт запомненный выбор абонента. Нет выбора: ErrNotFound.
+	PendingBuy(userID int64) (PendingBuy, error)
+	DeletePendingBuy(userID int64) error
+
 	// SetPaymentStatus меняет статус, только если сейчас он from. false значит, что статус уже другой.
 	SetPaymentStatus(id int64, from, to PayStatus) (bool, error)
 }
