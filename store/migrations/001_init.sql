@@ -8,6 +8,7 @@ CREATE TABLE users (
     username    TEXT    NOT NULL DEFAULT '',
     lang        TEXT    NOT NULL DEFAULT 'ru',
     referrer_id INTEGER REFERENCES users (id),
+    ref_code    TEXT    NOT NULL UNIQUE,  -- код личной реферальной ссылки, случайный
     balance     INTEGER NOT NULL DEFAULT 0 CHECK (balance >= 0), -- кэш суммы ledger
     trial_used  INTEGER NOT NULL DEFAULT 0,
     banned_at   INTEGER,
@@ -107,6 +108,7 @@ CREATE TABLE promo_codes (
     code       TEXT    NOT NULL UNIQUE COLLATE NOCASE,
     kind       TEXT    NOT NULL CHECK (kind IN ('money', 'days')),
     value      INTEGER NOT NULL CHECK (value > 0),
+    tariff_id  INTEGER REFERENCES tariffs (id), -- тариф для кода на дни, если подписки нет
     max_uses   INTEGER NOT NULL DEFAULT 0, -- 0 значит без лимита
     uses       INTEGER NOT NULL DEFAULT 0,
     new_only   INTEGER NOT NULL DEFAULT 0,

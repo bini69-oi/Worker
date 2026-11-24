@@ -46,7 +46,7 @@ func TestParallelWritesNoLock(t *testing.T) {
 				return
 			}
 			defer tx.Rollback()
-			if _, err := tx.Exec("INSERT INTO users (tg_id, created_at) VALUES (?, 0)", i+1); err != nil {
+			if _, err := tx.Exec("INSERT INTO users (tg_id, ref_code, created_at) VALUES (?, ?, 0)", i+1, i+1); err != nil {
 				errs <- err
 				return
 			}
@@ -74,7 +74,7 @@ func TestParallelWritesNoLock(t *testing.T) {
 
 func TestReadPoolCannotWrite(t *testing.T) {
 	db := openTest(t)
-	if _, err := db.R.Exec("INSERT INTO users (tg_id, created_at) VALUES (1, 0)"); err == nil {
+	if _, err := db.R.Exec("INSERT INTO users (tg_id, ref_code, created_at) VALUES (1, 'a', 0)"); err == nil {
 		t.Fatal("пул чтения не должен писать")
 	}
 }
@@ -171,7 +171,7 @@ func TestAuditLogInsertOnly(t *testing.T) {
 
 func TestBalanceCannotGoNegative(t *testing.T) {
 	db := openTest(t)
-	_, err := db.W.Exec("INSERT INTO users (tg_id, balance, created_at) VALUES (1, -1, 0)")
+	_, err := db.W.Exec("INSERT INTO users (tg_id, ref_code, balance, created_at) VALUES (1, 'a', -1, 0)")
 	if err == nil {
 		t.Fatal("отрицательный баланс должен быть запрещён схемой")
 	}
