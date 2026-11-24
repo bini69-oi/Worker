@@ -33,34 +33,34 @@ func hookRequest(body, sig, ts string) *http.Request {
 
 func TestVerifyWebhook(t *testing.T) {
 	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
-	body := `{"scope":"user","event":"user.expired"}`
-	good := sign(testSecret, []byte(body))
-	fresh := now.Add(-time.Minute).Format(time.RFC3339Nano)
-	old := now.Add(-time.Hour).Format(time.RFC3339Nano)
+	at := func(d time.Duration) string {
+		return `{"scope":"user","event":"user.expired","timestamp":"` + now.Add(d).Format(time.RFC3339Nano) + `"}`
+	}
+	fresh, old := at(-time.Minute), at(-time.Hour)
+	noTime := `{"scope":"user","event":"user.expired"}`
 
 	cases := []struct {
 		name   string
 		secret string
+		body   string
 		sig    string
-		ts     string
 		want   error
 	}{
-		{"верная подпись", testSecret, good, fresh, nil},
-		{"без метки времени", testSecret, good, "", nil},
-		{"неверная подпись", testSecret, sign("other", []byte(body)), fresh, ErrWebhookBadSignature},
-		{"не hex", testSecret, "zz", fresh, ErrWebhookBadSignature},
-		{"пустой секрет", "", good, fresh, ErrWebhookNoSecret},
-		{"без заголовка", testSecret, "", fresh, ErrWebhookNoSignature},
-		{"старая метка", testSecret, good, old, ErrWebhookStale},
-		{"битая метка", testSecret, good, "вчера", ErrWebhookBadTimestamp},
+		{"верная подпись", testSecret, fresh, sign(testSecret, []byte(fresh)), nil},
+		{"неверная подпись", testSecret, fresh, sign("other", []byte(fresh)), ErrWebhookBadSignature},
+		{"не hex", testSecret, fresh, "zz", ErrWebhookBadSignature},
+		{"пустой секрет", "", fresh, sign(testSecret, []byte(fresh)), ErrWebhookNoSecret},
+		{"без заголовка", testSecret, fresh, "", ErrWebhookNoSignature},
+		{"старое событие повтором", testSecret, old, sign(testSecret, []byte(old)), ErrWebhookStale},
+		{"без времени в теле", testSecret, noTime, sign(testSecret, []byte(noTime)), ErrWebhookBadTimestamp},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got, err := VerifyWebhook(hookRequest(body, c.sig, c.ts), c.secret, now)
+			got, err := VerifyWebhook(hookRequest(c.body, c.sig, ""), c.secret, now)
 			if !errors.Is(err, c.want) {
 				t.Fatalf("ошибка %v, ждали %v", err, c.want)
 			}
-			if c.want == nil && string(got) != body {
+			if c.want == nil && string(got) != c.body {
 				t.Fatalf("тело %q", got)
 			}
 		})

@@ -87,14 +87,16 @@ func VerifyWebhook(r *http.Request, secret string, now time.Time) ([]byte, error
 	if err != nil || !hmac.Equal(gotBytes, want) {
 		return nil, ErrWebhookBadSignature
 	}
-	if ts := strings.TrimSpace(r.Header.Get(HeaderTimestamp)); ts != "" {
-		at, err := time.Parse(time.RFC3339Nano, ts)
-		if err != nil {
-			return nil, ErrWebhookBadTimestamp
-		}
-		if d := now.Sub(at); d > WebhookMaxAge || d < -WebhookMaxAge {
-			return nil, ErrWebhookStale
-		}
+	// Время берётся из подписанного тела: заголовок можно убрать, а тело без ключа не поменять.
+	// Без срока давности перехваченный вебхук можно было бы слать повторно бесконечно.
+	var stamp struct {
+		Timestamp time.Time `json:"timestamp"`
+	}
+	if json.Unmarshal(body, &stamp) != nil || stamp.Timestamp.IsZero() {
+		return nil, ErrWebhookBadTimestamp
+	}
+	if d := now.Sub(stamp.Timestamp); d > WebhookMaxAge || d < -WebhookMaxAge {
+		return nil, ErrWebhookStale
 	}
 	return body, nil
 }
