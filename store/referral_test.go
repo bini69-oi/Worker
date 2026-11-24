@@ -26,7 +26,7 @@ func TestRefStatsOnSQLite(t *testing.T) {
 		if i == 2 {
 			continue
 		}
-		if _, err := c.AdminAdjust(ctx, 9, f.ID, 10000, "тест"); err != nil {
+		if _, err := c.AdminAdjust(ctx, 1, f.ID, 10000, "тест"); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := c.Buy(ctx, f.ID, tr.ID, 30); err != nil {

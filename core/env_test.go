@@ -9,6 +9,9 @@ import (
 	"github.com/bini69-oi/worker/settings"
 )
 
+// owner это Telegram ID владельца в тестах ядра.
+const owner = 1
+
 type env struct {
 	c     *core.Core
 	st    *coretest.Store
@@ -23,7 +26,7 @@ func newEnv(t *testing.T) *env {
 	t.Helper()
 	e := &env{st: coretest.NewStore(), clock: coretest.NewClock(t0), cfg: coretest.NewConfig(t),
 		panel: coretest.NewPanel(), notes: &coretest.Notifier{}}
-	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes})
+	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes, OwnerID: owner})
 	u, err := e.c.Register(context.Background(), 1001, "ivan", "ru")
 	if err != nil {
 		t.Fatal(err)

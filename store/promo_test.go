@@ -12,7 +12,7 @@ import (
 func sqlCore(t *testing.T) (*core.Core, *CoreStore) {
 	t.Helper()
 	s := NewCoreStore(openTest(t))
-	return core.New(core.Deps{Store: s, Clock: coretest.NewClock(tNow), Config: coretest.NewConfig(t)}), s
+	return core.New(core.Deps{Store: s, Clock: coretest.NewClock(tNow), Config: coretest.NewConfig(t), OwnerID: 1}), s
 }
 
 // TestPromoLimitConcurrent: 10 абонентов одновременно вводят код на 3 активации, проходят ровно 3.

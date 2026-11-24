@@ -30,7 +30,7 @@ func newStarsEnv(t *testing.T) *starsEnv {
 		e.asked = append(e.asked, charge)
 		return e.refund
 	}
-	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes,
+	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes, OwnerID: owner,
 		Gateways: []core.Gateway{e.gw}})
 	e.tariff = e.env.tariff(t, "Месяц", core.Period{Days: 30, Price: 15000})
 	return e

@@ -20,7 +20,7 @@ func payCore(t *testing.T) (*core.Core, *CoreStore, int64, *gatewaytest.Fake) {
 		t.Fatal(err)
 	}
 	fake := &gatewaytest.Fake{Secret: "s", Paid: map[string]bool{}}
-	c := core.New(core.Deps{Store: s, Clock: coretest.NewClock(tNow), Config: cfg, Gateways: []core.Gateway{fake}})
+	c := core.New(core.Deps{Store: s, Clock: coretest.NewClock(tNow), Config: cfg, Gateways: []core.Gateway{fake}, OwnerID: 1})
 	return c, s, uid, fake
 }
 

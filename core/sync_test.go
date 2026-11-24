@@ -162,7 +162,7 @@ func TestNotifyDelivered(t *testing.T) {
 
 func TestNoNotifierKeepsTasks(t *testing.T) {
 	e := newEnv(t)
-	c := core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel})
+	c := core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, OwnerID: owner})
 	e.bought(t)
 	e.clock.Add(27 * 24 * time.Hour)
 	if _, err := c.RemindDue(context.Background()); err != nil {

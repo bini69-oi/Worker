@@ -25,7 +25,7 @@ func newPayEnv(t *testing.T) *payEnv {
 			t.Fatal(err)
 		}
 	}
-	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes,
+	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes, OwnerID: owner,
 		Gateways: []core.Gateway{fake, manual.New(e.cfg)}})
 	return &payEnv{env: e, fake: fake}
 }
@@ -147,13 +147,13 @@ func TestCheckPayment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := e.c.CheckPayment(ctx, "fake", p.ID, 30000); err != nil {
+	if err := e.c.CheckPayment(ctx, e.user.ID, "fake", p.ID, 30000); err != nil {
 		t.Fatalf("верный платёж: %v", err)
 	}
-	if err := e.c.CheckPayment(ctx, "fake", p.ID, 29999); !errors.Is(err, core.ErrAmountMismatch) {
+	if err := e.c.CheckPayment(ctx, e.user.ID, "fake", p.ID, 29999); !errors.Is(err, core.ErrAmountMismatch) {
 		t.Fatalf("другая сумма: ждали ErrAmountMismatch, получили %v", err)
 	}
-	if err := e.c.CheckPayment(ctx, "manual", p.ID, 30000); !errors.Is(err, core.ErrNotFound) {
+	if err := e.c.CheckPayment(ctx, e.user.ID, "manual", p.ID, 30000); !errors.Is(err, core.ErrNotFound) {
 		t.Fatalf("чужая касса: ждали ErrNotFound, получили %v", err)
 	}
 }
@@ -168,17 +168,17 @@ func TestConfirmManual(t *testing.T) {
 	if inv.Text != "Карта 0000" {
 		t.Fatalf("абонент не увидел реквизиты: %+v", inv)
 	}
-	if err := e.c.ConfirmManual(ctx, 42, p.ID); err != nil {
+	if err := e.c.ConfirmManual(ctx, owner, p.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.c.ConfirmManual(ctx, 42, p.ID); err != nil {
+	if err := e.c.ConfirmManual(ctx, owner, p.ID); err != nil {
 		t.Fatal(err)
 	}
 	if b := balance(t, e.st, e.user.ID); b != 50000 {
 		t.Fatalf("баланс %d, ждали 50000 один раз", b)
 	}
 	other, _, _ := e.c.CreatePayment(ctx, e.user.ID, "fake", 1000)
-	if err := e.c.ConfirmManual(ctx, 42, other.ID); !errors.Is(err, core.ErrForbidden) {
+	if err := e.c.ConfirmManual(ctx, owner, other.ID); !errors.Is(err, core.ErrForbidden) {
 		t.Fatalf("подтверждение платежа настоящей кассы: ждали ErrForbidden, получили %v", err)
 	}
 }
