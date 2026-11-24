@@ -132,12 +132,6 @@ func TestPendingExpires(t *testing.T) {
 	if got := e.st.Payment(p.ID).Status; got != core.PayExpired {
 		t.Fatalf("через 25 часов ждали «истёк», получили %s", got)
 	}
-	if err := e.c.Credit(ctx, "fake", core.GatewayEvent{ExternalID: p.ExternalID, ExtAmount: 30000, Status: core.PayPaid}); err != nil {
-		t.Fatal(err)
-	}
-	if b := balance(t, e.st, e.user.ID); b != 0 {
-		t.Fatalf("истёкший платёж зачислился: %d", b)
-	}
 }
 
 func TestCheckPayment(t *testing.T) {
@@ -205,4 +199,60 @@ type brokenGateway struct{ gatewaytest.Fake }
 func (b *brokenGateway) Configured() bool { return true }
 func (b *brokenGateway) Create(context.Context, core.Payment) (core.Invoice, error) {
 	return core.Invoice{}, errors.New("касса упала")
+}
+
+func TestLatePaymentAfterExpiry(t *testing.T) {
+	e := newPayEnv(t)
+	ctx := context.Background()
+	p, _, err := e.c.CreatePayment(ctx, e.user.ID, "fake", 30000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.clock.Add(25 * time.Hour)
+	if _, err := e.c.ReconcilePayments(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if e.st.Payment(p.ID).Status != core.PayExpired {
+		t.Fatal("платёж не истёк")
+	}
+	// Абонент всё же оплатил по старой ссылке: деньги пришли, их надо зачислить.
+	if err := e.c.Credit(ctx, "fake", core.GatewayEvent{ExternalID: p.ExternalID, ExtAmount: 30000, Status: core.PayPaid}); err != nil {
+		t.Fatal(err)
+	}
+	if b := balance(t, e.st, e.user.ID); b != 30000 {
+		t.Fatalf("поздняя оплата потерялась: баланс %d", b)
+	}
+}
+
+func TestManualConfirmAfterExpiry(t *testing.T) {
+	e := newPayEnv(t)
+	ctx := context.Background()
+	p, _, err := e.c.CreatePayment(ctx, e.user.ID, "manual", 50000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.clock.Add(48 * time.Hour)
+	if _, err := e.c.ReconcilePayments(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.c.ConfirmManual(ctx, owner, p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if b := balance(t, e.st, e.user.ID); b != 50000 {
+		t.Fatalf("ручное подтверждение через сутки не зачислило: %d", b)
+	}
+}
+
+func TestForeignExternalIDNotSwallowed(t *testing.T) {
+	e := newPayEnv(t)
+	ctx := context.Background()
+	a, _, _ := e.c.CreatePayment(ctx, e.user.ID, "fake", 1000)
+	b, _, _ := e.c.CreatePayment(ctx, e.user.ID, "fake", 1000)
+	err := e.c.Credit(ctx, "fake", core.GatewayEvent{PaymentID: a.ID, ExternalID: b.ExternalID, ExtAmount: 1000, Status: core.PayPaid})
+	if err == nil {
+		t.Fatal("чужой номер кассы принят как «уже зачислено»")
+	}
+	if e.st.Payment(a.ID).Status != core.PayPending {
+		t.Fatal("платёж с чужим номером изменился")
+	}
 }

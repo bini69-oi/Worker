@@ -82,7 +82,8 @@ type Tx interface {
 	PaymentByExt(gateway, externalID string) (Payment, error)
 	// SetPaymentExt запоминает номер и сумму платежа в кассе.
 	SetPaymentExt(id int64, externalID string, extAmount int64, extCurrency string) error
-	// MarkPaid переводит платёж из «ожидает» в «оплачен». false значит, что платёж уже не ожидал.
+	// MarkPaid переводит платёж в «оплачен» из «ожидает», «истёк» или «ошибка»: деньги могли прийти позже срока.
+	// false значит, что платёж уже оплачен или возвращён.
 	// Пустой externalID оставляет прежний номер.
 	MarkPaid(id int64, externalID string, at time.Time) (bool, error)
 	// Promo ищет промокод без учёта регистра.

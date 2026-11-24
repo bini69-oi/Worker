@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"strconv"
 	"time"
@@ -122,7 +123,7 @@ func (c *Core) Credit(ctx context.Context, gateway string, ev GatewayEvent) erro
 		if err != nil {
 			return err
 		}
-		if p.Status == PayPaid {
+		if p.Status == PayPaid || p.Status == PayRefunded {
 			return nil
 		}
 		if p.ExtAmount != 0 && ev.ExtAmount != p.ExtAmount {
@@ -131,6 +132,10 @@ func (c *Core) Credit(ctx context.Context, gateway string, ev GatewayEvent) erro
 		}
 		now := c.clock.Now()
 		ok, err := tx.MarkPaid(p.ID, ev.ExternalID, now)
+		if errors.Is(err, ErrDuplicate) {
+			// Этот номер кассы уже у другого платежа: касса прислала чужой номер. Это не «уже зачислено».
+			return fmt.Errorf("номер оплаты %q уже у другого платежа: %w", ev.ExternalID, ErrInvalid)
+		}
 		if err != nil || !ok {
 			return err
 		}
@@ -142,7 +147,7 @@ func (c *Core) Credit(ctx context.Context, gateway string, ev GatewayEvent) erro
 		return c.afterTopup(tx, p, now)
 	})
 	if errors.Is(err, ErrDuplicate) {
-		return nil // зачисление уже было, второй вебхук ничего не меняет
+		return nil // строка зачисления уже есть: второй вебхук ничего не меняет
 	}
 	if err == nil && credited.ID != 0 {
 		c.log.Info("платёж зачислен", "payment", credited.ID, "gateway", gateway, "amount", credited.Amount)

@@ -76,7 +76,7 @@ func (t *tx) SetPaymentExt(id int64, ext string, extAmount int64, extCurrency st
 
 func (t *tx) MarkPaid(id int64, ext string, at time.Time) (bool, error) {
 	p, ok := t.st.pays[id]
-	if !ok || p.Status != core.PayPending {
+	if !ok || p.Status == core.PayPaid || p.Status == core.PayRefunded {
 		return false, nil
 	}
 	if ext != "" {

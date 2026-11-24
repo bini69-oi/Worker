@@ -91,11 +91,12 @@ func (t *coreTx) SetPaymentExt(id int64, externalID string, extAmount int64, ext
 	return mapErr(err)
 }
 
-// MarkPaid это условное обновление: из «ожидает» в «оплачен». Второй вызов затронет 0 строк.
+// MarkPaid это условное обновление в «оплачен». Поздняя оплата истёкшего платежа тоже зачисляется,
+// а второй вызов и возвращённый платёж затронут 0 строк.
 func (t *coreTx) MarkPaid(id int64, externalID string, at time.Time) (bool, error) {
 	res, err := t.q.ExecContext(t.ctx,
 		`UPDATE payments SET status = 'paid', paid_at = ?, external_id = COALESCE(?, external_id)
-		 WHERE id = ? AND status = 'pending'`, at.Unix(), nullText(externalID), id)
+		 WHERE id = ? AND status IN ('pending', 'expired', 'failed')`, at.Unix(), nullText(externalID), id)
 	if err != nil {
 		return false, mapErr(err)
 	}
