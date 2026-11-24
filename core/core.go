@@ -29,6 +29,9 @@ type Store interface {
 	Tariffs(ctx context.Context, onlyActive bool) ([]Tariff, error)
 	SubByUser(ctx context.Context, userID int64) (Subscription, error)
 	RefStats(ctx context.Context, userID int64) (RefStats, error)
+	Admins(ctx context.Context) ([]Admin, error)
+	// Sessions отдаёт сессии админки, которые открыты и не истекли к моменту now.
+	Sessions(ctx context.Context, now time.Time) ([]Session, error)
 	// SubsInPanel отдаёт подписки, у которых уже есть абонент в панели. Нужно для сверки.
 	SubsInPanel(ctx context.Context) ([]Subscription, error)
 
@@ -92,6 +95,27 @@ type Tx interface {
 	Limit(key string) (count int, until time.Time, err error)
 	SetLimit(key string, count int, until time.Time) error
 
+	Admin(tgID int64) (Admin, error)
+	// SaveAdmin создаёт или заменяет админа.
+	SaveAdmin(a Admin) error
+	// AddAudit пишет строку журнала действий. Правки и удаления журнала нет.
+	AddAudit(a AuditEntry) error
+
+	CreateConfirm(cf Confirm) (int64, error)
+	Confirm(id int64) (Confirm, error)
+	// AnswerConfirm записывает ответ, только если ответа ещё нет и срок не вышел. false значит поздно.
+	AnswerConfirm(id int64, answer string, at time.Time) (bool, error)
+	// UseConfirm отмечает, что подтверждением воспользовались. Второй раз false.
+	UseConfirm(id int64, at time.Time) (bool, error)
+
+	CreateSession(tokenHash []byte, s Session) error
+	Session(tokenHash []byte) (Session, error)
+	CloseSession(id string, at time.Time) error
+	CloseAdminSessions(adminTg int64, at time.Time) error
+
+	AdminChat() (AdminChat, error)
+	SaveAdminChat(ch AdminChat) error
+
 	SetPendingBuy(pb PendingBuy) error
 	// PendingBuy отдаёт запомненный выбор абонента. Нет выбора: ErrNotFound.
 	PendingBuy(userID int64) (PendingBuy, error)
@@ -105,6 +129,8 @@ type Tx interface {
 type Notifier interface {
 	User(ctx context.Context, n NotifyTask) error
 	Admin(ctx context.Context, n AdminTask) error
+	// Confirm шлёт админу в личку сообщение с кнопками «Да» и «Нет».
+	Confirm(ctx context.Context, n ConfirmTask) error
 }
 
 // Config это настройки, которые читает ядро. Реализует их пакет settings.
@@ -122,7 +148,10 @@ type Deps struct {
 	Panel    Panel
 	Notifier Notifier
 	Gateways []Gateway
-	Log      *slog.Logger
+	Telegram TelegramAPI
+	// OwnerID это Telegram ID владельца из окружения. Изнутри системы он не меняется.
+	OwnerID int64
+	Log     *slog.Logger
 }
 
 // Core это сценарии ядра. Бот, Mini App и админка зовут только их.
@@ -133,8 +162,12 @@ type Core struct {
 	panel    Panel
 	notifier Notifier
 	gateways []Gateway
+	telegram TelegramAPI
+	owner    int64
 	log      *slog.Logger
 	kick     chan struct{}
+	secrets  pending
+	actions  map[string]func(ctx context.Context, payload []byte) error
 }
 
 // New собирает ядро. Часы, уведомления и журнал можно не задавать: будут настоящие часы,
@@ -151,7 +184,8 @@ func New(d Deps) *Core {
 	}
 	return &Core{
 		store: d.Store, clock: d.Clock, cfg: d.Config, panel: d.Panel,
-		notifier: d.Notifier, gateways: d.Gateways, log: d.Log, kick: make(chan struct{}, 1),
+		notifier: d.Notifier, gateways: d.Gateways, telegram: d.Telegram, owner: d.OwnerID, log: d.Log,
+		kick: make(chan struct{}, 1), actions: map[string]func(context.Context, []byte) error{},
 	}
 }
 

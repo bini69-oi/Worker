@@ -68,6 +68,12 @@ func (c *Core) runTask(ctx context.Context, t Task) error {
 			return err
 		}
 		return c.notifier.User(ctx, n)
+	case KindNotifyConfirm:
+		var n ConfirmTask
+		if err := json.Unmarshal(t.Payload, &n); err != nil {
+			return err
+		}
+		return c.notifier.Confirm(ctx, n)
 	case KindNotifyAdmin:
 		var n AdminTask
 		if err := json.Unmarshal(t.Payload, &n); err != nil {
@@ -119,5 +125,6 @@ var errNoNotifier = errors.New("уведомления не подключены
 
 type noNotifier struct{}
 
-func (noNotifier) User(context.Context, NotifyTask) error { return errNoNotifier }
-func (noNotifier) Admin(context.Context, AdminTask) error { return errNoNotifier }
+func (noNotifier) User(context.Context, NotifyTask) error     { return errNoNotifier }
+func (noNotifier) Admin(context.Context, AdminTask) error     { return errNoNotifier }
+func (noNotifier) Confirm(context.Context, ConfirmTask) error { return errNoNotifier }

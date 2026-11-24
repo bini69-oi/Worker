@@ -105,6 +105,8 @@ var base = []Def{
 		Desc: "Сколько копеек стоит одна звезда Telegram"},
 	{Key: "lang.default", Kind: KindString, Default: "ru", Group: "texts",
 		Desc: "Язык текстов, если нужного перевода нет"},
+	{Key: "bot.token", Kind: KindString, Default: "", Group: "bot", Secret: true,
+		Desc: "Новый токен бота после смены из админки. Пустой значит токен из .env"},
 	{Key: "panel.reconcile_minutes", Kind: KindInt, Default: "60", Group: "panel",
 		Desc: "Как часто сверять базу с панелью, минуты"},
 	{Key: "panel.webhook_secret", Kind: KindString, Default: "", Group: "panel", Secret: true,

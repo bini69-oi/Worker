@@ -151,6 +151,12 @@ func (s *Settings) Int(key string) int64 {
 	return n
 }
 
+// IsSecret говорит, что настройка секретная: хранится зашифрованной и меняется только подтверждением владельца.
+func (s *Settings) IsSecret(key string) bool {
+	def, ok := find(key)
+	return ok && def.Secret
+}
+
 // Money отдаёт сумму в копейках.
 func (s *Settings) Money(key string) int64 { return s.Int(key) }
 

@@ -77,6 +77,19 @@ var (
 	ErrTooManyTries   = newErr("E5007", "err.too_many_tries", "слишком много попыток, попробуйте позже")
 )
 
+// Безопасность
+var (
+	ErrBadLogin     = newErr("E6001", "err.bad_login", "неверный логин или пароль")
+	ErrLoginLocked  = newErr("E6002", "err.login_locked", "слишком много попыток входа, подождите")
+	ErrConfirmGone  = newErr("E6003", "err.confirm_gone", "подтверждение устарело или уже использовано")
+	ErrNotConfirmed = newErr("E6004", "err.not_confirmed", "вход не подтверждён в Telegram")
+	ErrWeakPassword = newErr("E6005", "err.weak_password", "пароль короче 10 символов")
+	ErrNoPassword   = newErr("E6006", "err.no_password", "пароль владельца не задан")
+	ErrBadToken     = newErr("E6007", "err.bad_token", "Telegram не принял токен")
+	ErrSessionGone  = newErr("E6008", "err.session_gone", "сессия закрыта или истекла")
+	ErrOwnerOnly    = newErr("E6009", "err.owner_only", "это может только владелец")
+)
+
 // ErrDuplicate значит, что событие с этой ссылкой уже было проведено.
 // Это не ошибка для абонента: ядро трактует её как «уже сделано».
 var ErrDuplicate = errors.New("событие уже проведено")

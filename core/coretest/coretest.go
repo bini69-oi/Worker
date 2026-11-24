@@ -64,6 +64,11 @@ type state struct {
 	nextID  int64
 
 	promoUses map[[2]int64]bool
+	admins    map[int64]core.Admin
+	audit     []core.AuditEntry
+	confirms  map[int64]core.Confirm
+	sessions  map[string]sessionRow
+	chat      *core.AdminChat
 }
 
 func (s *state) clone() *state {
@@ -81,6 +86,11 @@ func (s *state) clone() *state {
 		limits:  maps.Clone(s.limits),
 
 		promoUses: maps.Clone(s.promoUses),
+		admins:    maps.Clone(s.admins),
+		audit:     slices.Clone(s.audit),
+		confirms:  maps.Clone(s.confirms),
+		sessions:  maps.Clone(s.sessions),
+		chat:      cloneChat(s.chat),
 		nextID:    s.nextID,
 	}
 }
@@ -102,7 +112,8 @@ func NewStore() *Store {
 		users: map[int64]core.User{}, refs: map[refKey]bool{}, tariffs: map[int64]core.Tariff{},
 		subs: map[int64]core.Subscription{}, notices: map[string]bool{}, pays: map[int64]core.Payment{},
 		carts: map[int64]core.PendingBuy{}, promos: map[int64]core.Promo{}, limits: map[string]limitRow{},
-		promoUses: map[[2]int64]bool{},
+		promoUses: map[[2]int64]bool{}, admins: map[int64]core.Admin{}, confirms: map[int64]core.Confirm{},
+		sessions: map[string]sessionRow{},
 	}}
 }
 

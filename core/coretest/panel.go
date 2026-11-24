@@ -159,9 +159,10 @@ func (p *Panel) RevokeLink(_ context.Context, ref string) (core.PanelResult, err
 
 // Notifier запоминает уведомления вместо отправки.
 type Notifier struct {
-	mu       sync.Mutex
-	ToUsers  []core.NotifyTask
-	ToAdmins []core.AdminTask
+	mu        sync.Mutex
+	ToUsers   []core.NotifyTask
+	ToAdmins  []core.AdminTask
+	ToConfirm []core.ConfirmTask
 }
 
 func (n *Notifier) User(_ context.Context, t core.NotifyTask) error {
@@ -175,5 +176,12 @@ func (n *Notifier) Admin(_ context.Context, t core.AdminTask) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.ToAdmins = append(n.ToAdmins, t)
+	return nil
+}
+
+func (n *Notifier) Confirm(_ context.Context, t core.ConfirmTask) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.ToConfirm = append(n.ToConfirm, t)
 	return nil
 }
