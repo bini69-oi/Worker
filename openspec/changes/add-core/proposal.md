@@ -42,6 +42,6 @@ Worker начинается с ядра. Ядро это вся логика п�
 
 ## Impact
 
-- Новый код: `core/`, `store/`, `panel/`, `pay/`, `jobs/`, `auth/`, `tgsign/`, `cmd/worker/`.
-- Зависимости: драйвер SQLite без CGO (`modernc.org/sqlite`), хэш паролей argon2id (`golang.org/x/crypto`), больше ничего обязательного.
+- Новый код: `core/`, `store/`, `panel/`, `pay/`, `jobs/`, `redact/`, `tgsign/`, `cmd/worker/`.
+- Зависимости: драйвер SQLite без CGO (`modernc.org/sqlite`), хэш паролей argon2id (`golang.org/x/crypto`) и скрытый ввод пароля в терминале (`golang.org/x/term`), больше ничего обязательного.
 - Внешние системы: API панели Remnawave 2.x и 3.x, API касс.
