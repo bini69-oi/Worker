@@ -48,6 +48,8 @@ type Def struct {
 var (
 	ErrUnknownKey = errors.New("настройки с таким ключом нет")
 	ErrBadValue   = errors.New("значение не подходит к типу настройки")
+	// ErrSecretNeedsConfirm значит, что секрет нельзя записать обычной правкой, только подтверждением владельца.
+	ErrSecretNeedsConfirm = errors.New("секрет меняется только подтверждением владельца")
 )
 
 // registry это весь список настроек. Новые ключи добавляют сюда.

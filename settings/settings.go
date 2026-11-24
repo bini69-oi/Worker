@@ -86,6 +86,25 @@ func (s *Settings) Set(key, raw string) error {
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
 	}
+	if def.Secret {
+		// Секрет меняется только через подтверждение владельца в Telegram (ядро зовёт SetSecret).
+		return fmt.Errorf("%w: %s", ErrSecretNeedsConfirm, key)
+	}
+	return s.set(def, raw)
+}
+
+// SetSecret меняет секретную настройку. Его зовёт только ядро после «Да» владельца,
+// поэтому случайный обработчик админки не запишет ключ кассы в обход подтверждения.
+func (s *Settings) SetSecret(key, raw string) error {
+	def, ok := find(key)
+	if !ok || !def.Secret {
+		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
+	}
+	return s.set(def, raw)
+}
+
+func (s *Settings) set(def Def, raw string) error {
+	key := def.Key
 	norm, err := normalize(def.Kind, raw)
 	if err != nil {
 		return fmt.Errorf("%s: %w", key, err)

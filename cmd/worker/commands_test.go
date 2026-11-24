@@ -24,7 +24,7 @@ func TestRotateCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Set("yookassa.secret_key", "live_key_one"); err != nil {
+	if err := s.SetSecret("yookassa.secret_key", "live_key_one"); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()

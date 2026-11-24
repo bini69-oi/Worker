@@ -69,7 +69,7 @@ func TestSecretNotPlainInDBFiles(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	s := newSettings(t, db)
 	const secret = "live_SUPER-SECRET-KEY-12345"
-	if err := s.Set("yookassa.secret_key", secret); err != nil {
+	if err := s.SetSecret("yookassa.secret_key", secret); err != nil {
 		t.Fatal(err)
 	}
 	if got := s.Secret("yookassa.secret_key"); got != secret {
@@ -100,7 +100,7 @@ func TestSecretNotPlainInDBFiles(t *testing.T) {
 
 func TestSecretWrongKeyRefusesStart(t *testing.T) {
 	db := openTest(t)
-	if err := newSettings(t, db).Set("yookassa.secret_key", "live_abcdefghij"); err != nil {
+	if err := newSettings(t, db).SetSecret("yookassa.secret_key", "live_abcdefghij"); err != nil {
 		t.Fatal(err)
 	}
 	other := []byte("ffffffffffffffffffffffffffffffff")

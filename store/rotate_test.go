@@ -22,7 +22,11 @@ func TestRotateKey(t *testing.T) {
 	oldKey := settings.NewKey()
 	s := secretSettings(t, st, oldKey)
 	for k, v := range map[string]string{"yookassa.secret_key": "live_key_one", "panel.webhook_secret": "hook-secret-two", "trial.days": "7"} {
-		if err := s.Set(k, v); err != nil {
+		set := s.Set
+		if s.IsSecret(k) {
+			set = s.SetSecret
+		}
+		if err := set(k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -47,7 +51,11 @@ func TestRotateFailsWhole(t *testing.T) {
 	oldKey := settings.NewKey()
 	s := secretSettings(t, st, oldKey)
 	for k, v := range map[string]string{"yookassa.secret_key": "live_key_one", "panel.webhook_secret": "hook-secret-two"} {
-		if err := s.Set(k, v); err != nil {
+		set := s.Set
+		if s.IsSecret(k) {
+			set = s.SetSecret
+		}
+		if err := set(k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -72,7 +80,7 @@ func TestRotateFailsWhole(t *testing.T) {
 func TestRotateWrongOldKey(t *testing.T) {
 	st := NewSettingsStore(openTest(t))
 	oldKey := settings.NewKey()
-	if err := secretSettings(t, st, oldKey).Set("yookassa.secret_key", "live_key_one"); err != nil {
+	if err := secretSettings(t, st, oldKey).SetSecret("yookassa.secret_key", "live_key_one"); err != nil {
 		t.Fatal(err)
 	}
 	err := st.Rotate(func(rows map[string]string) (map[string]string, error) {

@@ -63,7 +63,7 @@ func TestSecretSettingAPI(t *testing.T) {
 		t.Fatal("по умолчанию секрет не задан")
 	}
 	const secret = "live_1234567890"
-	if err := s.Set("yookassa.secret_key", secret); err != nil {
+	if err := s.SetSecret("yookassa.secret_key", secret); err != nil {
 		t.Fatal(err)
 	}
 	if m := s.Masked("yookassa.secret_key"); !m.IsSet || m.Last4 != "7890" {
@@ -80,7 +80,7 @@ func TestSecretSettingAPI(t *testing.T) {
 	if err != nil || s2.Secret("yookassa.secret_key") != secret {
 		t.Fatalf("после перезапуска секрет не прочитан: %v", err)
 	}
-	if err := s.Set("yookassa.secret_key", ""); err != nil || f.has("yookassa.secret_key") {
+	if err := s.SetSecret("yookassa.secret_key", ""); err != nil || f.has("yookassa.secret_key") {
 		t.Fatal("пустое значение должно сбросить секрет")
 	}
 }
@@ -97,5 +97,15 @@ func TestSecretNotInErrors(t *testing.T) {
 func TestBadKeyLength(t *testing.T) {
 	if _, err := New(newFake(), []byte("короткий"), t0Func); err == nil {
 		t.Fatal("ключ не в 32 байта должен отклоняться")
+	}
+}
+
+func TestSecretNeedsConfirm(t *testing.T) {
+	s, _ := newSettings(t)
+	if err := s.Set("yookassa.secret_key", "live_key_value"); !errors.Is(err, ErrSecretNeedsConfirm) {
+		t.Fatalf("секрет записан обычной правкой: %v", err)
+	}
+	if err := s.SetSecret("trial.days", "5"); err == nil {
+		t.Fatal("SetSecret записал обычную настройку")
 	}
 }

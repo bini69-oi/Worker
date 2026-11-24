@@ -9,7 +9,7 @@ import (
 
 // ConfigWriter это запись настроек. Нужна ядру только для опасных действий: смены ключей и токена.
 type ConfigWriter interface {
-	Set(key, raw string) error
+	SetSecret(key, raw string) error
 	IsSecret(key string) bool
 }
 
@@ -146,7 +146,7 @@ func (c *Core) execute(ctx context.Context, cf Confirm, now time.Time) error {
 		if !ok || !can {
 			return ErrConfirmGone
 		}
-		return w.Set(p.Key, value)
+		return w.SetSecret(p.Key, value)
 	case "bot_token":
 		token, ok := c.secrets.take(cf.ID, now)
 		w, can := c.cfg.(ConfigWriter)
@@ -156,7 +156,7 @@ func (c *Core) execute(ctx context.Context, cf Confirm, now time.Time) error {
 		if err := c.telegram.SetWebhook(ctx, token); err != nil {
 			return err
 		}
-		return w.Set("bot.token", token)
+		return w.SetSecret("bot.token", token)
 	case "add_admin", "remove_admin":
 		var p adminPayload
 		if err := json.Unmarshal(cf.Payload, &p); err != nil {
