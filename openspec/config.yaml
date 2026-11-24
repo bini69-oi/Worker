@@ -5,24 +5,43 @@ context: |
   All artifacts must be written in ru.
   Keep OpenSpec structural headings and SHALL/MUST keywords in English.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always state what is out of scope
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  Проект: Worker, открытый бесплатный бот продажи VPN-подписок под панель Remnawave.
+  Для владельцев VPN-сервисов, которые продают подписки через Telegram.
+  Лицензия MIT.
 
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+  Стек: Go, один бинарник. База SQLite (WAL), без Redis и без очередей снаружи.
+  Фронт один (Svelte), собран и вшит в бинарник через embed: Mini App, веб-кабинет, веб-админка.
+
+  Части (делаются по очереди, каждая отдельным change):
+  1. core: тарифы, подписки, баланс, промокоды, рефералка, Remnawave, кассы, SQLite.
+  2. bot: текстовый Telegram-бот.
+  3. miniapp: Mini App и веб-кабинет вне Telegram.
+  4. admin: веб-админка и уведомления админу в боте с кнопками действий.
+  5. install: установщик и обновление.
+
+  Законы устройства:
+  - Вся логика только в core. Бот, Mini App и админка зовут одни и те же функции ядра.
+  - Один источник настроек: в .env только токен, домен, ключ шифрования. Остальное в базе.
+  - Один механизм текстов: строка по ключу, правится в админке.
+  - Деньги целыми копейками (int64), никаких float.
+  - Сначала пишем в панель Remnawave, потом в базу; сбой уходит в очередь повторов (таблица).
+  - Каждая касса одним файлом за общим интерфейсом.
+  - Файл до ~300 строк, функция делает одно дело.
+  - Только стандартная библиотека Go, где её хватает.
+
+  Как писать: просто, короткими фразами, как человеку, который видит проект впервые.
+  Без длинных тире. Термин при первом упоминании пояснить в скобках.
+
+rules:
+  proposal:
+    - Не длиннее 400 слов
+    - Явно написать, что не входит в изменение
+  specs:
+    - Одно требование = одна мысль, сценарии короткие
+    - Сценарии проверяемы тестом
+  design:
+    - Каждое решение с причиной в одну-две фразы
+    - Схемы данных таблицей, а не текстом
+  tasks:
+    - Задача на 1-2 часа работы
+    - Каждая задача заканчивается проверкой (тест или команда)
