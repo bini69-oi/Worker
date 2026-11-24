@@ -185,7 +185,8 @@ CREATE TABLE confirms (
     created_at  INTEGER NOT NULL,
     expires_at  INTEGER NOT NULL,
     answer      TEXT CHECK (answer IN ('yes', 'no')),
-    answered_at INTEGER
+    answered_at INTEGER,
+    used_at     INTEGER -- когда подтверждением воспользовались (вход или действие), второй раз нельзя
 ) STRICT;
 
 -- Защита от перебора пароля: ключ это админ или IP
