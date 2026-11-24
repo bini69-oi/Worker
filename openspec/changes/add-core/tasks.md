@@ -3,7 +3,7 @@
 ## 1. Каркас
 
 - [x] 1.1 Создать `go.mod` (модуль `github.com/bini69-oi/worker`, Go 1.26), папки из `design.md`, `.gitignore`; проверка: `go build ./...` проходит
-- [ ] 1.2 Добавить `Makefile` с целями `check` (gofmt, go vet, staticcheck, go test -race) и `build`; проверка: `make check` зелёный на пустом проекте
+- [x] 1.2 Добавить `Makefile` с целями `check` (gofmt, go vet, staticcheck, go test -race) и `build`; проверка: `make check` зелёный на пустом проекте
 - [ ] 1.3 Добавить CI в `.github/workflows/ci.yml`, который зовёт `make check`; проверка: CI зелёный на пуше
 - [ ] 1.4 `cmd/worker/main.go`: чтение `.env` (включая `OWNER_TG_ID`), проверка обязательных переменных, предупреждение о лишних; проверка: тест на нехватку токена и на лишнюю переменную
 
