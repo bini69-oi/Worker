@@ -42,13 +42,13 @@ func (c *Core) SavePromo(ctx context.Context, p Promo) (Promo, error) {
 	return p, err
 }
 
-// ApplyPromo активирует промокод. Регистр и пробелы по краям не важны. Неверные коды считаются,
-// и после 10 неверных за 10 минут любые попытки отклоняются до конца окна, даже верные.
+// ApplyPromo активирует промокод. Регистр и пробелы по краям не важны. Каждая попытка засчитывается заранее,
+// своей транзакцией, а удачная возвращает попытку назад. После 10 неудачных за 10 минут любые попытки
+// отклоняются до конца окна, даже верные. Так пачка параллельных запросов счётчик не обходит.
 func (c *Core) ApplyPromo(ctx context.Context, userID int64, code string) (Promo, error) {
 	key := "promo:" + itoa(userID)
 	now := c.clock.Now()
-	var out Promo
-	err := c.tx(ctx, func(tx Tx) error {
+	if err := c.tx(ctx, func(tx Tx) error {
 		count, until, err := tx.Limit(key)
 		if err != nil {
 			return err
@@ -56,6 +56,16 @@ func (c *Core) ApplyPromo(ctx context.Context, userID int64, code string) (Promo
 		if now.Before(until) && count >= promoTries {
 			return ErrTooManyTries
 		}
+		if !now.Before(until) {
+			count, until = 0, now.Add(promoWindow)
+		}
+		return tx.SetLimit(key, count+1, until)
+	}); err != nil {
+		return Promo{}, err
+	}
+
+	var out Promo
+	err := c.tx(ctx, func(tx Tx) error {
 		u, err := activeUser(tx, userID)
 		if err != nil {
 			return err
@@ -73,11 +83,18 @@ func (c *Core) ApplyPromo(ctx context.Context, userID int64, code string) (Promo
 			}
 			return err
 		}
+		if err := c.grantPromo(tx, p, u, now); err != nil {
+			return err
+		}
 		out = p
-		return c.grantPromo(tx, p, u, now)
+		// Удачная попытка не в счёт.
+		count, until, err := tx.Limit(key)
+		if err != nil || count == 0 {
+			return err
+		}
+		return tx.SetLimit(key, count-1, until)
 	})
 	if errors.Is(err, ErrNotFound) {
-		c.countMiss(ctx, key, now)
 		return out, ErrPromoNotFound
 	}
 	return out, err
@@ -132,21 +149,4 @@ func (c *Core) grantPromo(tx Tx, p Promo, u User, now time.Time) error {
 		return err
 	}
 	return enqueueSync(tx, sub.ID, now)
-}
-
-// countMiss засчитывает неверный код. Своя транзакция: попытка считается, даже когда сама активация откатилась.
-func (c *Core) countMiss(ctx context.Context, key string, now time.Time) {
-	err := c.store.Tx(ctx, func(tx Tx) error {
-		count, until, err := tx.Limit(key)
-		if err != nil {
-			return err
-		}
-		if !now.Before(until) {
-			count, until = 0, now.Add(promoWindow)
-		}
-		return tx.SetLimit(key, count+1, until)
-	})
-	if err != nil {
-		c.log.Warn("не удалось засчитать неверный промокод", "key", key, "err", err)
-	}
 }

@@ -3,6 +3,9 @@ package core_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -125,6 +128,35 @@ func TestPromoValidation(t *testing.T) {
 	} {
 		if _, err := e.c.SavePromo(context.Background(), p); !errors.Is(err, core.ErrInvalid) {
 			t.Errorf("%q: ждали ErrInvalid, получили %v", p.Code, err)
+		}
+	}
+}
+
+func TestPromoParallelGuessesCounted(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	var checked atomic.Int32
+	for i := range 40 {
+		wg.Go(func() {
+			if _, err := e.c.ApplyPromo(ctx, e.user.ID, fmt.Sprintf("GUESS%02d", i)); !errors.Is(err, core.ErrTooManyTries) {
+				checked.Add(1)
+			}
+		})
+	}
+	wg.Wait()
+	if n := checked.Load(); n > 10 {
+		t.Fatalf("пачка параллельных кодов проверена %d раз, предел 10", n)
+	}
+}
+
+func TestPromoSuccessNotCounted(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	for i := range 12 {
+		e.promo(t, core.Promo{Code: fmt.Sprintf("GOOD%02d", i), Kind: core.PromoMoney, Value: 1})
+		if _, err := e.c.ApplyPromo(ctx, e.user.ID, fmt.Sprintf("good%02d", i)); err != nil {
+			t.Fatalf("верный код %d отклонён: %v", i, err)
 		}
 	}
 }
