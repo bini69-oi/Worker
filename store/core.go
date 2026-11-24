@@ -69,6 +69,7 @@ func (s *CoreStore) Ledger(ctx context.Context, userID int64, limit int) ([]core
 // querier это то общее, что есть у *sql.DB и *sql.Tx.
 type querier interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 

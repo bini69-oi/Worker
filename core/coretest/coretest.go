@@ -5,6 +5,7 @@ package coretest
 
 import (
 	"context"
+	"maps"
 	"slices"
 	"sync"
 	"time"
@@ -39,27 +40,36 @@ type refKey struct {
 	id  int64
 }
 
+// Task это задача из очереди, как её положило ядро.
+type Task struct {
+	ID      int64
+	Kind    string
+	Payload []byte
+	At      time.Time
+}
+
 type state struct {
-	users  map[int64]core.User
-	ledger []core.LedgerEntry
-	refs   map[refKey]bool
-	nextID int64
+	users   map[int64]core.User
+	ledger  []core.LedgerEntry
+	refs    map[refKey]bool
+	tariffs map[int64]core.Tariff
+	subs    map[int64]core.Subscription
+	tasks   []Task
+	notices map[string]bool
+	nextID  int64
 }
 
 func (s *state) clone() *state {
-	c := &state{
-		users:  make(map[int64]core.User, len(s.users)),
-		ledger: slices.Clone(s.ledger),
-		refs:   make(map[refKey]bool, len(s.refs)),
-		nextID: s.nextID,
+	return &state{
+		users:   maps.Clone(s.users),
+		ledger:  slices.Clone(s.ledger),
+		refs:    maps.Clone(s.refs),
+		tariffs: maps.Clone(s.tariffs),
+		subs:    maps.Clone(s.subs),
+		tasks:   slices.Clone(s.tasks),
+		notices: maps.Clone(s.notices),
+		nextID:  s.nextID,
 	}
-	for k, v := range s.users {
-		c.users[k] = v
-	}
-	for k, v := range s.refs {
-		c.refs[k] = v
-	}
-	return c
 }
 
 func (s *state) id() int64 {
@@ -75,7 +85,10 @@ type Store struct {
 
 // NewStore возвращает пустое хранилище.
 func NewStore() *Store {
-	return &Store{st: &state{users: map[int64]core.User{}, refs: map[refKey]bool{}}}
+	return &Store{st: &state{
+		users: map[int64]core.User{}, refs: map[refKey]bool{}, tariffs: map[int64]core.Tariff{},
+		subs: map[int64]core.Subscription{}, notices: map[string]bool{},
+	}}
 }
 
 // Tx работает на копии состояния и заменяет им настоящее, только если fn вернула nil.

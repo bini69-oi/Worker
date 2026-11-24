@@ -15,7 +15,7 @@ var t0 = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 func newCore(t *testing.T) (*core.Core, *coretest.Store, core.User) {
 	t.Helper()
 	st := coretest.NewStore()
-	c := core.New(core.Deps{Store: st, Clock: coretest.NewClock(t0)})
+	c := core.New(core.Deps{Store: st, Clock: coretest.NewClock(t0), Config: coretest.NewConfig(t)})
 	u, err := c.Register(context.Background(), 1001, "ivan", "ru")
 	if err != nil {
 		t.Fatal(err)

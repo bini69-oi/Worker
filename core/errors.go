@@ -37,6 +37,24 @@ var (
 	ErrNeedComment    = newErr("E2003", "err.need_comment", "нужен комментарий")
 )
 
+// NeedMoney это «не хватает денег» с суммой, которой не хватает. errors.Is(err, ErrNotEnoughMoney) для неё истинно.
+type NeedMoney struct {
+	Missing int64 // копейки
+}
+
+func (e *NeedMoney) Error() string { return ErrNotEnoughMoney.Error() }
+func (e *NeedMoney) Unwrap() error { return ErrNotEnoughMoney }
+
+// Подписки
+var (
+	ErrNoPeriod     = newErr("E3001", "err.no_period", "у тарифа нет такого срока")
+	ErrTariffHidden = newErr("E3002", "err.tariff_hidden", "тариф не продаётся")
+	ErrOtherTariff  = newErr("E3003", "err.other_tariff", "у абонента живая подписка на другой тариф")
+	ErrTrialOff     = newErr("E3004", "err.trial_off", "пробный период выключен")
+	ErrTrialUsed    = newErr("E3005", "err.trial_used", "пробный период уже был")
+	ErrBanned       = newErr("E3006", "err.banned", "абонент заблокирован")
+)
+
 // ErrDuplicate значит, что событие с этой ссылкой уже было проведено.
 // Это не ошибка для абонента: ядро трактует её как «уже сделано».
 var ErrDuplicate = errors.New("событие уже проведено")
