@@ -43,3 +43,30 @@ func (s *SettingsStore) Delete(key string) error {
 	_, err := s.db.W.Exec("DELETE FROM settings WHERE key = ?", key)
 	return err
 }
+
+// Rotate заменяет строки настроек результатом fn в одной транзакции: при сбое не меняется ничего.
+// Нужен для смены мастер-ключа, когда все секреты перешифровываются разом.
+func (s *SettingsStore) Rotate(fn func(rows map[string]string) (map[string]string, error)) error {
+	rows, err := s.LoadAll()
+	if err != nil {
+		return err
+	}
+	next, err := fn(rows)
+	if err != nil {
+		return err
+	}
+	tx, err := s.db.W.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for key, value := range next {
+		if value == rows[key] {
+			continue
+		}
+		if _, err := tx.Exec("UPDATE settings SET value = ? WHERE key = ?", value, key); err != nil {
+			return fmt.Errorf("settings: %w", err)
+		}
+	}
+	return tx.Commit()
+}
