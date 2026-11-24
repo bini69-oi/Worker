@@ -38,7 +38,7 @@ CREATE TABLE tariff_periods (
 CREATE TABLE subscriptions (
     id          INTEGER PRIMARY KEY,
     user_id     INTEGER NOT NULL REFERENCES users (id),
-    tariff_id   INTEGER NOT NULL REFERENCES tariffs (id),
+    tariff_id   INTEGER REFERENCES tariffs (id), -- NULL у пробного периода
     period_days INTEGER NOT NULL,
     price       INTEGER NOT NULL,
     trial       INTEGER NOT NULL DEFAULT 0,
@@ -50,7 +50,7 @@ CREATE TABLE subscriptions (
     created_at  INTEGER NOT NULL,
     updated_at  INTEGER NOT NULL
 ) STRICT;
-CREATE INDEX subscriptions_user ON subscriptions (user_id);
+CREATE UNIQUE INDEX subscriptions_user ON subscriptions (user_id); -- одна подписка на абонента
 CREATE INDEX subscriptions_expires ON subscriptions (status, expires_at);
 
 -- Каждое движение денег. Сумма строк абонента равна users.balance
