@@ -12,21 +12,19 @@ func (c *Core) AdminAdjust(ctx context.Context, adminID, userID, amount int64, c
 	if comment == "" {
 		return LedgerEntry{}, ErrNeedComment
 	}
-	if adminID <= 0 {
-		return LedgerEntry{}, ErrForbidden
-	}
 	var out LedgerEntry
 	err := c.tx(ctx, func(tx Tx) error {
+		if _, err := c.can(ctx, tx, adminID, PermGrant); err != nil {
+			return err
+		}
+		now := c.clock.Now()
 		var err error
-		out, err = move(tx, c.clock.Now(), LedgerEntry{
-			UserID:  userID,
-			Amount:  amount,
-			Reason:  ReasonAdmin,
-			AdminID: adminID,
-			Comment: comment,
-		})
-		// Запись в журнал действий админов встанет сюда же, в эту транзакцию (группа 11).
-		return err
+		out, err = move(tx, now, LedgerEntry{UserID: userID, Amount: amount, Reason: ReasonAdmin, AdminID: adminID, Comment: comment})
+		if err != nil {
+			return err
+		}
+		return c.audit(ctx, tx, adminID, "balance.adjust", itoa(userID),
+			map[string]string{"amount": itoa(amount), "comment": comment}, now)
 	})
 	return out, err
 }

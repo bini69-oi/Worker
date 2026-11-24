@@ -212,7 +212,7 @@ func (c *Core) ReconcilePayments(ctx context.Context) (int, error) {
 
 // CheckPayment проверяет платёж перед оплатой, когда касса спрашивает «можно?» (pre_checkout_query у Stars):
 // платёж наш, ещё ожидает и сумма та.
-func (c *Core) CheckPayment(ctx context.Context, gateway string, paymentID, extAmount int64) error {
+func (c *Core) CheckPayment(ctx context.Context, userID int64, gateway string, paymentID, extAmount int64) error {
 	var p Payment
 	err := c.store.Tx(ctx, func(tx Tx) error {
 		var err error
@@ -222,7 +222,7 @@ func (c *Core) CheckPayment(ctx context.Context, gateway string, paymentID, extA
 	if err != nil {
 		return err
 	}
-	if p.Gateway != gateway || p.Status != PayPending {
+	if p.UserID != userID || p.Gateway != gateway || p.Status != PayPending {
 		return ErrNotFound
 	}
 	if p.ExtAmount != extAmount {
@@ -234,20 +234,40 @@ func (c *Core) CheckPayment(ctx context.Context, gateway string, paymentID, extA
 // ConfirmManual подтверждает ручной платёж от имени админа: деньги пришли на реквизиты.
 // Работает только для ручной кассы, платежи настоящих касс зачисляет сама касса.
 func (c *Core) ConfirmManual(ctx context.Context, adminID, paymentID int64) error {
-	if adminID <= 0 {
-		return ErrForbidden
-	}
 	var p Payment
-	if err := c.store.Tx(ctx, func(tx Tx) error {
+	if err := c.tx(ctx, func(tx Tx) error {
+		if _, err := c.can(ctx, tx, adminID, PermGrant); err != nil {
+			return err
+		}
 		var err error
-		p, err = tx.Payment(paymentID)
-		return err
+		if p, err = tx.Payment(paymentID); err != nil {
+			return err
+		}
+		if p.Gateway != "manual" {
+			return ErrForbidden
+		}
+		return c.audit(ctx, tx, adminID, "payment.confirm", itoa(p.ID), map[string]string{"amount": itoa(p.Amount)}, c.clock.Now())
 	}); err != nil {
 		return err
 	}
-	if p.Gateway != "manual" {
-		return ErrForbidden
-	}
-	// Запись в журнал действий админов встанет сюда (группа 11).
 	return c.Credit(ctx, "manual", GatewayEvent{PaymentID: p.ID, ExtAmount: p.ExtAmount, Status: PayPaid})
+}
+
+// CreditOwn зачисляет оплату, которую абонент прислал сам (Stars через бота): платёж должен быть его.
+func (c *Core) CreditOwn(ctx context.Context, userID int64, gateway string, ev GatewayEvent) error {
+	if err := c.ownPayment(ctx, userID, ev.PaymentID); err != nil {
+		return err
+	}
+	return c.Credit(ctx, gateway, ev)
+}
+
+// ownPayment проверяет, что платёж принадлежит абоненту. Чужой выглядит как несуществующий.
+func (c *Core) ownPayment(ctx context.Context, userID, paymentID int64) error {
+	return c.store.Tx(ctx, func(tx Tx) error {
+		p, err := tx.Payment(paymentID)
+		if err != nil || p.UserID != userID {
+			return ErrNotFound
+		}
+		return nil
+	})
 }

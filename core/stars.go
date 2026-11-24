@@ -63,8 +63,8 @@ func (c *Core) ChargeRecurring(ctx context.Context, userID, tariffID int64, char
 // отменяется зачисление: со счёта абонента списываются деньги, а если их не хватает, срок подписки.
 // Если Telegram отказал, ничего не меняется, а ошибка несёт причину.
 func (c *Core) RefundStars(ctx context.Context, adminID, paymentID int64) error {
-	if adminID <= 0 {
-		return ErrForbidden
+	if err := c.ownerOnly(ctx, adminID, "refund"); err != nil {
+		return err
 	}
 	var p Payment
 	var u User
@@ -89,8 +89,13 @@ func (c *Core) RefundStars(ctx context.Context, adminID, paymentID int64) error 
 	if err := r.Refund(ctx, p, u.TgID); err != nil {
 		return fmt.Errorf("%w: %v", ErrRefundFailed, err)
 	}
-	// Запись в журнал действий админов встанет сюда (группа 11).
-	err := c.tx(ctx, func(tx Tx) error { return c.undoPayment(tx, p, c.clock.Now()) })
+	err := c.tx(ctx, func(tx Tx) error {
+		now := c.clock.Now()
+		if err := c.undoPayment(tx, p, now); err != nil {
+			return err
+		}
+		return c.audit(ctx, tx, adminID, "payment.refund", itoa(p.ID), map[string]string{"amount": itoa(p.Amount)}, now)
+	})
 	if err != nil {
 		c.log.Error("возврат прошёл в Telegram, но не отменён в базе", "payment", p.ID, "err", err)
 	}
