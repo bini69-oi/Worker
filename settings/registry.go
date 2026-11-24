@@ -1,0 +1,114 @@
+package settings
+
+import (
+	"errors"
+	"fmt"
+	"strconv"
+	"time"
+)
+
+// Kind это тип настройки.
+type Kind int
+
+const (
+	KindBool     Kind = iota // true или false
+	KindInt                  // целое число
+	KindString               // строка
+	KindDuration             // промежуток времени, например 72h
+	KindMoney                // деньги в копейках, целое число
+)
+
+func (k Kind) String() string {
+	switch k {
+	case KindBool:
+		return "bool"
+	case KindInt:
+		return "int"
+	case KindString:
+		return "string"
+	case KindDuration:
+		return "duration"
+	case KindMoney:
+		return "money"
+	}
+	return "unknown"
+}
+
+// Def описывает одну настройку. Настроек вне реестра не существует.
+type Def struct {
+	Key     string
+	Kind    Kind
+	Default string // умолчание в том же виде, в каком значение хранится в базе
+	Desc    string
+	Group   string
+	Secret  bool // секрет хранится в базе зашифрованным и наружу целиком не отдаётся
+}
+
+// Ошибки, по которым вызывающий отличает отказы.
+var (
+	ErrUnknownKey = errors.New("настройки с таким ключом нет")
+	ErrBadValue   = errors.New("значение не подходит к типу настройки")
+)
+
+// registry это весь список настроек. Новые ключи добавляют сюда.
+var registry = []Def{
+	{Key: "trial.enabled", Kind: KindBool, Default: "true", Group: "trial",
+		Desc: "Выдавать ли пробный период новым абонентам"},
+	{Key: "trial.days", Kind: KindInt, Default: "3", Group: "trial",
+		Desc: "Сколько дней длится пробный период"},
+	{Key: "trial.traffic_gb", Kind: KindInt, Default: "5", Group: "trial",
+		Desc: "Лимит трафика пробного периода, ГБ"},
+	{Key: "stars.rate", Kind: KindMoney, Default: "150", Group: "pay",
+		Desc: "Сколько копеек стоит одна звезда Telegram"},
+	{Key: "lang.default", Kind: KindString, Default: "ru", Group: "texts",
+		Desc: "Язык текстов, если нужного перевода нет"},
+}
+
+// Registry возвращает копию списка настроек.
+func Registry() []Def {
+	return append([]Def(nil), registry...)
+}
+
+func find(key string) (Def, bool) {
+	for _, d := range registry {
+		if d.Key == key {
+			return d, true
+		}
+	}
+	return Def{}, false
+}
+
+// normalize проверяет значение по типу и приводит к одному виду записи.
+// Значение в текст ошибки не попадает: оно может оказаться секретом.
+func normalize(k Kind, raw string) (string, error) {
+	bad := fmt.Errorf("%w: нужен тип %s", ErrBadValue, k)
+	switch k {
+	case KindBool:
+		b, err := strconv.ParseBool(raw)
+		if err != nil {
+			return "", bad
+		}
+		return strconv.FormatBool(b), nil
+	case KindInt:
+		n, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			return "", bad
+		}
+		return strconv.FormatInt(n, 10), nil
+	case KindMoney:
+		n, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || n < 0 {
+			return "", bad
+		}
+		return strconv.FormatInt(n, 10), nil
+	case KindDuration:
+		d, err := time.ParseDuration(raw)
+		if err != nil || d < 0 {
+			return "", bad
+		}
+		return d.String(), nil
+	case KindString:
+		return raw, nil
+	}
+	return "", bad
+}
