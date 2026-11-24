@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -407,5 +409,46 @@ func TestAdminChatBinding(t *testing.T) {
 	}
 	if !e.c.IsAdmin(ctx, helper, core.PermSupport) || e.c.IsAdmin(ctx, 777, core.PermSupport) {
 		t.Fatal("проверка админов в группе не та")
+	}
+}
+
+func TestStrangerCannotLockOwner(t *testing.T) {
+	e := newSecEnv(t)
+	ctx := context.Background()
+	for range 20 {
+		_, _, _ = e.c.LoginStart(ctx, owner, "guess-guess", core.LoginInfo{IP: "6.6.6.6"})
+	}
+	if _, _, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info}); err != nil {
+		t.Fatalf("перебор с чужого IP заблокировал вход владельцу: %v", err)
+	}
+}
+
+func TestParallelGuessesCounted(t *testing.T) {
+	e := newSecEnv(t)
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	var passed atomic.Int32
+	for range 30 {
+		wg.Go(func() {
+			if _, _, err := e.c.LoginStart(ctx, owner, "wrong-password", core.LoginInfo{IP: info}); !errors.Is(err, core.ErrLoginLocked) {
+				passed.Add(1)
+			}
+		})
+	}
+	wg.Wait()
+	if n := passed.Load(); n > 5 {
+		t.Fatalf("пачка параллельных запросов проверила пароль %d раз, предел 5", n)
+	}
+}
+
+func TestLoginInfoCleaned(t *testing.T) {
+	e := newSecEnv(t)
+	agent := "Safari\n\x1b[31mВаш iPhone, Москва" + strings.Repeat("x", 500)
+	if _, _, err := e.c.LoginStart(context.Background(), owner, ownerPw, core.LoginInfo{IP: info, Agent: agent}); err != nil {
+		t.Fatal(err)
+	}
+	cf := e.lastConfirm(t)
+	if strings.ContainsAny(cf.Vars["agent"], "\n\x1b") || len([]rune(cf.Vars["agent"])) > 200 {
+		t.Fatalf("браузер не очищен: %q", cf.Vars["agent"])
 	}
 }

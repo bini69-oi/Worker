@@ -8,7 +8,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
+	"sync"
 	"time"
+	"unicode"
 )
 
 // Сроки входа и сессии.
@@ -51,14 +54,38 @@ func sha(s string) []byte {
 	return h[:]
 }
 
+// cleanInfo обрезает IP и браузер и убирает управляющие символы: эти строки приходят от клиента
+// и попадают в сообщение админу и в журнал.
+func cleanInfo(in LoginInfo) LoginInfo {
+	clean := func(s string, n int) string {
+		r := []rune(strings.Map(func(r rune) rune {
+			if unicode.IsControl(r) {
+				return -1
+			}
+			return r
+		}, s))
+		return string(r[:min(len(r), n)])
+	}
+	return LoginInfo{IP: clean(in.IP, 64), Agent: clean(in.Agent, 200)}
+}
+
+// dummyHash нужен, чтобы вход незнакомого админа считал хэш так же долго, как знакомого,
+// и по времени ответа нельзя было подобрать номера админов.
+var dummyHash = sync.OnceValue(func() string { return hashPassword(randomToken()) })
+
 // LoginStart это первый шаг входа: пароль. При верном пароле админу в Telegram уходит «Вход с IP, браузер
 // [Да] [Нет]». Возвращает номер подтверждения и одноразовый ключ браузера: без ключа закончить вход нельзя,
 // даже зная номер. Неверный логин и неверный пароль дают одну и ту же ошибку.
+//
+// Попытка засчитывается до проверки пароля и своей транзакцией, поэтому пачка параллельных запросов
+// счётчик не обходит. Блокируется пара «админ + IP» и сам IP: чужой не может заблокировать вход владельцу,
+// а подбор пароля без кнопки в Telegram всё равно ничего не даёт.
 func (c *Core) LoginStart(ctx context.Context, tgID int64, password string, info LoginInfo) (int64, string, error) {
+	info = cleanInfo(info)
 	now := c.clock.Now()
-	keys := []string{"login:" + itoa(tgID), "loginip:" + info.IP}
-	var confirmID int64
-	nonce := randomToken()
+	keys := []string{"login:" + itoa(tgID) + "@" + info.IP, "loginip:" + info.IP}
+	var a Admin
+	known, alarm := false, false
 	err := c.tx(ctx, func(tx Tx) error {
 		for _, k := range keys {
 			count, until, err := tx.Limit(k)
@@ -68,60 +95,59 @@ func (c *Core) LoginStart(ctx context.Context, tgID int64, password string, info
 			if count >= loginTries && now.Before(until) {
 				return ErrLoginLocked
 			}
-		}
-		a, err := c.admin(tx, tgID)
-		if err != nil {
-			return ErrBadLogin
-		}
-		if a.Owner && a.PassHash == "" {
-			c.log.Warn("пароль владельца не задан, выполните на сервере: worker admin password")
-			return ErrNoPassword
-		}
-		if !checkPassword(a.PassHash, password) {
-			return ErrBadLogin
-		}
-		if err := tx.SetLimit(keys[0], 0, now); err != nil {
-			return err
-		}
-		body, _ := json.Marshal(loginPayload{IP: info.IP, Agent: info.Agent, NonceHash: hex.EncodeToString(sha(nonce))})
-		cf, err := c.newConfirm(tx, tgID, "login", body, map[string]string{"ip": info.IP, "agent": info.Agent}, now)
-		confirmID = cf.ID
-		return err
-	})
-	if err == ErrBadLogin {
-		c.loginFailed(ctx, tgID, keys, info, now)
-	}
-	return confirmID, nonce, err
-}
-
-// loginFailed считает неверный пароль своей транзакцией и на пятой ошибке шлёт владельцу тревогу.
-func (c *Core) loginFailed(ctx context.Context, tgID int64, keys []string, info LoginInfo, now time.Time) {
-	err := c.tx(ctx, func(tx Tx) error {
-		alarm := false
-		for _, k := range keys {
-			count, _, err := tx.Limit(k)
-			if err != nil {
-				return err
-			}
 			count++
 			if err := tx.SetLimit(k, count, loginLock(count, now)); err != nil {
 				return err
 			}
 			alarm = alarm || count == loginTries
 		}
-		if !alarm {
-			return nil
-		}
-		return c.alert(tx, "admin.login_bruteforce", map[string]string{"admin": itoa(tgID), "ip": info.IP}, now)
+		var err error
+		a, err = c.admin(tx, tgID)
+		known = err == nil
+		return nil
 	})
 	if err != nil {
-		c.log.Warn("не удалось засчитать неверный пароль", "err", err)
+		return 0, "", err
 	}
+	if known && a.Owner && a.PassHash == "" {
+		c.log.Warn("пароль владельца не задан, выполните на сервере: worker admin password")
+		return 0, "", ErrNoPassword
+	}
+
+	// Медленный хэш считается вне транзакции записи: иначе на это время встали бы все записи, включая оплаты.
+	hash := a.PassHash
+	if !known {
+		hash = dummyHash()
+	}
+	if !checkPassword(hash, password) || !known {
+		if alarm {
+			_ = c.tx(ctx, func(tx Tx) error {
+				return c.alert(tx, "admin.login_bruteforce", map[string]string{"admin": itoa(tgID), "ip": info.IP}, now)
+			})
+		}
+		return 0, "", ErrBadLogin
+	}
+
+	nonce := randomToken()
+	var confirmID int64
+	err = c.tx(ctx, func(tx Tx) error {
+		for _, k := range keys {
+			if err := tx.SetLimit(k, 0, now); err != nil {
+				return err
+			}
+		}
+		body, _ := json.Marshal(loginPayload{IP: info.IP, Agent: info.Agent, NonceHash: hex.EncodeToString(sha(nonce))})
+		cf, err := c.newConfirm(tx, tgID, "login", body, map[string]string{"ip": info.IP, "agent": info.Agent}, now)
+		confirmID = cf.ID
+		return err
+	})
+	return confirmID, nonce, err
 }
 
 // LoginFinish это второй шаг: админ нажал «Да». Браузер предъявляет номер подтверждения и свой ключ
 // и получает токен сессии на 12 часов. Подтверждение одноразовое.
 func (c *Core) LoginFinish(ctx context.Context, confirmID int64, nonce string, info LoginInfo) (string, Session, error) {
+	info = cleanInfo(info)
 	token := randomToken()
 	var s Session
 	err := c.tx(ctx, func(tx Tx) error {
