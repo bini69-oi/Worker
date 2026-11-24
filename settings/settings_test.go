@@ -6,12 +6,16 @@ import (
 	"time"
 )
 
+var testKey = []byte("0123456789abcdef0123456789abcdef")
+
 var t0 = time.Unix(1_700_000_000, 0)
+
+func t0Func() time.Time { return t0 }
 
 func newSettings(t *testing.T) (*Settings, *fakeStore) {
 	t.Helper()
 	f := newFake()
-	s, err := New(f, func() time.Time { return t0 })
+	s, err := New(f, testKey, func() time.Time { return t0 })
 	if err != nil {
 		t.Fatal(err)
 	}

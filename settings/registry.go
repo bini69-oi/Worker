@@ -62,6 +62,8 @@ var registry = []Def{
 		Desc: "Сколько копеек стоит одна звезда Telegram"},
 	{Key: "lang.default", Kind: KindString, Default: "ru", Group: "texts",
 		Desc: "Язык текстов, если нужного перевода нет"},
+	{Key: "yookassa.secret_key", Kind: KindString, Default: "", Group: "pay", Secret: true,
+		Desc: "Секретный ключ кассы ЮKassa"},
 }
 
 // Registry возвращает копию списка настроек.

@@ -1,8 +1,11 @@
 package settings
 
 import (
+	"errors"
 	"fmt"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -17,6 +20,7 @@ type Store interface {
 // Settings держит в памяти значения, отличные от умолчаний.
 type Settings struct {
 	st  Store
+	key []byte // мастер-ключ шифрования секретов, 32 байта
 	now func() time.Time
 
 	mu   sync.RWMutex
@@ -24,8 +28,12 @@ type Settings struct {
 }
 
 // New читает таблицу и возвращает готовые настройки. Время подставляется снаружи.
-func New(st Store, now func() time.Time) (*Settings, error) {
-	s := &Settings{st: st, now: now, vals: map[string]string{}}
+// Ключ шифрования нужен ровно 32 байта (AES-256). Если секрет не расшифровывается, New отказывает.
+func New(st Store, key []byte, now func() time.Time) (*Settings, error) {
+	if len(key) != 32 {
+		return nil, errors.New("ключ шифрования должен быть 32 байта")
+	}
+	s := &Settings{st: st, key: key, now: now, vals: map[string]string{}}
 	if err := s.Reload(); err != nil {
 		return nil, err
 	}
@@ -40,19 +48,35 @@ func (s *Settings) Reload() error {
 		return fmt.Errorf("чтение настроек: %w", err)
 	}
 	vals := make(map[string]string, len(rows))
+	var bad []string
 	for key, raw := range rows {
 		def, ok := find(key)
 		if !ok {
 			continue
 		}
-		if norm, err := normalize(def.Kind, raw); err == nil {
-			vals[key] = norm
+		v, err := s.decode(def, raw)
+		if err != nil {
+			bad = append(bad, key)
+			continue
 		}
+		vals[key] = v
 	}
 	s.mu.Lock()
 	s.vals = vals
 	s.mu.Unlock()
+	if len(bad) > 0 {
+		sort.Strings(bad)
+		return fmt.Errorf("настройки не прочитаны (ключ шифрования или значение): %s", strings.Join(bad, ", "))
+	}
 	return nil
+}
+
+// decode превращает строку из базы в значение: секрет расшифровывает, остальное проверяет по типу.
+func (s *Settings) decode(def Def, raw string) (string, error) {
+	if def.Secret {
+		return open(s.key, def.Key, raw)
+	}
+	return normalize(def.Kind, raw)
 }
 
 // Set меняет настройку. Неизвестный ключ и неверный тип отклоняются, старое значение остаётся.
@@ -69,7 +93,13 @@ func (s *Settings) Set(key, raw string) error {
 	if norm == def.Default {
 		return s.Reset(key)
 	}
-	if err := s.st.Save(key, norm, s.now().Unix()); err != nil {
+	stored := norm
+	if def.Secret {
+		if stored, err = seal(s.key, key, norm); err != nil {
+			return fmt.Errorf("шифрование настройки %s: %w", key, err)
+		}
+	}
+	if err := s.st.Save(key, stored, s.now().Unix()); err != nil {
 		return fmt.Errorf("запись настройки %s: %w", key, err)
 	}
 	s.mu.Lock()
@@ -124,10 +154,28 @@ func (s *Settings) Int(key string) int64 {
 // Money отдаёт сумму в копейках.
 func (s *Settings) Money(key string) int64 { return s.Int(key) }
 
-// String отдаёт строку.
+// String отдаёт строку. Для секретов отдаёт пустую строку, секрет берут только через Secret.
 func (s *Settings) String(key string) string {
+	if def, ok := find(key); ok && def.Secret {
+		return ""
+	}
 	v, _ := s.raw(key)
 	return v
+}
+
+// Secret отдаёт расшифрованный секрет для работы кода (например, запроса к кассе).
+// Наружу, в админку и в журнал, его отдавать нельзя: для них есть Masked.
+func (s *Settings) Secret(key string) string {
+	if def, ok := find(key); !ok || !def.Secret {
+		return ""
+	}
+	v, _ := s.raw(key)
+	return v
+}
+
+// Masked отдаёт про секрет только признак «задан» и последние 4 символа.
+func (s *Settings) Masked(key string) Masked {
+	return mask(s.Secret(key))
 }
 
 // Duration отдаёт промежуток времени.

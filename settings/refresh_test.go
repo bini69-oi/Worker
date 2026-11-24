@@ -21,7 +21,7 @@ func (c *fakeClock) advance(d time.Duration) {
 func TestChangeVisibleWithin5Seconds(t *testing.T) {
 	f := newFake()
 	clock := &fakeClock{now: t0, tick: make(chan time.Time)}
-	s, err := New(f, func() time.Time { return clock.now })
+	s, err := New(f, testKey, func() time.Time { return clock.now })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestChangeVisibleWithin5Seconds(t *testing.T) {
 func TestRunSurvivesStoreFail(t *testing.T) {
 	f := newFake()
 	clock := &fakeClock{now: t0, tick: make(chan time.Time)}
-	s, err := New(f, func() time.Time { return clock.now })
+	s, err := New(f, testKey, func() time.Time { return clock.now })
 	if err != nil {
 		t.Fatal(err)
 	}
