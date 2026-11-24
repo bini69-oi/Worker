@@ -57,6 +57,15 @@ var (
 	ErrPanelDown    = newErr("E3008", "err.panel_down", "сервис временно недоступен")
 )
 
+// Кассы
+var (
+	ErrAmountLimits   = newErr("E4001", "err.amount_limits", "сумма вне пределов кассы")
+	ErrGatewayDown    = newErr("E4002", "err.gateway_down", "касса не ответила")
+	ErrAmountMismatch = newErr("E4003", "err.amount_mismatch", "оплачена другая сумма")
+	ErrNoGateway      = newErr("E4004", "err.no_gateway", "касса недоступна")
+	ErrRefundFailed   = newErr("E4005", "err.refund_failed", "касса отказала в возврате")
+)
+
 // ErrDuplicate значит, что событие с этой ссылкой уже было проведено.
 // Это не ошибка для абонента: ядро трактует её как «уже сделано».
 var ErrDuplicate = errors.New("событие уже проведено")

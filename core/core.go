@@ -38,6 +38,9 @@ type Store interface {
 	// StuckTasks отдаёт невыполненные задачи старше before, о которых админу ещё не сообщали.
 	// Уведомления админу сюда не попадают, иначе тревога о тревоге шла бы по кругу.
 	StuckTasks(ctx context.Context, before time.Time) ([]Task, error)
+
+	// PendingPayments отдаёт платежи «ожидает», созданные раньше before.
+	PendingPayments(ctx context.Context, before time.Time) ([]Payment, error)
 }
 
 // Tx это действия внутри транзакции. Все изменения ядра идут только через Tx.
@@ -67,6 +70,17 @@ type Tx interface {
 	AddNotice(userID int64, kind, ref string, at time.Time) (bool, error)
 	// MarkAlerted отмечает, что о задачах админу уже сообщили.
 	MarkAlerted(ids []int64) error
+
+	CreatePayment(p Payment) (int64, error)
+	Payment(id int64) (Payment, error)
+	PaymentByExt(gateway, externalID string) (Payment, error)
+	// SetPaymentExt запоминает номер и сумму платежа в кассе.
+	SetPaymentExt(id int64, externalID string, extAmount int64, extCurrency string) error
+	// MarkPaid переводит платёж из «ожидает» в «оплачен». false значит, что платёж уже не ожидал.
+	// Пустой externalID оставляет прежний номер.
+	MarkPaid(id int64, externalID string, at time.Time) (bool, error)
+	// SetPaymentStatus меняет статус, только если сейчас он from. false значит, что статус уже другой.
+	SetPaymentStatus(id int64, from, to PayStatus) (bool, error)
 }
 
 // Notifier отправляет уведомления. Реализует его бот, до бота задачи ждут в очереди.
@@ -89,6 +103,7 @@ type Deps struct {
 	Config   Config
 	Panel    Panel
 	Notifier Notifier
+	Gateways []Gateway
 	Log      *slog.Logger
 }
 
@@ -99,6 +114,7 @@ type Core struct {
 	cfg      Config
 	panel    Panel
 	notifier Notifier
+	gateways []Gateway
 	log      *slog.Logger
 	kick     chan struct{}
 }
@@ -117,7 +133,7 @@ func New(d Deps) *Core {
 	}
 	return &Core{
 		store: d.Store, clock: d.Clock, cfg: d.Config, panel: d.Panel,
-		notifier: d.Notifier, log: d.Log, kick: make(chan struct{}, 1),
+		notifier: d.Notifier, gateways: d.Gateways, log: d.Log, kick: make(chan struct{}, 1),
 	}
 }
 

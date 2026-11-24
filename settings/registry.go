@@ -51,7 +51,34 @@ var (
 )
 
 // registry это весь список настроек. Новые ключи добавляют сюда.
-var registry = []Def{
+var registry = base
+
+// AddGateway добавляет в реестр общие настройки кассы (включена, название, порядок, пределы) и её собственные,
+// например ключи. Касса зовёт его в init своего файла, поэтому новая касса не правит этот реестр.
+// Зовётся только при старте программы, до чтения настроек.
+func AddGateway(name, title string, extra ...Def) {
+	for _, d := range append(gatewayDefs(name, title), extra...) {
+		if _, ok := find(d.Key); !ok {
+			registry = append(registry, d)
+		}
+	}
+}
+
+// gatewayDefs описывает общие настройки кассы: включена, название, порядок, пределы суммы.
+func gatewayDefs(name, title string) []Def {
+	g := "pay." + name
+	return []Def{
+		{Key: name + ".enabled", Kind: KindBool, Default: "false", Group: g, Desc: "Показывать ли кассу абонентам"},
+		{Key: name + ".title", Kind: KindString, Default: title, Group: g, Desc: "Название кассы для абонента"},
+		{Key: name + ".sort", Kind: KindInt, Default: "0", Group: g, Desc: "Порядок в списке касс, меньше значит выше"},
+		{Key: name + ".min", Kind: KindMoney, Default: "0", Group: g, Desc: "Минимальная сумма пополнения, копейки, 0 без предела"},
+		{Key: name + ".max", Kind: KindMoney, Default: "0", Group: g, Desc: "Максимальная сумма пополнения, копейки, 0 без предела"},
+	}
+}
+
+var base = []Def{
+	{Key: "pay.pending_hours", Kind: KindInt, Default: "24", Group: "pay",
+		Desc: "Через сколько часов неоплаченный платёж считается истёкшим"},
 	{Key: "trial.enabled", Kind: KindBool, Default: "true", Group: "trial",
 		Desc: "Выдавать ли пробный период новым абонентам"},
 	{Key: "trial.days", Kind: KindInt, Default: "3", Group: "trial",
