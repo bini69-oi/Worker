@@ -55,7 +55,7 @@
 | `settings` | key, value | только отличия от умолчаний |
 | `texts` | key, lang, value | только изменённые тексты |
 | `notices` | user_id, kind, ref, sent_at | чтобы напоминание не ушло дважды |
-| `admins` | tg_id, pass_hash, perms (JSON), created_at, disabled_at | помощники; владельца здесь нет, он в `.env` |
+| `admins` | tg_id, pass_hash, perms (JSON), created_at, disabled_at | админы и их пароли; роль владельца берётся только из `.env`, его `perms` не читаются |
 | `admin_sessions` | token_hash, admin_tg_id, ip, agent, created_at, expires_at, closed_at | сессии админки |
 | `confirms` | id, admin_tg_id, kind, payload (JSON), expires_at, answer, answered_at | подтверждения кнопкой в Telegram |
 | `login_fails` | key (админ или IP), count, until | защита от перебора |
@@ -188,7 +188,7 @@ type Gateway interface {
 - [Кассы меняют API] → у каждой кассы записанные примеры вебхуков в тестах, поломка видна сразу.
 - [Чистый Go-драйвер SQLite медленнее CGO-версии] → на нагрузке бота разница незаметна, зато сборка простая.
 - [Взломан весь сервер] → у злоумышленника и база, и ключ, код это не спасает. Поэтому тревоги владельцу, журнал действий и быстрая смена ключа и токена.
-- [Telegram недоступен, а войти в админку надо] → вход без кнопки невозможен. Владелец может сбросить пароль командой на сервере `worker admin reset`.
+- [Telegram недоступен, а войти в админку надо] → вход без кнопки невозможен, это осознанно. Пароль владельца задаётся и сбрасывается только командой на сервере `worker admin password`.
 
 ## Migration Plan
 
