@@ -105,6 +105,8 @@ var base = []Def{
 		Desc: "Сколько копеек стоит одна звезда Telegram"},
 	{Key: "lang.default", Kind: KindString, Default: "ru", Group: "texts",
 		Desc: "Язык текстов, если нужного перевода нет"},
+	{Key: "panel.reconcile_minutes", Kind: KindInt, Default: "60", Group: "panel",
+		Desc: "Как часто сверять базу с панелью, минуты"},
 	{Key: "panel.webhook_secret", Kind: KindString, Default: "", Group: "panel", Secret: true,
 		Desc: "Секрет вебхуков панели (WEBHOOK_SECRET_HEADER в настройках Remnawave)"},
 	{Key: "yookassa.secret_key", Kind: KindString, Default: "", Group: "pay", Secret: true,
