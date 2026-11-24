@@ -37,7 +37,7 @@ func (c *Core) Register(ctx context.Context, tgID int64, username, lang string) 
 		lang = "ru"
 	}
 	var out User
-	err := c.store.Tx(ctx, func(tx Tx) error {
+	err := c.tx(ctx, func(tx Tx) error {
 		u, err := tx.UserByTg(tgID)
 		if err == nil {
 			out = u

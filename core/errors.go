@@ -53,6 +53,8 @@ var (
 	ErrTrialOff     = newErr("E3004", "err.trial_off", "пробный период выключен")
 	ErrTrialUsed    = newErr("E3005", "err.trial_used", "пробный период уже был")
 	ErrBanned       = newErr("E3006", "err.banned", "абонент заблокирован")
+	ErrPanelPending = newErr("E3007", "err.panel_pending", "подписка ещё оформляется")
+	ErrPanelDown    = newErr("E3008", "err.panel_down", "сервис временно недоступен")
 )
 
 // ErrDuplicate значит, что событие с этой ссылкой уже было проведено.

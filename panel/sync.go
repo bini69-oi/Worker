@@ -59,4 +59,20 @@ func (c *Client) find(ctx context.Context, ct contract, s State) (wireUser, bool
 }
 
 // userPath это путь абонента для действий над ним.
+// Get читает абонента из панели по сохранённому идентификатору. Нужен для сверки с базой.
+func (c *Client) Get(ctx context.Context, ref string) (Result, error) {
+	ct, err := c.current(ctx)
+	if err != nil {
+		return Result{}, err
+	}
+	if !ct.validRef(ref) {
+		return Result{}, &Error{Status: 404, Msg: "абонент не найден"}
+	}
+	u, err := c.byRef(ctx, ref)
+	if err != nil {
+		return Result{}, err
+	}
+	return ct.result(u, false), nil
+}
+
 func userPath(ref string) string { return "/api/users/" + url.PathEscape(ref) }

@@ -16,6 +16,14 @@ func (s *CoreStore) SubByUser(ctx context.Context, userID int64) (core.Subscript
 	return (&coreTx{ctx: ctx, q: s.db.R}).SubByUser(userID)
 }
 
+func (t *coreTx) Sub(id int64) (core.Subscription, error) {
+	sub, err := scanSub(t.q.QueryRowContext(t.ctx, "SELECT "+subCols+" FROM subscriptions WHERE id = ?", id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return sub, core.ErrNotFound
+	}
+	return sub, err
+}
+
 func (t *coreTx) SubByUser(userID int64) (core.Subscription, error) {
 	sub, err := scanSub(t.q.QueryRowContext(t.ctx, "SELECT "+subCols+" FROM subscriptions WHERE user_id = ?", userID))
 	if errors.Is(err, sql.ErrNoRows) {

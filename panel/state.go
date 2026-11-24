@@ -47,6 +47,7 @@ type Result struct {
 	ShortUUID       string
 	SubscriptionURL string
 	ExpireAt        time.Time
+	Enabled         bool
 	// Created истинно, если абонента создали при этом вызове.
 	Created bool
 }

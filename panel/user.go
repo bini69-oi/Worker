@@ -45,6 +45,7 @@ func (c contract) result(u wireUser, created bool) Result {
 		ShortUUID:       u.ShortUUID,
 		SubscriptionURL: u.SubscriptionURL,
 		ExpireAt:        u.ExpireAt.UTC(),
+		Enabled:         u.Status == "ACTIVE",
 		Created:         created,
 	}
 }

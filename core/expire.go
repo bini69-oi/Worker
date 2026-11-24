@@ -14,7 +14,7 @@ import (
 // Возвращает, сколько подписок отключено. Повторный запуск ничего не делает.
 func (c *Core) ExpireDue(ctx context.Context) (int, error) {
 	n := 0
-	err := c.store.Tx(ctx, func(tx Tx) error {
+	err := c.tx(ctx, func(tx Tx) error {
 		now := c.clock.Now()
 		subs, err := tx.ActiveSubsUntil(now)
 		if err != nil {
@@ -44,7 +44,7 @@ func (c *Core) RemindDue(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 	n := 0
-	err := c.store.Tx(ctx, func(tx Tx) error {
+	err := c.tx(ctx, func(tx Tx) error {
 		now := c.clock.Now()
 		subs, err := tx.ActiveSubsUntil(now.Add(time.Duration(marks[len(marks)-1]) * day))
 		if err != nil {

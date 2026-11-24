@@ -40,11 +40,28 @@ func (s *Store) SubByUser(_ context.Context, userID int64) (core.Subscription, e
 	return (&tx{st: s.st}).SubByUser(userID)
 }
 
-// Tasks отдаёт задачи очереди, которые положило ядро, в порядке появления.
-func (s *Store) Tasks() []Task {
+// Tasks отдаёт все задачи очереди, которые положило ядро, в порядке появления, и выполненные тоже.
+func (s *Store) Tasks() []core.Task {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return slices.Clone(s.st.tasks)
+	out := make([]core.Task, len(s.st.tasks))
+	for i, r := range s.st.tasks {
+		out[i] = r.Task
+	}
+	return out
+}
+
+// Pending считает невыполненные задачи вида kind.
+func (s *Store) Pending(kind string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for _, r := range s.st.tasks {
+		if r.Kind == kind && !r.done {
+			n++
+		}
+	}
+	return n
 }
 
 // SetUser подменяет абонента в обход ядра.
@@ -91,6 +108,14 @@ func (t *tx) SaveTariff(v core.Tariff) (int64, error) {
 	return v.ID, nil
 }
 
+func (t *tx) Sub(id int64) (core.Subscription, error) {
+	s, ok := t.st.subs[id]
+	if !ok {
+		return s, core.ErrNotFound
+	}
+	return s, nil
+}
+
 func (t *tx) SubByUser(userID int64) (core.Subscription, error) {
 	for _, s := range t.st.subs {
 		if s.UserID == userID {
@@ -126,7 +151,10 @@ func (t *tx) ActiveSubsUntil(until time.Time) ([]core.Subscription, error) {
 
 func (t *tx) Enqueue(kind string, payload []byte, at time.Time) (int64, error) {
 	id := t.st.id()
-	t.st.tasks = append(t.st.tasks, Task{ID: id, Kind: kind, Payload: slices.Clone(payload), At: at})
+	t.st.tasks = append(t.st.tasks, taskRow{
+		Task:   core.Task{ID: id, Kind: kind, Payload: slices.Clone(payload), CreatedAt: at},
+		nextAt: at,
+	})
 	return id, nil
 }
 

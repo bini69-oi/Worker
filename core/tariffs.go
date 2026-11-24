@@ -35,7 +35,7 @@ func (c *Core) SaveTariff(ctx context.Context, t Tariff) (Tariff, error) {
 	if t.ID == 0 {
 		t.CreatedAt = c.clock.Now()
 	}
-	err := c.store.Tx(ctx, func(tx Tx) error {
+	err := c.tx(ctx, func(tx Tx) error {
 		id, err := tx.SaveTariff(t)
 		t.ID = id
 		return err

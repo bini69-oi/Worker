@@ -14,7 +14,7 @@ import (
 // Другой тариф при живой подписке не продаётся: смена тарифа с пересчётом будет позже.
 func (c *Core) Buy(ctx context.Context, userID, tariffID int64, days int) (Subscription, error) {
 	var out Subscription
-	err := c.store.Tx(ctx, func(tx Tx) error {
+	err := c.tx(ctx, func(tx Tx) error {
 		if _, err := activeUser(tx, userID); err != nil {
 			return err
 		}

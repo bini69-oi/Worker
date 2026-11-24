@@ -11,7 +11,24 @@ const (
 	KindPanelSync = "panel.sync_user"
 	// KindNotifyUser шлёт абоненту текст по ключу.
 	KindNotifyUser = "notify.user"
+	// KindNotifyAdmin шлёт событие в тему админ-чата.
+	KindNotifyAdmin = "notify.admin"
 )
+
+// Темы админ-чата.
+const (
+	TopicPayments = "payments"
+	TopicNew      = "new"
+	TopicErrors   = "errors"
+	TopicSecurity = "security"
+)
+
+// AdminTask это событие для админов: тема, ключ текста и подстановки.
+type AdminTask struct {
+	Topic string            `json:"topic"`
+	Key   string            `json:"key"`
+	Vars  map[string]string `json:"vars,omitempty"`
+}
 
 // PanelSyncTask это задача синхронизации: в ней только id подписки, состояние берётся из базы в момент выполнения.
 type PanelSyncTask struct {
@@ -31,6 +48,15 @@ func enqueueSync(tx Tx, subID int64, now time.Time) error {
 		return err
 	}
 	_, err = tx.Enqueue(KindPanelSync, body, now)
+	return err
+}
+
+func enqueueAdmin(tx Tx, n AdminTask, now time.Time) error {
+	body, err := json.Marshal(n)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Enqueue(KindNotifyAdmin, body, now)
 	return err
 }
 

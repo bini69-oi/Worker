@@ -16,7 +16,7 @@ func (c *Core) Trial(ctx context.Context, userID int64) (Subscription, error) {
 		return Subscription{}, ErrTrialOff
 	}
 	var out Subscription
-	err := c.store.Tx(ctx, func(tx Tx) error {
+	err := c.tx(ctx, func(tx Tx) error {
 		u, err := activeUser(tx, userID)
 		if err != nil {
 			return err

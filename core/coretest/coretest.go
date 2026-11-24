@@ -40,12 +40,13 @@ type refKey struct {
 	id  int64
 }
 
-// Task это задача из очереди, как её положило ядро.
-type Task struct {
-	ID      int64
-	Kind    string
-	Payload []byte
-	At      time.Time
+// taskRow это строка очереди: задача и её служебные поля.
+type taskRow struct {
+	core.Task
+	nextAt  time.Time
+	lastErr string
+	done    bool
+	alerted bool
 }
 
 type state struct {
@@ -54,7 +55,7 @@ type state struct {
 	refs    map[refKey]bool
 	tariffs map[int64]core.Tariff
 	subs    map[int64]core.Subscription
-	tasks   []Task
+	tasks   []taskRow
 	notices map[string]bool
 	nextID  int64
 }

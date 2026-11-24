@@ -16,7 +16,7 @@ func (c *Core) AdminAdjust(ctx context.Context, adminID, userID, amount int64, c
 		return LedgerEntry{}, ErrForbidden
 	}
 	var out LedgerEntry
-	err := c.store.Tx(ctx, func(tx Tx) error {
+	err := c.tx(ctx, func(tx Tx) error {
 		var err error
 		out, err = move(tx, c.clock.Now(), LedgerEntry{
 			UserID:  userID,

@@ -14,13 +14,16 @@ type env struct {
 	st    *coretest.Store
 	clock *coretest.Clock
 	cfg   *settings.Settings
+	panel *coretest.Panel
+	notes *coretest.Notifier
 	user  core.User
 }
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
-	e := &env{st: coretest.NewStore(), clock: coretest.NewClock(t0), cfg: coretest.NewConfig(t)}
-	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg})
+	e := &env{st: coretest.NewStore(), clock: coretest.NewClock(t0), cfg: coretest.NewConfig(t),
+		panel: coretest.NewPanel(), notes: &coretest.Notifier{}}
+	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes})
 	u, err := e.c.Register(context.Background(), 1001, "ivan", "ru")
 	if err != nil {
 		t.Fatal(err)
@@ -53,4 +56,28 @@ func (e *env) syncTasks() int {
 		}
 	}
 	return n
+}
+
+// process выполняет очередь, как воркер.
+func (e *env) process(t *testing.T) {
+	t.Helper()
+	if _, err := e.c.ProcessDue(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// bought покупает тариф на 30 дней и прогоняет очередь, чтобы абонент появился в панели.
+func (e *env) bought(t *testing.T) core.Subscription {
+	t.Helper()
+	tr := e.tariff(t, "Месяц", core.Period{Days: 30, Price: 100})
+	e.topup(t, 10000)
+	if _, err := e.c.Buy(context.Background(), e.user.ID, tr.ID, 30); err != nil {
+		t.Fatal(err)
+	}
+	e.process(t)
+	sub, err := e.c.Sub(context.Background(), e.user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sub
 }
