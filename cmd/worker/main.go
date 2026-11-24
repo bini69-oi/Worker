@@ -7,13 +7,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	base := slog.NewJSONHandler(os.Stdout, nil)
+	log := slog.New(base)
 
 	env, warns, err := loadEnv(".env", os.Getenv)
 	for _, w := range warns {
@@ -31,5 +36,24 @@ func main() {
 		}
 		return
 	}
-	log.Info("настройки прочитаны", "public_url", env.PublicURL, "db", env.DBPath)
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := run(ctx, env, base); err != nil {
+		log.Error("worker упал", "err", err)
+		os.Exit(1)
+	}
+}
+
+func run(ctx context.Context, env Env, base slog.Handler) error {
+	a, err := build(env, base)
+	if err != nil {
+		return err
+	}
+	ln, err := net.Listen("tcp", a.cfg.String("http.addr"))
+	if err != nil {
+		a.db.Close()
+		return err
+	}
+	return a.serve(ctx, ln)
 }
