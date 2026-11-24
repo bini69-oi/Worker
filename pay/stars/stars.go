@@ -22,6 +22,7 @@ type Config interface {
 }
 
 // RefundFunc возвращает звёзды через Telegram (метод refundStarPayment). Её подставляет бот.
+// Если Telegram ответил, что оплата уже возвращена, функция должна вернуть ошибку с core.ErrAlreadyRefunded.
 type RefundFunc func(ctx context.Context, userTgID int64, chargeID string) error
 
 // Gateway это касса Stars.

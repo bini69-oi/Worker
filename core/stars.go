@@ -15,48 +15,70 @@ type Refunder interface {
 	Refund(ctx context.Context, p Payment, userTgID int64) error
 }
 
-// ChargeRecurring проводит очередное списание автоподписки Stars: платёж, зачисление и продление
-// на 30 дней одной транзакцией. Номер списания от Telegram уникален, поэтому повтор ничего не делает.
-// Если абонент отменил автоподписку в Telegram, списаний просто нет и подписка доживает свой срок.
+// ErrAlreadyRefunded возвращает Refunder, когда Telegram отвечает, что оплата уже возвращена.
+// Тогда возврат считается сделанным: так повтор после сбоя базы доводит отмену зачисления до конца.
+var ErrAlreadyRefunded = errors.New("оплата уже возвращена")
+
+// ChargeRecurring проводит очередное списание автоподписки Stars. Сначала платёж и зачисление по реально
+// уплаченным звёздам и текущему курсу, отдельной транзакцией: Telegram звёзды уже списал, и деньги не должны
+// пропасть ни при какой ошибке продления. Потом продление на 30 дней с баланса. Если продлить нельзя
+// (тариф скрыт, абонент сменил тариф, денег по новой цене не хватает), деньги остаются на балансе,
+// абонент и админы получают уведомление. Номер списания от Telegram уникален, повтор ничего не делает.
 func (c *Core) ChargeRecurring(ctx context.Context, userID, tariffID int64, chargeID string, stars int64) (Subscription, error) {
-	if chargeID == "" || stars <= 0 {
+	amount := stars * c.cfg.Int("stars.rate")
+	if chargeID == "" || stars <= 0 || amount <= 0 {
 		return Subscription{}, ErrInvalid
 	}
-	var out Subscription
 	err := c.tx(ctx, func(tx Tx) error {
-		t, err := tx.Tariff(tariffID)
-		if err != nil {
-			return err
-		}
-		period, ok := t.period(recurringDays)
-		if !ok {
-			return ErrNoPeriod
-		}
 		now := c.clock.Now()
-		p := Payment{UserID: userID, Gateway: "stars", Amount: period.Price, ExtAmount: stars, ExtCurrency: "XTR",
+		p := Payment{UserID: userID, Gateway: "stars", Amount: amount, ExtAmount: stars, ExtCurrency: "XTR",
 			Recurring: true, Status: PayPending, CreatedAt: now}
+		var err error
 		if p.ID, err = tx.CreatePayment(p); err != nil {
 			return err
 		}
 		if ok, err := tx.MarkPaid(p.ID, chargeID, now); err != nil || !ok {
 			return err
 		}
-		if period.Price > 0 {
-			if _, err := move(tx, now, LedgerEntry{UserID: userID, Amount: period.Price, Reason: ReasonTopup,
-				RefType: "payment", RefID: p.ID}); err != nil {
-				return err
-			}
-		}
-		if out, err = c.buyTx(tx, userID, tariffID, recurringDays, now); err != nil {
+		if _, err := move(tx, now, LedgerEntry{UserID: userID, Amount: amount, Reason: ReasonTopup,
+			RefType: "payment", RefID: p.ID}); err != nil {
 			return err
 		}
 		return enqueueAdmin(tx, AdminTask{Topic: TopicPayments, Key: "admin.payment_recurring",
-			Vars: map[string]string{"user_id": fmt.Sprint(userID), "stars": fmt.Sprint(stars)}}, now)
+			Vars: map[string]string{"user_id": itoa(userID), "stars": itoa(stars), "amount": itoa(amount)}}, now)
 	})
 	if errors.Is(err, ErrDuplicate) {
-		return c.store.SubByUser(ctx, userID) // это списание уже проведено
+		// Это списание уже проведено. Подписки может и не быть, если продлить тогда не вышло.
+		sub, serr := c.store.SubByUser(ctx, userID)
+		if errors.Is(serr, ErrNotFound) {
+			return Subscription{}, nil
+		}
+		return sub, serr
 	}
-	return out, err
+	if err != nil {
+		return Subscription{}, err
+	}
+
+	var sub Subscription
+	err = c.tx(ctx, func(tx Tx) error {
+		var err error
+		sub, err = c.buyTx(tx, userID, tariffID, recurringDays, c.clock.Now())
+		return err
+	})
+	if err != nil {
+		c.log.Warn("автоподписка: деньги зачислены, продлить не вышло", "user", userID, "tariff", tariffID, "err", err)
+		_ = c.tx(ctx, func(tx Tx) error {
+			now := c.clock.Now()
+			if err := enqueueNotify(tx, NotifyTask{UserID: userID, Key: "notify.recurring_failed",
+				Vars: map[string]string{"amount": itoa(amount)}}, now); err != nil {
+				return err
+			}
+			return enqueueAdmin(tx, AdminTask{Topic: TopicErrors, Key: "admin.recurring_failed",
+				Vars: map[string]string{"user_id": itoa(userID), "tariff": itoa(tariffID)}}, now)
+		})
+		return Subscription{}, err
+	}
+	return sub, nil
 }
 
 // RefundStars возвращает оплату Stars. Сначала возврат в Telegram, и только после его подтверждения
@@ -86,7 +108,7 @@ func (c *Core) RefundStars(ctx context.Context, adminID, paymentID int64) error 
 	if !ok || !can {
 		return ErrNoGateway
 	}
-	if err := r.Refund(ctx, p, u.TgID); err != nil {
+	if err := r.Refund(ctx, p, u.TgID); err != nil && !errors.Is(err, ErrAlreadyRefunded) {
 		return fmt.Errorf("%w: %v", ErrRefundFailed, err)
 	}
 	err := c.tx(ctx, func(tx Tx) error {
@@ -124,11 +146,14 @@ func (c *Core) undoPayment(tx Tx, p Payment, now time.Time) error {
 		return nil
 	}
 	sub, err := tx.SubByUser(p.UserID)
-	if errors.Is(err, ErrNotFound) || sub.Trial || sub.Price <= 0 || sub.PeriodDays <= 0 {
+	if errors.Is(err, ErrNotFound) {
 		return nil
 	}
 	if err != nil {
 		return err
+	}
+	if sub.Trial || sub.Price <= 0 || sub.PeriodDays <= 0 {
+		return nil
 	}
 	// Срезаем столько дней, сколько стоит невозвращённый остаток по цене подписки.
 	cut := (rest*int64(sub.PeriodDays) + sub.Price - 1) / sub.Price

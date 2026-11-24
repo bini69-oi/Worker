@@ -3,6 +3,7 @@ package core_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -152,5 +153,67 @@ func TestRefundRejectedByTelegram(t *testing.T) {
 	}
 	if b := balance(t, e.st, e.user.ID); b != 30000 {
 		t.Fatalf("после отказа баланс %d", b)
+	}
+}
+
+func TestRecurringKeepsMoneyWhenRenewFails(t *testing.T) {
+	e := newStarsEnv(t)
+	ctx := context.Background()
+	hidden := e.tariff
+	hidden.Active = false
+	if _, err := e.c.SaveTariff(ctx, hidden); err != nil {
+		t.Fatal(err)
+	}
+	// Новый абонент, тариф скрыт: продлить нельзя, но звёзды Telegram уже списал.
+	if _, err := e.c.ChargeRecurring(ctx, e.user.ID, e.tariff.ID, "charge-x", 100); err == nil {
+		t.Fatal("ждали ошибку продления")
+	}
+	if b := balance(t, e.st, e.user.ID); b != 15000 {
+		t.Fatalf("деньги за списанные звёзды пропали: баланс %d", b)
+	}
+	if _, err := e.c.ChargeRecurring(ctx, e.user.ID, e.tariff.ID, "charge-x", 100); err != nil {
+		t.Fatalf("повтор того же списания: %v", err)
+	}
+	if b := balance(t, e.st, e.user.ID); b != 15000 {
+		t.Fatalf("повтор списания зачислил второй раз: %d", b)
+	}
+	e.process(t)
+	if notified(e.env, "notify.recurring_failed") != 1 {
+		t.Fatalf("абонент не узнал, что продления нет: %+v", e.notes.ToUsers)
+	}
+}
+
+func TestRecurringPaysByActualStars(t *testing.T) {
+	e := newStarsEnv(t)
+	ctx := context.Background()
+	// Цену подняли, а Telegram списывает по старому счёту 100 звёзд (15000 по курсу 150).
+	e.tariff.Periods = []core.Period{{Days: 30, Price: 20000}}
+	if _, err := e.c.SaveTariff(ctx, e.tariff); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.c.ChargeRecurring(ctx, e.user.ID, e.tariff.ID, "charge-old", 100); !errors.Is(err, core.ErrNotEnoughMoney) {
+		t.Fatalf("по старой цене новая подписка не продлевается: %v", err)
+	}
+	if b := balance(t, e.st, e.user.ID); b != 15000 {
+		t.Fatalf("на баланс должно прийти ровно уплаченное: %d", b)
+	}
+}
+
+func TestRefundAlreadyDoneInTelegram(t *testing.T) {
+	e := newStarsEnv(t)
+	ctx := context.Background()
+	e.refund = fmt.Errorf("CHARGE_ALREADY_REFUNDED: %w", core.ErrAlreadyRefunded)
+	p, inv, err := e.c.CreatePayment(ctx, e.user.ID, "stars", 30000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.c.Credit(ctx, "stars", core.GatewayEvent{PaymentID: p.ID, ExternalID: "charge-r", ExtAmount: inv.ExtAmount, Status: core.PayPaid}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.c.RefundStars(ctx, owner, p.ID); err != nil {
+		t.Fatalf("повтор возврата после сбоя должен доводить отмену: %v", err)
+	}
+	if e.st.Payment(p.ID).Status != core.PayRefunded || balance(t, e.st, e.user.ID) != 0 {
+		t.Fatal("отмена зачисления не доведена")
 	}
 }
