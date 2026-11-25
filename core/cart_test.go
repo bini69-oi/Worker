@@ -216,7 +216,7 @@ func TestAutoRenewOffOnPermanentError(t *testing.T) {
 		t.Fatal(err)
 	}
 	tr.Periods = []core.Period{{Days: 90, Price: 300}} // срок 30 дней убрали
-	if _, err := e.c.SaveTariff(ctx, tr); err != nil {
+	if _, err := e.c.SaveTariff(ctx, owner, tr); err != nil {
 		t.Fatal(err)
 	}
 	e.clock.Add(29 * 24 * time.Hour)

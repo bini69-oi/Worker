@@ -15,7 +15,7 @@ import (
 func (e *env) promo(t *testing.T, p core.Promo) core.Promo {
 	t.Helper()
 	p.Active = true
-	out, err := e.c.SavePromo(context.Background(), p)
+	out, err := e.c.SavePromo(context.Background(), owner, p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestPromoValidation(t *testing.T) {
 		{Code: "KIND", Kind: "gift", Value: 1},
 		{Code: "MONEYTARIFF", Kind: core.PromoMoney, Value: 1, TariffID: 1},
 	} {
-		if _, err := e.c.SavePromo(context.Background(), p); !errors.Is(err, core.ErrInvalid) {
+		if _, err := e.c.SavePromo(context.Background(), owner, p); !errors.Is(err, core.ErrInvalid) {
 			t.Errorf("%q: ждали ErrInvalid, получили %v", p.Code, err)
 		}
 	}

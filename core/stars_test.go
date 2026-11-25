@@ -161,7 +161,7 @@ func TestRecurringKeepsMoneyWhenRenewFails(t *testing.T) {
 	ctx := context.Background()
 	hidden := e.tariff
 	hidden.Active = false
-	if _, err := e.c.SaveTariff(ctx, hidden); err != nil {
+	if _, err := e.c.SaveTariff(ctx, owner, hidden); err != nil {
 		t.Fatal(err)
 	}
 	// Новый абонент, тариф скрыт: продлить нельзя, но звёзды Telegram уже списал.
@@ -188,7 +188,7 @@ func TestRecurringPaysByActualStars(t *testing.T) {
 	ctx := context.Background()
 	// Цену подняли, а Telegram списывает по старому счёту 100 звёзд (15000 по курсу 150).
 	e.tariff.Periods = []core.Period{{Days: 30, Price: 20000}}
-	if _, err := e.c.SaveTariff(ctx, e.tariff); err != nil {
+	if _, err := e.c.SaveTariff(ctx, owner, e.tariff); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.c.ChargeRecurring(ctx, e.user.ID, e.tariff.ID, "charge-old", 100); !errors.Is(err, core.ErrNotEnoughMoney) {
@@ -223,14 +223,14 @@ func TestRecurringRetryFinishesRenewal(t *testing.T) {
 	ctx := context.Background()
 	hidden := e.tariff
 	hidden.Active = false
-	if _, err := e.c.SaveTariff(ctx, hidden); err != nil {
+	if _, err := e.c.SaveTariff(ctx, owner, hidden); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.c.ChargeRecurring(ctx, e.user.ID, e.tariff.ID, "charge-y", 100); err == nil {
 		t.Fatal("ждали сбой продления")
 	}
 	hidden.Active = true
-	if _, err := e.c.SaveTariff(ctx, hidden); err != nil {
+	if _, err := e.c.SaveTariff(ctx, owner, hidden); err != nil {
 		t.Fatal(err)
 	}
 	for range 2 {

@@ -2,7 +2,10 @@ package core
 
 import (
 	"context"
+	"errors"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // resetPeriods это способы сброса трафика, которые понимает Remnawave.
@@ -27,18 +30,27 @@ func validTariff(t *Tariff) error {
 	return nil
 }
 
-// SaveTariff создаёт тариф (ID == 0) или меняет его. Уже проданные подписки не меняются: их цена заморожена.
-func (c *Core) SaveTariff(ctx context.Context, t Tariff) (Tariff, error) {
+// SaveTariff создаёт тариф (ID == 0) или меняет его от имени админа с правом «тарифы».
+// Уже проданные подписки не меняются: их цена заморожена.
+func (c *Core) SaveTariff(ctx context.Context, actorTg int64, t Tariff) (Tariff, error) {
 	if err := validTariff(&t); err != nil {
 		return t, err
 	}
 	if t.ID == 0 {
 		t.CreatedAt = c.clock.Now()
 	}
-	err := c.tx(ctx, func(tx Tx) error {
+	err := c.asAdmin(ctx, actorTg, PermTariffs, "tariff.save", func(tx Tx, _ Admin, _ time.Time) (string, map[string]string, error) {
 		id, err := tx.SaveTariff(t)
 		t.ID = id
-		return err
+		if err != nil {
+			return "", nil, err
+		}
+		prices := make([]string, len(t.Periods))
+		for i, p := range t.Periods {
+			prices[i] = strconv.Itoa(p.Days) + ":" + itoa(p.Price)
+		}
+		return itoa(t.ID), map[string]string{"name": t.Name, "active": strconv.FormatBool(t.Active),
+			"prices": strings.Join(prices, ",")}, nil
 	})
 	return t, err
 }
@@ -48,9 +60,21 @@ func (c *Core) Tariffs(ctx context.Context) ([]Tariff, error) {
 	return c.store.Tariffs(ctx, true)
 }
 
-// AllTariffs отдаёт все тарифы, включая скрытые. Это для админки.
-func (c *Core) AllTariffs(ctx context.Context) ([]Tariff, error) {
-	return c.store.Tariffs(ctx, false)
+// AllTariffs отдаёт все тарифы, включая скрытые. Это для админки, нужно право «тарифы».
+func (c *Core) AllTariffs(ctx context.Context, actorTg int64) ([]Tariff, error) {
+	var out []Tariff
+	err := c.store.Tx(ctx, func(tx Tx) error {
+		_, err := c.can(ctx, tx, actorTg, PermTariffs)
+		return err
+	})
+	if errors.Is(err, ErrForbidden) {
+		c.deny(ctx, actorTg, "tariff.list")
+	}
+	if err != nil {
+		return nil, err
+	}
+	out, err = c.store.Tariffs(ctx, false)
+	return out, err
 }
 
 // period ищет срок тарифа.

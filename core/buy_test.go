@@ -93,7 +93,7 @@ func TestPriceFrozen(t *testing.T) {
 		t.Fatal(err)
 	}
 	tr.Periods = []core.Period{{Days: 30, Price: 20000}}
-	if _, err := e.c.SaveTariff(ctx, tr); err != nil {
+	if _, err := e.c.SaveTariff(ctx, owner, tr); err != nil {
 		t.Fatal(err)
 	}
 	sub, _ := e.c.Sub(ctx, e.user.ID)
@@ -112,7 +112,7 @@ func TestHiddenTariff(t *testing.T) {
 		t.Fatal(err)
 	}
 	tr.Active = false
-	if _, err := e.c.SaveTariff(ctx, tr); err != nil {
+	if _, err := e.c.SaveTariff(ctx, owner, tr); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.c.Buy(ctx, e.user.ID, tr.ID, 30); err != nil {

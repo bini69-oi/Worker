@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"time"
 )
@@ -70,7 +71,8 @@ func (c *Core) admin(tx Tx, tgID int64) (Admin, error) {
 	return a, nil
 }
 
-// can проверяет право админа на каждый запрос. Нет права: отказ и запись попытки в журнал действий.
+// can проверяет право админа на каждый запрос. Попытку без права пишет в журнал asAdmin, а не can:
+// запись внутри транзакции, которая вернула отказ, откатилась бы вместе с ней.
 func (c *Core) can(ctx context.Context, tx Tx, tgID int64, p Perm) (Admin, error) {
 	a, err := c.admin(tx, tgID)
 	if err != nil {
@@ -87,14 +89,44 @@ func (c *Core) ownerOnly(ctx context.Context, tgID int64, action string) error {
 	if c.isOwner(tgID) {
 		return nil
 	}
-	now := c.clock.Now()
-	_ = c.tx(ctx, func(tx Tx) error {
-		if err := c.audit(ctx, tx, tgID, "denied:"+action, "", nil, now); err != nil {
+	c.deny(ctx, tgID, action)
+	return ErrOwnerOnly
+}
+
+// asAdmin выполняет действие админа: право проверяется, действие делается и пишется в журнал
+// в одной транзакции. Отказ пишется отдельной транзакцией и уходит владельцу тревогой.
+// fn отдаёт, над чем действие (target) и подробности для журнала.
+func (c *Core) asAdmin(ctx context.Context, actorTg int64, p Perm, action string,
+	fn func(tx Tx, a Admin, now time.Time) (string, map[string]string, error)) error {
+	denied := false
+	err := c.tx(ctx, func(tx Tx) error {
+		now := c.clock.Now()
+		a, err := c.can(ctx, tx, actorTg, p)
+		if err != nil {
+			denied = errors.Is(err, ErrForbidden)
 			return err
 		}
-		return c.alert(tx, "admin.denied", map[string]string{"admin": itoa(tgID), "action": action}, now)
+		target, details, err := fn(tx, a, now)
+		if err != nil {
+			return err
+		}
+		return c.audit(ctx, tx, actorTg, action, target, details, now)
 	})
-	return ErrOwnerOnly
+	if denied {
+		c.deny(ctx, actorTg, action)
+	}
+	return err
+}
+
+// deny пишет отказ в журнал и шлёт владельцу тревогу.
+func (c *Core) deny(ctx context.Context, actorTg int64, action string) {
+	now := c.clock.Now()
+	_ = c.tx(ctx, func(tx Tx) error {
+		if err := c.audit(ctx, tx, actorTg, "denied:"+action, "", nil, now); err != nil {
+			return err
+		}
+		return c.alert(tx, "admin.denied", map[string]string{"admin": itoa(actorTg), "action": action}, now)
+	})
 }
 
 // audit пишет действие админа в журнал. Зовётся в той же транзакции, что и само действие.

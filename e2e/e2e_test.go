@@ -97,7 +97,7 @@ func (w *world) panelUser(t *testing.T) paneltest.User {
 func TestSubscriberJourney(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
-	tr, err := w.c.SaveTariff(ctx, core.Tariff{Name: "Месяц", Active: true, Devices: 3, TrafficBytes: 100 << 30,
+	tr, err := w.c.SaveTariff(ctx, 1, core.Tariff{Name: "Месяц", Active: true, Devices: 3, TrafficBytes: 100 << 30,
 		Squads: []string{"11111111-1111-1111-1111-111111111111"}, Periods: []core.Period{{Days: 30, Price: 15000}}})
 	if err != nil {
 		t.Fatal(err)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -19,8 +20,8 @@ var promoCodeRe = regexp.MustCompile(`^[A-Z0-9_-]{3,32}$`)
 // normCode приводит код к виду из базы: без пробелов по краям, заглавными.
 func normCode(code string) string { return strings.ToUpper(strings.TrimSpace(code)) }
 
-// SavePromo создаёт или меняет промокод. Это действие админа.
-func (c *Core) SavePromo(ctx context.Context, p Promo) (Promo, error) {
+// SavePromo создаёт или меняет промокод от имени админа с правом «промокоды».
+func (c *Core) SavePromo(ctx context.Context, actorTg int64, p Promo) (Promo, error) {
 	p.Code = normCode(p.Code)
 	if !promoCodeRe.MatchString(p.Code) || p.Value <= 0 || p.MaxUses < 0 ||
 		(p.Kind != PromoMoney && p.Kind != PromoDays) || (p.Kind == PromoMoney && p.TariffID != 0) {
@@ -29,15 +30,18 @@ func (c *Core) SavePromo(ctx context.Context, p Promo) (Promo, error) {
 	if p.ID == 0 {
 		p.CreatedAt = c.clock.Now()
 	}
-	err := c.tx(ctx, func(tx Tx) error {
+	err := c.asAdmin(ctx, actorTg, PermPromo, "promo.save", func(tx Tx, _ Admin, _ time.Time) (string, map[string]string, error) {
 		if p.TariffID != 0 {
 			if _, err := tx.Tariff(p.TariffID); err != nil {
-				return err
+				return "", nil, err
 			}
 		}
 		var err error
-		p.ID, err = tx.SavePromo(p)
-		return err
+		if p.ID, err = tx.SavePromo(p); err != nil {
+			return "", nil, err
+		}
+		return p.Code, map[string]string{"kind": string(p.Kind), "value": itoa(p.Value), "max_uses": itoa(int64(p.MaxUses)),
+			"active": strconv.FormatBool(p.Active)}, nil
 	})
 	return p, err
 }

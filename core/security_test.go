@@ -70,7 +70,12 @@ func (e *secEnv) approve(t *testing.T, id int64) {
 
 func (e *secEnv) addHelper(t *testing.T, perms ...core.Perm) {
 	t.Helper()
-	id, err := e.c.RequestAddHelper(context.Background(), owner, helper, perms, helpPw)
+	e.addHelperTg(t, helper, perms...)
+}
+
+func (e *secEnv) addHelperTg(t *testing.T, tg int64, perms ...core.Perm) {
+	t.Helper()
+	id, err := e.c.RequestAddHelper(context.Background(), owner, tg, perms, helpPw)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +124,7 @@ func TestHelperPerms(t *testing.T) {
 		t.Fatalf("помощник меняет список админов: ждали ErrOwnerOnly, получили %v", err)
 	}
 	e.process(t)
-	if alerts(e.env, "admin.denied") != 2 {
+	if alerts(e.env, "admin.denied") != 3 {
 		t.Fatalf("владелец не получил тревоги о попытках: %+v", e.notes.ToAdmins)
 	}
 	denied := 0
@@ -128,8 +133,50 @@ func TestHelperPerms(t *testing.T) {
 			denied++
 		}
 	}
-	if denied != 2 {
+	if denied != 3 {
 		t.Fatalf("попытки не записаны в журнал действий: %+v", e.st.Audit())
+	}
+}
+
+func TestEveryAdminActionChecksPerms(t *testing.T) {
+	e := newSecEnv(t)
+	ctx := context.Background()
+	e.addHelper(t, core.PermSupport)
+	if _, err := e.c.SavePromo(ctx, helper, core.Promo{Code: "FREE100K", Kind: core.PromoMoney, Value: 10_000_000, Active: true}); !errors.Is(err, core.ErrForbidden) {
+		t.Fatalf("помощник с поддержкой создал промокод: %v", err)
+	}
+	if _, err := e.c.SaveTariff(ctx, helper, core.Tariff{Name: "Даром", Active: true, Periods: []core.Period{{Days: 365, Price: 0}}}); !errors.Is(err, core.ErrForbidden) {
+		t.Fatalf("помощник с поддержкой создал тариф: %v", err)
+	}
+	if _, err := e.c.AllTariffs(ctx, helper); !errors.Is(err, core.ErrForbidden) {
+		t.Fatalf("помощник с поддержкой видит скрытые тарифы: %v", err)
+	}
+	e.addHelperTg(t, 3, core.PermPromo)
+	if _, err := e.c.SavePromo(ctx, 3, core.Promo{Code: "SPRING26", Kind: core.PromoDays, Value: 7, Active: true}); err != nil {
+		t.Fatal(err)
+	}
+	actions := map[string]int{}
+	for _, a := range e.st.Audit() {
+		actions[a.Action]++
+	}
+	if actions["denied:promo.save"] != 1 || actions["denied:tariff.save"] != 1 || actions["denied:tariff.list"] != 1 || actions["promo.save"] != 1 {
+		t.Fatalf("журнал действий неполный: %v", actions)
+	}
+}
+
+func TestHelperMoneyAlertsOwner(t *testing.T) {
+	e := newSecEnv(t)
+	ctx := context.Background()
+	e.addHelper(t, core.PermGrant)
+	if _, err := e.c.AdminAdjust(ctx, owner, e.user.ID, 500, "владелец"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.c.AdminAdjust(ctx, helper, e.user.ID, 700, "помощник"); err != nil {
+		t.Fatal(err)
+	}
+	e.process(t)
+	if n := alerts(e.env, "admin.helper_money"); n != 1 {
+		t.Fatalf("тревог о деньгах от помощника %d, ждали 1 (владелец не шумит)", n)
 	}
 }
 

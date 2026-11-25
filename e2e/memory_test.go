@@ -16,7 +16,7 @@ func TestMemory10k(t *testing.T) {
 	}
 	w := newWorld(t)
 	ctx := context.Background()
-	tr, err := w.c.SaveTariff(ctx, core.Tariff{Name: "Месяц", Active: true, Periods: []core.Period{{Days: 30, Price: 0}}})
+	tr, err := w.c.SaveTariff(ctx, 1, core.Tariff{Name: "Месяц", Active: true, Periods: []core.Period{{Days: 30, Price: 0}}})
 	if err != nil {
 		t.Fatal(err)
 	}

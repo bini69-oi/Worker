@@ -20,7 +20,7 @@ func TestTariffValidation(t *testing.T) {
 		{Name: "Сброс", Reset: "YEAR", Periods: []core.Period{{Days: 30, Price: 1}}},
 	}
 	for _, tr := range bad {
-		if _, err := e.c.SaveTariff(ctx, tr); !errors.Is(err, core.ErrInvalid) {
+		if _, err := e.c.SaveTariff(ctx, owner, tr); !errors.Is(err, core.ErrInvalid) {
 			t.Errorf("%q: ждали ErrInvalid, получили %v", tr.Name, err)
 		}
 	}
@@ -32,7 +32,7 @@ func TestTariffsOrderAndHidden(t *testing.T) {
 	month := e.tariff(t, "Месяц", core.Period{Days: 30, Price: 15000})
 	year := e.tariff(t, "Год", core.Period{Days: 365, Price: 150000})
 	year.Sort = -1
-	if _, err := e.c.SaveTariff(ctx, year); err != nil {
+	if _, err := e.c.SaveTariff(ctx, owner, year); err != nil {
 		t.Fatal(err)
 	}
 	list, _ := e.c.Tariffs(ctx)
@@ -40,7 +40,7 @@ func TestTariffsOrderAndHidden(t *testing.T) {
 		t.Fatalf("ждали «Год» первым: %+v", list)
 	}
 	month.Active = false
-	if _, err := e.c.SaveTariff(ctx, month); err != nil {
+	if _, err := e.c.SaveTariff(ctx, owner, month); err != nil {
 		t.Fatal(err)
 	}
 	list, _ = e.c.Tariffs(ctx)

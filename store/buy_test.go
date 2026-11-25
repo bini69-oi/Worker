@@ -15,7 +15,7 @@ func TestBuyOnSQLite(t *testing.T) {
 	s, uid := newCoreStore(t)
 	ctx := context.Background()
 	c := core.New(core.Deps{Store: s, Clock: coretest.NewClock(tNow), Config: coretest.NewConfig(t), OwnerID: 1})
-	tr, err := c.SaveTariff(ctx, core.Tariff{Name: "Месяц", Active: true, Periods: []core.Period{{Days: 30, Price: 15000}}})
+	tr, err := c.SaveTariff(ctx, 1, core.Tariff{Name: "Месяц", Active: true, Periods: []core.Period{{Days: 30, Price: 15000}}})
 	if err != nil {
 		t.Fatal(err)
 	}

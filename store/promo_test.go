@@ -19,7 +19,7 @@ func sqlCore(t *testing.T) (*core.Core, *CoreStore) {
 func TestPromoLimitConcurrent(t *testing.T) {
 	c, s := sqlCore(t)
 	ctx := context.Background()
-	if _, err := c.SavePromo(ctx, core.Promo{Code: "Three", Kind: core.PromoMoney, Value: 100, MaxUses: 3, Active: true}); err != nil {
+	if _, err := c.SavePromo(ctx, 1, core.Promo{Code: "Three", Kind: core.PromoMoney, Value: 100, MaxUses: 3, Active: true}); err != nil {
 		t.Fatal(err)
 	}
 	var users []core.User

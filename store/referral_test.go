@@ -14,7 +14,7 @@ func TestRefStatsOnSQLite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tr, err := c.SaveTariff(ctx, core.Tariff{Name: "Месяц", Active: true, Periods: []core.Period{{Days: 30, Price: 10000}}})
+	tr, err := c.SaveTariff(ctx, 1, core.Tariff{Name: "Месяц", Active: true, Periods: []core.Period{{Days: 30, Price: 10000}}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -20,10 +20,11 @@ func TestSyncWithRealPanelClient(t *testing.T) {
 	clock := coretest.NewClock(time.Now().UTC().Truncate(time.Second))
 	c := core.New(core.Deps{
 		Store: s, Clock: clock, Config: coretest.NewConfig(t),
-		Panel: panel.CoreAdapter{Client: panel.New(fake.URL(), paneltest.Token, nil)},
+		Panel:   panel.CoreAdapter{Client: panel.New(fake.URL(), paneltest.Token, nil)},
+		OwnerID: 1,
 	})
 
-	tr, err := c.SaveTariff(ctx, core.Tariff{Name: "Месяц", Active: true, Squads: []string{"11111111-1111-1111-1111-111111111111"},
+	tr, err := c.SaveTariff(ctx, 1, core.Tariff{Name: "Месяц", Active: true, Squads: []string{"11111111-1111-1111-1111-111111111111"},
 		Periods: []core.Period{{Days: 30, Price: 0}}})
 	if err != nil {
 		t.Fatal(err)
