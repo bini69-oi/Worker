@@ -100,10 +100,12 @@ func TestLoadEnvWideRights(t *testing.T) {
 
 func TestLoadEnvBadValues(t *testing.T) {
 	cases := map[string][2]string{
-		"короткий ключ":       {"SECRET_KEY=" + testKey, "SECRET_KEY=c2hvcnQ="},
-		"владелец не число":   {"OWNER_TG_ID=42", "OWNER_TG_ID=admin"},
-		"публичный без https": {"PUBLIC_URL=https://bot.example.com/", "PUBLIC_URL=http://bot.example.com"},
-		"панель без схемы":    {`PANEL_URL="http://127.0.0.1:3000"`, "PANEL_URL=panel.example.com"},
+		"короткий ключ":                {"SECRET_KEY=" + testKey, "SECRET_KEY=c2hvcnQ="},
+		"владелец не число":            {"OWNER_TG_ID=42", "OWNER_TG_ID=admin"},
+		"публичный без https":          {"PUBLIC_URL=https://bot.example.com/", "PUBLIC_URL=http://bot.example.com"},
+		"панель без схемы":             {`PANEL_URL="http://127.0.0.1:3000"`, "PANEL_URL=panel.example.com"},
+		"панель по http извне":         {`PANEL_URL="http://127.0.0.1:3000"`, "PANEL_URL=http://panel.example.com"},
+		"панель по http на внешний IP": {`PANEL_URL="http://127.0.0.1:3000"`, "PANEL_URL=http://203.0.113.5:3000"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -127,5 +129,13 @@ func TestLoadEnvErrorsHaveNoSecrets(t *testing.T) {
 func TestParseEnvBadLine(t *testing.T) {
 	if _, err := parseEnv(strings.NewReader("BOT_TOKEN\n")); err == nil {
 		t.Fatal("ждали ошибку про строку без =")
+	}
+}
+
+func TestPanelHTTPInside(t *testing.T) {
+	for _, u := range []string{"http://127.0.0.1:3000", "http://10.0.0.5:3000", "http://localhost:3000", "http://remnawave:3000", "https://panel.example.com"} {
+		if _, err := cleanURL(u, false); err != nil {
+			t.Errorf("%s: %v", u, err)
+		}
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"net/url"
 	"os"
 	"slices"
@@ -151,5 +152,18 @@ func cleanURL(raw string, httpsOnly bool) (string, error) {
 		}
 		return "", errors.New("нужен адрес на http или https")
 	}
+	if u.Scheme == "http" && !inside(u.Hostname()) {
+		// По http ключ панели шёл бы по сети открытым текстом, а ответы панели можно было бы подменить.
+		return "", errors.New("http можно только до панели на этом сервере или в своей сети, иначе нужен https")
+	}
 	return strings.TrimRight(u.String(), "/"), nil
+}
+
+// inside говорит, что адрес внутренний: этот сервер, частная сеть или имя без точки (контейнер в своей сети).
+func inside(host string) bool {
+	if host == "localhost" || (host != "" && !strings.Contains(host, ".") && net.ParseIP(host) == nil) {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && (ip.IsLoopback() || ip.IsPrivate())
 }
