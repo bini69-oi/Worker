@@ -69,6 +69,22 @@ func TestServeAndStop(t *testing.T) {
 	check("POST", "/pay/unknown", 404)
 	check("POST", "/pay/stars", 401)
 	check("POST", "/panel/webhook", 401)
+	// Чужой адрес через наш прокси: уведомление ЮKassa отклоняется ещё до запроса к её API.
+	req, _ := http.NewRequest("POST", base+"/pay/yookassa", strings.NewReader(`{"event":"payment.succeeded","object":{"id":"x"}}`))
+	req.Header.Set("X-Real-IP", "203.0.113.9")
+	if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != 401 {
+		t.Fatalf("уведомление ЮKassa с чужого адреса: %v %v", resp, err)
+	}
+	for range hookLimit {
+		req, _ := http.NewRequest("POST", base+"/pay/unknown", strings.NewReader("{}"))
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+	check("POST", "/pay/unknown", 429)
+	check("GET", "/healthz", 200)
 
 	a.log.Warn("проверка фильтра", "token", env.BotToken, "panel", env.PanelToken)
 	cancel()

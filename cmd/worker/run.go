@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/bini69-oi/worker/core"
+	"github.com/bini69-oi/worker/guard"
 	"github.com/bini69-oi/worker/jobs"
 	"github.com/bini69-oi/worker/panel"
 	"github.com/bini69-oi/worker/pay"
@@ -36,14 +37,20 @@ type app struct {
 
 // gateways это все кассы. Новая касса добавляется сюда одной строкой.
 func gateways(cfg *settings.Settings) []pay.Gateway {
+	kassa := yookassa.New(cfg, "", nil)
+	kassa.RestrictIPs(yookassa.OfficialNets()) // уведомления ЮKassa только с её адресов
 	return []pay.Gateway{
 		manual.New(cfg),
 		stars.New(cfg),
-		yookassa.New(cfg, "", nil),
+		kassa,
 		cryptobot.New(cfg, "", nil),
 		platega.New(cfg, "", nil),
 	}
 }
+
+// hookLimit это предел запросов с одного IP в минуту на адреса касс и панели. Касса шлёт единицы
+// уведомлений в минуту, а поток подделок упрётся в предел и не нагрузит API касс перепроверками.
+const hookLimit = 120
 
 // secretValues это все известные секреты: из окружения и из секретных настроек. Их вычищает журнал.
 func secretValues(env Env, cfg *settings.Settings) []string {
@@ -61,6 +68,7 @@ func build(env Env, base slog.Handler) (*app, error) {
 	secrets := &redact.Set{}
 	secrets.Add(env.BotToken, env.PanelToken, base64.StdEncoding.EncodeToString(env.SecretKey))
 	log := slog.New(redact.Handler(base, secrets))
+	slog.SetDefault(log) // и журнал пакетов, которые пишут в общий журнал, идёт через фильтр
 
 	db, err := store.Open(env.DBPath)
 	if err != nil {
@@ -84,13 +92,14 @@ func build(env Env, base slog.Handler) (*app, error) {
 		Log:      log,
 	})
 
+	hooks := &guard.Limiter{Max: hookLimit, Window: time.Minute}
 	mux := http.NewServeMux()
-	mux.Handle("POST /pay/{name}", pay.Handler(c, gws, log))
-	mux.Handle("POST /panel/webhook", panel.WebhookHandler(c, func() string { return cfg.Secret("panel.webhook_secret") }, log))
+	mux.Handle("POST /pay/{name}", hooks.Wrap(pay.Handler(c, gws, log)))
+	mux.Handle("POST /panel/webhook", hooks.Wrap(panel.WebhookHandler(c, func() string { return cfg.Secret("panel.webhook_secret") }, log)))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 
 	return &app{
-		db: db, cfg: cfg, core: c, handler: mux, log: log,
+		db: db, cfg: cfg, core: c, handler: guard.RealIP(mux), log: log,
 		jobs: &jobs.Scheduler{Jobs: jobs.CoreJobs(c, cfg), Log: log},
 	}, nil
 }
@@ -104,6 +113,8 @@ func (a *app) serve(ctx context.Context, ln net.Listener) error {
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       2 * time.Minute,
+		// Свои ошибки и паники обработчиков сервер пишет через тот же фильтр секретов.
+		ErrorLog: slog.NewLogLogger(a.log.Handler(), slog.LevelError),
 	}
 	var wg sync.WaitGroup
 	tick := time.NewTicker(settings.RefreshEvery)

@@ -8,12 +8,15 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/bini69-oi/worker/redact"
 )
 
 func main() {
@@ -31,7 +34,9 @@ func main() {
 
 	if len(os.Args) > 1 {
 		if err := command(env, os.Args[1:], os.Stdin, os.Stdout); err != nil {
-			fmt.Fprintln(os.Stderr, "ошибка:", err)
+			secrets := &redact.Set{}
+			secrets.Add(env.BotToken, env.PanelToken, base64.StdEncoding.EncodeToString(env.SecretKey))
+			fmt.Fprintln(os.Stderr, "ошибка:", secrets.String(err.Error()))
 			os.Exit(1)
 		}
 		return
