@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"sync"
 	"time"
@@ -51,13 +52,35 @@ func (c *Core) newConfirm(tx Tx, adminTg int64, kind string, payload []byte, var
 
 // AnswerConfirm принимает нажатие кнопки. Нажать может только тот админ, которому пришло сообщение,
 // и только один раз, пока не истекли 2 минуты. «Нет» шлёт владельцу тревогу. «Да» на опасное действие
-// выполняет его.
+// выполняет его. Вход «Да» так не подтверждается: только кнопкой с кодом через AnswerLogin.
 func (c *Core) AnswerConfirm(ctx context.Context, confirmID, pressedBy int64, yes bool) error {
-	answer := "no"
-	if yes {
-		answer = "yes"
-	}
+	return c.answer(ctx, confirmID, pressedBy, func(cf Confirm) (bool, error) {
+		if yes && cf.Kind == "login" {
+			return false, ErrInvalid
+		}
+		return yes, nil
+	})
+}
+
+// AnswerLogin принимает нажатие кнопки с кодом на сообщении о входе. Код тот, что показал браузер:
+// вход подтверждён. Код другой: это «Нет», то есть тревога и блок адреса, с которого входили.
+func (c *Core) AnswerLogin(ctx context.Context, confirmID, pressedBy int64, code string) error {
+	return c.answer(ctx, confirmID, pressedBy, func(cf Confirm) (bool, error) {
+		if cf.Kind != "login" {
+			return false, ErrInvalid
+		}
+		var p loginPayload
+		if err := json.Unmarshal(cf.Payload, &p); err != nil {
+			return false, err
+		}
+		return p.Code != "" && subtle.ConstantTimeCompare([]byte(code), []byte(p.Code)) == 1, nil
+	})
+}
+
+// answer записывает ответ на подтверждение. decide по подтверждению говорит, «Да» это или «Нет».
+func (c *Core) answer(ctx context.Context, confirmID, pressedBy int64, decide func(Confirm) (bool, error)) error {
 	var cf Confirm
+	yes := false
 	err := c.tx(ctx, func(tx Tx) error {
 		now := c.clock.Now()
 		var err error
@@ -66,6 +89,13 @@ func (c *Core) AnswerConfirm(ctx context.Context, confirmID, pressedBy int64, ye
 		}
 		if cf.AdminTg != pressedBy {
 			return ErrForbidden
+		}
+		if yes, err = decide(cf); err != nil {
+			return err
+		}
+		answer := "no"
+		if yes {
+			answer = "yes"
 		}
 		ok, err := tx.AnswerConfirm(confirmID, answer, now)
 		if err != nil {
@@ -77,8 +107,12 @@ func (c *Core) AnswerConfirm(ctx context.Context, confirmID, pressedBy int64, ye
 		if !yes {
 			vars := map[string]string{"admin": itoa(cf.AdminTg), "kind": cf.Kind}
 			var p loginPayload
-			if json.Unmarshal(cf.Payload, &p) == nil && p.IP != "" {
+			if cf.Kind == "login" && json.Unmarshal(cf.Payload, &p) == nil && p.IP != "" {
 				vars["ip"], vars["agent"] = p.IP, p.Agent
+				// Админ сказал «не я»: с этого адреса вход для него закрыт на час, даже с верным паролем.
+				if err := tx.SetLimit("login:"+itoa(cf.AdminTg)+"@"+p.IP, loginTries, now.Add(loginMaxPause)); err != nil {
+					return err
+				}
 			}
 			return c.alert(tx, "admin.confirm_rejected", vars, now)
 		}

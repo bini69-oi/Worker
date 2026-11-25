@@ -113,6 +113,8 @@ type Tx interface {
 
 	CreateSession(tokenHash []byte, s Session) error
 	Session(tokenHash []byte) (Session, error)
+	// TouchSession запоминает время последнего запроса сессии.
+	TouchSession(tokenHash []byte, at time.Time) error
 	CloseSession(id string, at time.Time) error
 	CloseAdminSessions(adminTg int64, at time.Time) error
 

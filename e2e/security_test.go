@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/bini69-oi/worker/core"
@@ -16,22 +17,23 @@ func TestSecurityJourney(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	id, nonce, err := w.c.LoginStart(ctx, owner, "owner-password-1", core.LoginInfo{IP: "10.0.0.1", Agent: "Safari"})
+	st, err := w.c.LoginStart(ctx, owner, "owner-password-1", core.LoginInfo{IP: "10.0.0.1", Agent: "Safari"})
 	if err != nil {
 		t.Fatal(err)
 	}
+	id, nonce := st.ConfirmID, st.Nonce
 	w.process(t)
-	if len(w.notes.ToConfirm) != 1 || w.notes.ToConfirm[0].ConfirmID != id {
-		t.Fatalf("подтверждение входа не ушло в Telegram: %+v", w.notes.ToConfirm)
+	if len(w.notes.ToConfirm) != 1 || w.notes.ToConfirm[0].ConfirmID != id || !strings.Contains(w.notes.ToConfirm[0].Vars["codes"], st.Code) {
+		t.Fatalf("подтверждение входа с кодами не ушло в Telegram: %+v", w.notes.ToConfirm)
 	}
-	if err := w.c.AnswerConfirm(ctx, id, owner, true); err != nil {
+	if err := w.c.AnswerLogin(ctx, id, owner, st.Code); err != nil {
 		t.Fatal(err)
 	}
 	token, _, err := w.c.LoginFinish(ctx, id, nonce, core.LoginInfo{IP: "10.0.0.1", Agent: "Safari"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a, _, err := w.c.SessionAdmin(ctx, token); err != nil || !a.Owner {
+	if a, _, err := w.c.SessionAdmin(ctx, token, core.LoginInfo{}); err != nil || !a.Owner {
 		t.Fatalf("сессия владельца: %+v %v", a, err)
 	}
 

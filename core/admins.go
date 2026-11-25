@@ -26,7 +26,7 @@ var HelperPerms = []Perm{PermUsers, PermGrant, PermPromo, PermTariffs, PermBroad
 // Admin это владелец или помощник. Владелец определяется только по OWNER_TG_ID из окружения.
 type Admin struct {
 	TgID       int64
-	PassHash   string
+	PassHash   string `json:"-"` // хэш пароля не уходит ни в админку, ни в выгрузку
 	Perms      []Perm
 	Owner      bool
 	CreatedAt  time.Time
@@ -65,7 +65,9 @@ func (c *Core) admin(tx Tx, tgID int64) (Admin, error) {
 		a.TgID, a.Owner, a.Perms = tgID, true, HelperPerms
 		return a, nil
 	}
-	if err != nil || !a.DisabledAt.IsZero() {
+	// Помощник без единого права не админ. Так же отпадает строка прежнего владельца
+	// после смены OWNER_TG_ID: у неё нет прав, и войти по старому паролю нельзя.
+	if err != nil || !a.DisabledAt.IsZero() || len(a.Perms) == 0 {
 		return Admin{}, ErrForbidden
 	}
 	return a, nil

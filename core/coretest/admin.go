@@ -124,6 +124,15 @@ func (t *tx) Session(hash []byte) (core.Session, error) {
 	return r.Session, nil
 }
 
+func (t *tx) TouchSession(hash []byte, at time.Time) error {
+	k := hex.EncodeToString(hash)
+	if r, ok := t.st.sessions[k]; ok {
+		r.SeenAt = at
+		t.st.sessions[k] = r
+	}
+	return nil
+}
+
 func (t *tx) CloseSession(id string, at time.Time) error {
 	for k, r := range t.st.sessions {
 		if r.ID == id && r.ClosedAt.IsZero() {

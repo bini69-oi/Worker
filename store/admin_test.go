@@ -26,21 +26,22 @@ func TestLoginOnSQLite(t *testing.T) {
 	if err := c.SetOwnerPassword(ctx, "owner-password-1"); err != nil {
 		t.Fatal(err)
 	}
-	id, nonce, err := c.LoginStart(ctx, 1, "owner-password-1", core.LoginInfo{IP: "1.2.3.4", Agent: "Firefox"})
+	st, err := c.LoginStart(ctx, 1, "owner-password-1", core.LoginInfo{IP: "1.2.3.4", Agent: "Firefox"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := c.AnswerConfirm(ctx, id, 1, true); err != nil {
+	id, nonce := st.ConfirmID, st.Nonce
+	if err := c.AnswerLogin(ctx, id, 1, st.Code); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.AnswerConfirm(ctx, id, 1, true); err != core.ErrConfirmGone {
+	if err := c.AnswerLogin(ctx, id, 1, st.Code); err != core.ErrConfirmGone {
 		t.Fatalf("второе нажатие на SQLite: %v", err)
 	}
 	token, sess, err := c.LoginFinish(ctx, id, nonce, core.LoginInfo{IP: "1.2.3.4", Agent: "Firefox"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := c.SessionAdmin(ctx, token); err != nil {
+	if _, _, err := c.SessionAdmin(ctx, token, core.LoginInfo{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -57,7 +58,7 @@ func TestLoginOnSQLite(t *testing.T) {
 	if err := c.CloseSession(ctx, 1, sess.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := c.SessionAdmin(ctx, token); err != core.ErrSessionGone {
+	if _, _, err := c.SessionAdmin(ctx, token, core.LoginInfo{}); err != core.ErrSessionGone {
 		t.Fatalf("закрытая сессия на SQLite работает: %v", err)
 	}
 	var audits int

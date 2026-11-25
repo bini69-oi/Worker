@@ -2,7 +2,9 @@ package core_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -86,11 +88,12 @@ func (e *secEnv) addHelperTg(t *testing.T, tg int64, perms ...core.Perm) {
 func (e *secEnv) login(t *testing.T, tg int64, pw string) string {
 	t.Helper()
 	ctx := context.Background()
-	id, nonce, err := e.c.LoginStart(ctx, tg, pw, core.LoginInfo{IP: info, Agent: "Firefox"})
+	st, err := e.c.LoginStart(ctx, tg, pw, core.LoginInfo{IP: info, Agent: "Firefox"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := e.c.AnswerConfirm(ctx, id, tg, true); err != nil {
+	id, nonce := st.ConfirmID, st.Nonce
+	if err := e.c.AnswerLogin(ctx, id, tg, st.Code); err != nil {
 		t.Fatal(err)
 	}
 	token, _, err := e.c.LoginFinish(ctx, id, nonce, core.LoginInfo{IP: info})
@@ -183,10 +186,11 @@ func TestHelperMoneyAlertsOwner(t *testing.T) {
 func TestLoginTwoSteps(t *testing.T) {
 	e := newSecEnv(t)
 	ctx := context.Background()
-	id, nonce, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info, Agent: "Firefox"})
+	st, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info, Agent: "Firefox"})
 	if err != nil {
 		t.Fatal(err)
 	}
+	id, nonce := st.ConfirmID, st.Nonce
 	cf := e.lastConfirm(t)
 	if cf.ConfirmID != id || cf.AdminTgID != owner || cf.Vars["ip"] != info || cf.Vars["agent"] != "Firefox" {
 		t.Fatalf("сообщение о входе не то: %+v", cf)
@@ -194,11 +198,16 @@ func TestLoginTwoSteps(t *testing.T) {
 	if _, _, err := e.c.LoginFinish(ctx, id, nonce, core.LoginInfo{}); !errors.Is(err, core.ErrNotConfirmed) {
 		t.Fatalf("без кнопки вход прошёл: %v", err)
 	}
-	if err := e.c.AnswerConfirm(ctx, id, helper, true); !errors.Is(err, core.ErrForbidden) {
+	if err := e.c.AnswerLogin(ctx, id, helper, st.Code); !errors.Is(err, core.ErrForbidden) {
 		t.Fatalf("кнопку нажал чужой: ждали ErrForbidden, получили %v", err)
 	}
-	e.approve(t, id)
-	if err := e.c.AnswerConfirm(ctx, id, owner, true); !errors.Is(err, core.ErrConfirmGone) {
+	if err := e.c.AnswerConfirm(ctx, id, owner, true); !errors.Is(err, core.ErrInvalid) {
+		t.Fatalf("вход подтверждён простым «Да» без кода: %v", err)
+	}
+	if err := e.c.AnswerLogin(ctx, id, owner, st.Code); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.c.AnswerLogin(ctx, id, owner, st.Code); !errors.Is(err, core.ErrConfirmGone) {
 		t.Fatalf("повторное нажатие: ждали ErrConfirmGone, получили %v", err)
 	}
 	if _, _, err := e.c.LoginFinish(ctx, id, "чужой-ключ", core.LoginInfo{}); !errors.Is(err, core.ErrNotConfirmed) {
@@ -211,7 +220,7 @@ func TestLoginTwoSteps(t *testing.T) {
 	if _, _, err := e.c.LoginFinish(ctx, id, nonce, core.LoginInfo{IP: info}); err == nil {
 		t.Fatal("одно подтверждение дало вторую сессию")
 	}
-	a, _, err := e.c.SessionAdmin(ctx, token)
+	a, _, err := e.c.SessionAdmin(ctx, token, core.LoginInfo{})
 	if err != nil || !a.Owner {
 		t.Fatalf("сессия не работает: %+v %v", a, err)
 	}
@@ -224,12 +233,12 @@ func TestLoginTwoSteps(t *testing.T) {
 func TestLoginConfirmExpires(t *testing.T) {
 	e := newSecEnv(t)
 	ctx := context.Background()
-	id, _, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info})
+	st, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info})
 	if err != nil {
 		t.Fatal(err)
 	}
 	e.clock.Add(2*time.Minute + time.Second)
-	if err := e.c.AnswerConfirm(ctx, id, owner, true); !errors.Is(err, core.ErrConfirmGone) {
+	if err := e.c.AnswerLogin(ctx, st.ConfirmID, owner, st.Code); !errors.Is(err, core.ErrConfirmGone) {
 		t.Fatalf("кнопка после 2 минут: ждали ErrConfirmGone, получили %v", err)
 	}
 }
@@ -237,10 +246,11 @@ func TestLoginConfirmExpires(t *testing.T) {
 func TestLoginRejected(t *testing.T) {
 	e := newSecEnv(t)
 	ctx := context.Background()
-	id, nonce, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info, Agent: "Chrome"})
+	st, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info, Agent: "Chrome"})
 	if err != nil {
 		t.Fatal(err)
 	}
+	id, nonce := st.ConfirmID, st.Nonce
 	if err := e.c.AnswerConfirm(ctx, id, owner, false); err != nil {
 		t.Fatal(err)
 	}
@@ -260,11 +270,11 @@ func TestLoginBruteForce(t *testing.T) {
 	e := newSecEnv(t)
 	ctx := context.Background()
 	for i := range 5 {
-		if _, _, err := e.c.LoginStart(ctx, owner, "wrong-password", core.LoginInfo{IP: info}); !errors.Is(err, core.ErrBadLogin) {
+		if _, err := e.c.LoginStart(ctx, owner, "wrong-password", core.LoginInfo{IP: info}); !errors.Is(err, core.ErrBadLogin) {
 			t.Fatalf("попытка %d: ждали ErrBadLogin, получили %v", i+1, err)
 		}
 	}
-	if _, _, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info}); !errors.Is(err, core.ErrLoginLocked) {
+	if _, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info}); !errors.Is(err, core.ErrLoginLocked) {
 		t.Fatalf("шестая попытка, даже с верным паролем: ждали ErrLoginLocked, получили %v", err)
 	}
 	e.process(t)
@@ -272,14 +282,14 @@ func TestLoginBruteForce(t *testing.T) {
 		t.Fatalf("владелец не получил уведомление о переборе: %+v", e.notes.ToAdmins)
 	}
 	e.clock.Add(time.Minute + time.Second)
-	if _, _, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: "5.6.7.8"}); err != nil {
+	if _, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: "5.6.7.8"}); err != nil {
 		t.Fatalf("после паузы верный пароль должен проходить: %v", err)
 	}
 }
 
 func TestUnknownAdminSameError(t *testing.T) {
 	e := newSecEnv(t)
-	if _, _, err := e.c.LoginStart(context.Background(), 999, ownerPw, core.LoginInfo{IP: info}); !errors.Is(err, core.ErrBadLogin) {
+	if _, err := e.c.LoginStart(context.Background(), 999, ownerPw, core.LoginInfo{IP: info}); !errors.Is(err, core.ErrBadLogin) {
 		t.Fatalf("незнакомый админ должен получать ту же ошибку, что неверный пароль: %v", err)
 	}
 }
@@ -287,7 +297,7 @@ func TestUnknownAdminSameError(t *testing.T) {
 func TestOwnerPassword(t *testing.T) {
 	e := newEnv(t)
 	c := core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, OwnerID: owner})
-	if _, _, err := c.LoginStart(context.Background(), owner, "anything-long", core.LoginInfo{}); !errors.Is(err, core.ErrNoPassword) {
+	if _, err := c.LoginStart(context.Background(), owner, "anything-long", core.LoginInfo{IP: info}); !errors.Is(err, core.ErrNoPassword) {
 		t.Fatalf("первый запуск без пароля: ждали ErrNoPassword, получили %v", err)
 	}
 	if err := c.SetOwnerPassword(context.Background(), "short"); !errors.Is(err, core.ErrWeakPassword) {
@@ -310,12 +320,12 @@ func TestSessionsCloseAndExpire(t *testing.T) {
 	if err := e.c.CloseSession(ctx, owner, list[0].ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := e.c.SessionAdmin(ctx, helperToken); !errors.Is(err, core.ErrSessionGone) {
+	if _, _, err := e.c.SessionAdmin(ctx, helperToken, core.LoginInfo{}); !errors.Is(err, core.ErrSessionGone) {
 		t.Fatalf("закрытая сессия работает: %v", err)
 	}
 	token := e.login(t, owner, ownerPw)
 	e.clock.Add(12*time.Hour + time.Second)
-	if _, _, err := e.c.SessionAdmin(ctx, token); !errors.Is(err, core.ErrSessionGone) {
+	if _, _, err := e.c.SessionAdmin(ctx, token, core.LoginInfo{}); !errors.Is(err, core.ErrSessionGone) {
 		t.Fatalf("сессия старше 12 часов работает: %v", err)
 	}
 }
@@ -353,7 +363,7 @@ func TestHelperRemovedLosesSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.approve(t, id)
-	if _, _, err := e.c.SessionAdmin(ctx, token); err == nil {
+	if _, _, err := e.c.SessionAdmin(ctx, token, core.LoginInfo{}); err == nil {
 		t.Fatal("отключённый помощник остался в админке")
 	}
 	if _, err := e.c.AdminAdjust(ctx, helper, e.user.ID, 100, "x"); !errors.Is(err, core.ErrForbidden) {
@@ -463,9 +473,9 @@ func TestStrangerCannotLockOwner(t *testing.T) {
 	e := newSecEnv(t)
 	ctx := context.Background()
 	for range 20 {
-		_, _, _ = e.c.LoginStart(ctx, owner, "guess-guess", core.LoginInfo{IP: "6.6.6.6"})
+		_, _ = e.c.LoginStart(ctx, owner, "guess-guess", core.LoginInfo{IP: "6.6.6.6"})
 	}
-	if _, _, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info}); err != nil {
+	if _, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info}); err != nil {
 		t.Fatalf("перебор с чужого IP заблокировал вход владельцу: %v", err)
 	}
 }
@@ -477,7 +487,7 @@ func TestParallelGuessesCounted(t *testing.T) {
 	var passed atomic.Int32
 	for range 30 {
 		wg.Go(func() {
-			if _, _, err := e.c.LoginStart(ctx, owner, "wrong-password", core.LoginInfo{IP: info}); !errors.Is(err, core.ErrLoginLocked) {
+			if _, err := e.c.LoginStart(ctx, owner, "wrong-password", core.LoginInfo{IP: info}); !errors.Is(err, core.ErrLoginLocked) {
 				passed.Add(1)
 			}
 		})
@@ -491,11 +501,144 @@ func TestParallelGuessesCounted(t *testing.T) {
 func TestLoginInfoCleaned(t *testing.T) {
 	e := newSecEnv(t)
 	agent := "Safari\n\x1b[31mВаш iPhone, Москва" + strings.Repeat("x", 500)
-	if _, _, err := e.c.LoginStart(context.Background(), owner, ownerPw, core.LoginInfo{IP: info, Agent: agent}); err != nil {
+	if _, err := e.c.LoginStart(context.Background(), owner, ownerPw, core.LoginInfo{IP: info, Agent: agent}); err != nil {
 		t.Fatal(err)
 	}
 	cf := e.lastConfirm(t)
 	if strings.ContainsAny(cf.Vars["agent"], "\n\x1b") || len([]rune(cf.Vars["agent"])) > 200 {
 		t.Fatalf("браузер не очищен: %q", cf.Vars["agent"])
+	}
+}
+
+func TestLoginWrongCodeBlocksAddress(t *testing.T) {
+	e := newSecEnv(t)
+	ctx := context.Background()
+	st, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: "7.7.7.7", Agent: "Firefox"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrong := "10"
+	if st.Code == wrong {
+		wrong = "11"
+	}
+	if err := e.c.AnswerLogin(ctx, st.ConfirmID, owner, wrong); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.c.LoginFinish(ctx, st.ConfirmID, st.Nonce, core.LoginInfo{IP: "7.7.7.7"}); err == nil {
+		t.Fatal("вход прошёл после неверного кода")
+	}
+	if _, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: "7.7.7.7"}); !errors.Is(err, core.ErrLoginLocked) {
+		t.Fatalf("после «не я» адрес должен быть закрыт даже с верным паролем: %v", err)
+	}
+	if _, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info}); err != nil {
+		t.Fatalf("свой адрес закрываться не должен: %v", err)
+	}
+	e.process(t)
+	if alerts(e.env, "admin.confirm_rejected") != 1 {
+		t.Fatalf("тревога о неверном коде не ушла: %+v", e.notes.ToAdmins)
+	}
+}
+
+func TestLoginCodesOffered(t *testing.T) {
+	e := newSecEnv(t)
+	st, err := e.c.LoginStart(context.Background(), owner, ownerPw, core.LoginInfo{IP: info})
+	if err != nil {
+		t.Fatal(err)
+	}
+	codes := strings.Split(e.lastConfirm(t).Vars["codes"], ",")
+	seen := map[string]bool{}
+	for _, c := range codes {
+		seen[c] = true
+	}
+	if len(codes) != 3 || len(seen) != 3 || !seen[st.Code] {
+		t.Fatalf("кнопки %v, код браузера %s", codes, st.Code)
+	}
+}
+
+func TestLoginSpreadAlarm(t *testing.T) {
+	e := newSecEnv(t)
+	ctx := context.Background()
+	for i := range 25 {
+		ip := "9.9." + itoa(i) + ".1"
+		if _, err := e.c.LoginStart(ctx, owner, "wrong-password", core.LoginInfo{IP: ip}); !errors.Is(err, core.ErrBadLogin) {
+			t.Fatalf("попытка с %s: %v", ip, err)
+		}
+	}
+	e.process(t)
+	if alerts(e.env, "admin.login_spread") != 1 {
+		t.Fatalf("перебор с разных адресов без тревоги: %+v", e.notes.ToAdmins)
+	}
+	if _, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info}); err != nil {
+		t.Fatalf("владелец со своего адреса должен входить: %v", err)
+	}
+}
+
+func TestLoginMessagesLimited(t *testing.T) {
+	e := newSecEnv(t)
+	ctx := context.Background()
+	for range 5 {
+		if _, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := e.c.LoginStart(ctx, owner, ownerPw, core.LoginInfo{IP: info}); !errors.Is(err, core.ErrTooManyTries) {
+		t.Fatalf("шестое сообщение о входе за 10 минут: %v", err)
+	}
+}
+
+func TestLoginNeedsAddress(t *testing.T) {
+	e := newSecEnv(t)
+	if _, err := e.c.LoginStart(context.Background(), owner, ownerPw, core.LoginInfo{}); !errors.Is(err, core.ErrInvalid) {
+		t.Fatalf("вход без IP: %v", err)
+	}
+}
+
+func TestSessionIdleAndNewAddress(t *testing.T) {
+	e := newSecEnv(t)
+	ctx := context.Background()
+	token := e.login(t, owner, ownerPw)
+	e.clock.Add(50 * time.Minute)
+	if _, _, err := e.c.SessionAdmin(ctx, token, core.LoginInfo{IP: info}); err != nil {
+		t.Fatalf("сессия через 50 минут: %v", err)
+	}
+	for range 2 {
+		if _, _, err := e.c.SessionAdmin(ctx, token, core.LoginInfo{IP: "8.8.8.8"}); err != nil {
+			t.Fatalf("смена адреса не закрывает сессию: %v", err)
+		}
+	}
+	e.process(t)
+	if alerts(e.env, "admin.session_ip") != 1 {
+		t.Fatalf("тревог о новом адресе сессии не одна: %+v", e.notes.ToAdmins)
+	}
+	e.clock.Add(61 * time.Minute)
+	if _, _, err := e.c.SessionAdmin(ctx, token, core.LoginInfo{IP: info}); !errors.Is(err, core.ErrSessionGone) {
+		t.Fatalf("сессия после часа простоя: %v", err)
+	}
+}
+
+func TestHelperNeedsPermsAndHashHidden(t *testing.T) {
+	e := newSecEnv(t)
+	if _, err := e.c.RequestAddHelper(context.Background(), owner, 5, nil, helpPw); !errors.Is(err, core.ErrInvalid) {
+		t.Fatalf("помощник без прав: %v", err)
+	}
+	e.addHelper(t, core.PermStats)
+	list, err := e.c.Admins(context.Background(), owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(list)
+	if strings.Contains(string(b), "argon2") {
+		t.Fatalf("хэш пароля в списке админов: %s", b)
+	}
+}
+
+func itoa(n int) string { return strconv.Itoa(n) }
+
+func TestOldOwnerCannotLogin(t *testing.T) {
+	e := newSecEnv(t)
+	// Владельца сменили в .env: прежний со своим паролем больше не входит.
+	c := core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, OwnerID: 77})
+	if _, err := c.LoginStart(context.Background(), owner, ownerPw, core.LoginInfo{IP: info}); !errors.Is(err, core.ErrBadLogin) {
+		t.Fatalf("прежний владелец: %v", err)
 	}
 }

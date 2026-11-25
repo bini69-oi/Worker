@@ -79,7 +79,7 @@ func TestAdminPasswordCommand(t *testing.T) {
 	}
 	defer db.Close()
 	c := core.New(core.Deps{Store: store.NewCoreStore(db), OwnerID: 1})
-	if _, _, err := c.LoginStart(context.Background(), 1, "owner-password-1", core.LoginInfo{IP: "1.1.1.1"}); err != nil {
+	if _, err := c.LoginStart(context.Background(), 1, "owner-password-1", core.LoginInfo{IP: "1.1.1.1"}); err != nil {
 		t.Fatalf("вход с заданным паролем: %v", err)
 	}
 }

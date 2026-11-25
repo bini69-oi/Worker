@@ -100,7 +100,7 @@ func (c *Core) RequestAddHelper(ctx context.Context, actorTg, helperTg int64, pe
 	if err := c.ownerOnly(ctx, actorTg, "admins.add"); err != nil {
 		return 0, err
 	}
-	if helperTg <= 0 || c.isOwner(helperTg) || len([]rune(password)) < minPassword {
+	if helperTg <= 0 || c.isOwner(helperTg) || len([]rune(password)) < minPassword || len(perms) == 0 {
 		return 0, ErrInvalid
 	}
 	for _, p := range perms {

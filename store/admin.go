@@ -144,18 +144,19 @@ func (t *coreTx) UseConfirm(id int64, at time.Time) (bool, error) {
 	return n == 1, err
 }
 
-const sessionCols = `token_hash, admin_tg_id, ip, agent, created_at, expires_at, closed_at`
+const sessionCols = `token_hash, admin_tg_id, ip, agent, created_at, expires_at, seen_at, closed_at`
 
 func scanSession(r scanner) (core.Session, error) {
 	var s core.Session
 	var hash []byte
-	var created, expires int64
+	var created, expires, seen int64
 	var closed sql.NullInt64
-	if err := r.Scan(&hash, &s.AdminTg, &s.IP, &s.Agent, &created, &expires, &closed); err != nil {
+	if err := r.Scan(&hash, &s.AdminTg, &s.IP, &s.Agent, &created, &expires, &seen, &closed); err != nil {
 		return s, err
 	}
 	s.ID = hex.EncodeToString(hash[:min(8, len(hash))])
 	s.CreatedAt, s.ExpiresAt, s.ClosedAt = time.Unix(created, 0).UTC(), time.Unix(expires, 0).UTC(), unix(closed)
+	s.SeenAt = time.Unix(seen, 0).UTC()
 	return s, nil
 }
 
@@ -179,8 +180,13 @@ func (s *CoreStore) Sessions(ctx context.Context, now time.Time) ([]core.Session
 
 func (t *coreTx) CreateSession(hash []byte, s core.Session) error {
 	_, err := t.q.ExecContext(t.ctx,
-		"INSERT INTO admin_sessions (token_hash, admin_tg_id, ip, agent, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
-		hash, s.AdminTg, s.IP, s.Agent, s.CreatedAt.Unix(), s.ExpiresAt.Unix())
+		"INSERT INTO admin_sessions (token_hash, admin_tg_id, ip, agent, created_at, expires_at, seen_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		hash, s.AdminTg, s.IP, s.Agent, s.CreatedAt.Unix(), s.ExpiresAt.Unix(), s.SeenAt.Unix())
+	return err
+}
+
+func (t *coreTx) TouchSession(hash []byte, at time.Time) error {
+	_, err := t.q.ExecContext(t.ctx, "UPDATE admin_sessions SET seen_at = ? WHERE token_hash = ?", at.Unix(), hash)
 	return err
 }
 

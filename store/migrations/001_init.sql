@@ -173,6 +173,7 @@ CREATE TABLE admin_sessions (
     agent       TEXT    NOT NULL DEFAULT '',
     created_at  INTEGER NOT NULL,
     expires_at  INTEGER NOT NULL,
+    seen_at     INTEGER NOT NULL, -- последний запрос: сессия без запросов закрывается
     closed_at   INTEGER
 ) STRICT;
 
