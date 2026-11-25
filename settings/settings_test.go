@@ -152,3 +152,21 @@ func TestDurationAndBoolGetters(t *testing.T) {
 		t.Fatalf("длительность записана как %q", got)
 	}
 }
+
+func TestReloadKeepsSecretThatStoppedDecrypting(t *testing.T) {
+	st := newFake()
+	s, err := New(st, NewKey(), time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetSecret("yookassa.secret_key", "live_kassa_key_123"); err != nil {
+		t.Fatal(err)
+	}
+	st.rows["yookassa.secret_key"] = "enc1:испорчено"
+	if err := s.Reload(); err == nil {
+		t.Fatal("испорченный секрет прочитан без ошибки")
+	}
+	if got := s.Secret("yookassa.secret_key"); got != "live_kassa_key_123" {
+		t.Fatalf("после сбоя перечитывания секрет пропал: %q", got)
+	}
+}

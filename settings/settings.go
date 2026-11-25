@@ -62,6 +62,12 @@ func (s *Settings) Reload() error {
 		vals[key] = v
 	}
 	s.mu.Lock()
+	// Значение, которое не прочиталось, остаётся прежним: сбой перечитывания не выключает кассы.
+	for _, key := range bad {
+		if old, ok := s.vals[key]; ok {
+			vals[key] = old
+		}
+	}
 	s.vals = vals
 	s.mu.Unlock()
 	if len(bad) > 0 {
