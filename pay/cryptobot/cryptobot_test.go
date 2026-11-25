@@ -58,7 +58,7 @@ func hook(token string, p core.Payment, extAmount int64) *http.Request {
 	id, _ := strconv.ParseInt(p.ExternalID, 10, 64)
 	body, _ := json.Marshal(map[string]any{
 		"update_id": 1, "update_type": "invoice_paid",
-		"payload": invoice{ID: id, Status: "paid", Payload: strconv.FormatInt(p.ID, 10), Amount: amount(formatKopeks(extAmount)), Fiat: "RUB"},
+		"payload": invoice{ID: id, Status: "paid", Payload: payloadPrefix + strconv.FormatInt(p.ID, 10), Amount: amount(formatKopeks(extAmount)), Fiat: "RUB"},
 	})
 	r := httptest.NewRequest(http.MethodPost, "/pay/cryptobot", strings.NewReader(string(body)))
 	r.Header.Set("crypto-pay-api-signature", hexSign(token, body))
@@ -124,5 +124,21 @@ func TestAmountStringOrNumber(t *testing.T) {
 		if err := json.Unmarshal([]byte(raw), &inv); err != nil || string(inv.Amount) != want {
 			t.Errorf("%s: получили %q (%v)", raw, inv.Amount, err)
 		}
+	}
+}
+
+func TestPaidInvoiceNeedsRublesAndAmount(t *testing.T) {
+	for _, inv := range []invoice{
+		{ID: 1, Status: "paid", Payload: "worker:1", Amount: "300", Fiat: ""},
+		{ID: 1, Status: "paid", Payload: "worker:1", Amount: "300", Fiat: "USD"},
+		{ID: 1, Status: "paid", Payload: "worker:1", Fiat: "RUB"},
+	} {
+		if _, err := toEvent(inv); err == nil {
+			t.Errorf("счёт принят: %+v", inv)
+		}
+	}
+	ev, err := toEvent(invoice{ID: 7, Status: "paid", Payload: "other:5", Amount: "300", Fiat: "RUB"})
+	if err != nil || ev.PaymentID != 0 || ev.ExtAmount != 30000 {
+		t.Fatalf("чужая метка не должна давать наш номер: %+v %v", ev, err)
 	}
 }

@@ -160,7 +160,7 @@ func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, err
 		"currency_type": "fiat",
 		"fiat":          "RUB",
 		"amount":        formatKopeks(p.Amount),
-		"payload":       strconv.FormatInt(p.ID, 10),
+		"payload":       payloadPrefix + strconv.FormatInt(p.ID, 10),
 	}
 	if assets := cleanAssets(g.cfg.String(keyAssets)); assets != "" {
 		req["accepted_assets"] = assets
@@ -192,26 +192,20 @@ func (g *Gateway) Status(ctx context.Context, p core.Payment) (core.GatewayEvent
 		if strconv.FormatInt(inv.ID, 10) != p.ExternalID {
 			continue
 		}
-		return toEvent(inv, p.ExtAmount)
+		return toEvent(inv)
 	}
 	return core.GatewayEvent{}, errors.New("cryptobot: счёта с таким номером у кассы нет")
 }
 
-// toEvent переводит счёт в событие. Сумму берём из счёта, а не из нашей записи, чтобы сверка её поймала.
-func toEvent(inv invoice, fallback int64) (core.GatewayEvent, error) {
-	ev := core.GatewayEvent{ExternalID: strconv.FormatInt(inv.ID, 10), ExtAmount: fallback, Status: core.PayPending}
-	if id, err := strconv.ParseInt(inv.Payload, 10, 64); err == nil {
-		ev.PaymentID = id
-	}
-	if inv.Amount != "" {
-		if inv.Fiat != "" && inv.Fiat != "RUB" {
-			return core.GatewayEvent{}, fmt.Errorf("cryptobot: счёт выставлен не в рублях (%s)", inv.Fiat)
-		}
-		k, err := parseKopeks(string(inv.Amount))
-		if err != nil {
-			return core.GatewayEvent{}, err
-		}
-		ev.ExtAmount = k
+// payloadPrefix метит наши счета: по нему чужой счёт того же приложения не примется за наш.
+const payloadPrefix = "worker:"
+
+// toEvent переводит счёт в событие. Сумму берём только из счёта, а не из нашей записи, чтобы сверка её поймала.
+// Оплаченный счёт обязан быть в рублях и с суммой: иначе сравнивать не с чем.
+func toEvent(inv invoice) (core.GatewayEvent, error) {
+	ev := core.GatewayEvent{ExternalID: strconv.FormatInt(inv.ID, 10), Status: core.PayPending}
+	if n, ok := strings.CutPrefix(inv.Payload, payloadPrefix); ok {
+		ev.PaymentID, _ = strconv.ParseInt(n, 10, 64)
 	}
 	switch inv.Status {
 	case "paid":
@@ -219,6 +213,20 @@ func toEvent(inv invoice, fallback int64) (core.GatewayEvent, error) {
 	case "expired":
 		ev.Status = core.PayExpired
 	}
+	if ev.Status != core.PayPaid {
+		return ev, nil
+	}
+	if inv.Fiat != "RUB" {
+		return core.GatewayEvent{}, fmt.Errorf("cryptobot: счёт выставлен не в рублях (%q)", inv.Fiat)
+	}
+	if inv.Amount == "" {
+		return core.GatewayEvent{}, errors.New("cryptobot: в счёте нет суммы")
+	}
+	k, err := parseKopeks(string(inv.Amount))
+	if err != nil {
+		return core.GatewayEvent{}, err
+	}
+	ev.ExtAmount = k
 	return ev, nil
 }
 
@@ -245,7 +253,7 @@ func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 		return core.GatewayEvent{ExternalID: strconv.FormatInt(upd.Payload.ID, 10), Status: core.PayPending}, nil
 	}
 	upd.Payload.Status = "paid"
-	return toEvent(upd.Payload, 0)
+	return toEvent(upd.Payload)
 }
 
 func sign(token string, body []byte) []byte {
