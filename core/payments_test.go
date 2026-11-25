@@ -326,3 +326,20 @@ func TestRefundReversesCredit(t *testing.T) {
 		t.Fatalf("повтор оплаты после возврата зачислил: %d", b)
 	}
 }
+
+func TestPaymentsPerUserLimited(t *testing.T) {
+	e := newPayEnv(t)
+	ctx := context.Background()
+	for i := range 5 {
+		if _, _, err := e.c.CreatePayment(ctx, e.user.ID, "fake", 1000); err != nil {
+			t.Fatalf("счёт %d: %v", i+1, err)
+		}
+	}
+	if _, _, err := e.c.CreatePayment(ctx, e.user.ID, "fake", 1000); !errors.Is(err, core.ErrTooManyTries) {
+		t.Fatalf("шестой счёт за 10 минут: %v", err)
+	}
+	e.clock.Add(11 * time.Minute)
+	if _, _, err := e.c.CreatePayment(ctx, e.user.ID, "fake", 1000); err != nil {
+		t.Fatalf("после окна счёт не создан: %v", err)
+	}
+}

@@ -77,6 +77,12 @@ func (c *Core) gateway(name string) (Gateway, bool) {
 	return nil, false
 }
 
+// Предел счетов на абонента: не больше payTries за payWindow.
+const (
+	payTries  = 5
+	payWindow = 10 * time.Minute
+)
+
 // CreatePayment создаёт платёж «ожидает» и счёт в кассе.
 func (c *Core) CreatePayment(ctx context.Context, userID int64, gateway string, amount int64) (Payment, Invoice, error) {
 	g, ok := c.gateway(gateway)
@@ -90,6 +96,10 @@ func (c *Core) CreatePayment(ctx context.Context, userID int64, gateway string, 
 	p := Payment{UserID: userID, Gateway: gateway, Amount: amount, Status: PayPending, CreatedAt: c.clock.Now()}
 	err := c.tx(ctx, func(tx Tx) error {
 		if _, err := activeUser(tx, userID); err != nil {
+			return err
+		}
+		// Счета в кассе без предела позволяли бы наплодить их тысячи, и касса ограничила бы магазин.
+		if err := countTry(tx, "pay:"+itoa(userID), payTries, payWindow, p.CreatedAt); err != nil {
 			return err
 		}
 		var err error
