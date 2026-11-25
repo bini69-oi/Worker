@@ -60,6 +60,10 @@ func secretValues(env Env, cfg *settings.Settings) []string {
 			vals = append(vals, cfg.Secret(d.Key))
 		}
 	}
+	// ЮKassa шлёт пару «магазин:ключ» в заголовке Basic: в base64 ловится только пара целиком.
+	if key := cfg.Secret("yookassa.secret_key"); key != "" {
+		vals = append(vals, cfg.String("yookassa.shop_id")+":"+key)
+	}
 	return vals
 }
 

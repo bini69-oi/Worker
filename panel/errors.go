@@ -43,7 +43,7 @@ func (c *Client) statusError(method, path string, status int, body []byte) *Erro
 	if status == http.StatusUnauthorized || status == http.StatusForbidden {
 		text += " (панель не приняла токен)"
 	} else if snippet := strings.TrimSpace(string(body)); snippet != "" {
-		text += ": " + c.redact(cut(snippet, 200))
+		text += ": " + cut(c.redact(snippet), 200) // сначала чистим, потом режем: обрывок токена на краю не останется
 	}
 	return &Error{Status: status, Msg: text}
 }

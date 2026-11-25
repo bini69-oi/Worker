@@ -2,6 +2,8 @@ package redact
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -58,5 +60,25 @@ func TestEncodedFormsHidden(t *testing.T) {
 		if got := set.String(s); strings.Contains(got, "AAH") {
 			t.Errorf("секрет в закодированном виде остался: %q", got)
 		}
+	}
+}
+
+func TestBase64AndHexHidden(t *testing.T) {
+	set := &Set{}
+	set.Add("shop1:live_secret_key")
+	basic := "Authorization: Basic " + base64.StdEncoding.EncodeToString([]byte("shop1:live_secret_key"))
+	hexed := hex.EncodeToString([]byte("shop1:live_secret_key"))
+	for _, s := range []string{basic, "dump " + hexed} {
+		if got := set.String(s); !strings.Contains(got, Mask) || strings.Contains(got, hexed) {
+			t.Errorf("секрет в кодировке остался: %q", got)
+		}
+	}
+}
+
+func TestLongerSecretFirst(t *testing.T) {
+	set := &Set{}
+	set.Add("abcdef", "abcdef-and-more-secret")
+	if got := set.String("x abcdef-and-more-secret y"); got != "x *** y" {
+		t.Fatalf("длинный секрет открылся по частям: %q", got)
 	}
 }

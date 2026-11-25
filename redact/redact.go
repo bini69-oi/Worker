@@ -4,6 +4,8 @@ package redact
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"log/slog"
 	"net/url"
@@ -25,7 +27,9 @@ type Set struct {
 }
 
 // Add добавляет секреты. Пустые и короткие значения пропускаются. Вместе с секретом запоминаются его виды
-// в адресе (URL-кодирование) и в JSON, чтобы секрет не проскочил в журнал внутри ссылки или ответа.
+// в адресе (URL-кодирование), в JSON, в base64 и hex, чтобы секрет не проскочил в журнал внутри ссылки,
+// ответа или заголовка Basic. Длинные значения заменяются первыми: если один секрет входит в другой,
+// длинный не откроется по частям.
 func (s *Set) Add(vals ...string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -33,7 +37,10 @@ func (s *Set) Add(vals ...string) {
 		if len(v) < minLen {
 			continue
 		}
-		forms := []string{v, url.QueryEscape(v), url.PathEscape(v), strings.ReplaceAll(v, "/", `\/`)}
+		b := []byte(v)
+		forms := []string{v, url.QueryEscape(v), url.PathEscape(v), strings.ReplaceAll(v, "/", `\/`),
+			base64.StdEncoding.EncodeToString(b), base64.RawStdEncoding.EncodeToString(b),
+			base64.URLEncoding.EncodeToString(b), base64.RawURLEncoding.EncodeToString(b), hex.EncodeToString(b)}
 		if j, err := json.Marshal(v); err == nil {
 			forms = append(forms, strings.Trim(string(j), `"`))
 		}
@@ -43,6 +50,7 @@ func (s *Set) Add(vals ...string) {
 			}
 		}
 	}
+	slices.SortStableFunc(s.vals, func(a, b string) int { return len(b) - len(a) })
 }
 
 // String заменяет в строке все известные секреты на ***.
