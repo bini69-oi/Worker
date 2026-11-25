@@ -26,10 +26,11 @@ type Client struct {
 }
 
 // New создаёт клиент. base это адрес панели без пути, например https://panel.example.com.
-// Если http равен nil, берётся клиент с тайм-аутом 15 секунд.
+// Если http равен nil, берётся клиент с тайм-аутом 15 секунд, который не ходит по редиректам:
+// иначе ключ панели в заголовке мог бы уйти по адресу, на который панель (или подменивший её) перенаправит.
 func New(base, token string, httpClient *http.Client) *Client {
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 15 * time.Second}
+		httpClient = &http.Client{Timeout: 15 * time.Second, CheckRedirect: noRedirect}
 	}
 	return &Client{
 		base:  strings.TrimRight(base, "/"),
@@ -131,3 +132,5 @@ func (c *Client) current(ctx context.Context) (contract, error) {
 	}
 	return contractFor(v), nil
 }
+
+func noRedirect(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
