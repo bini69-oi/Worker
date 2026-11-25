@@ -42,6 +42,15 @@ func (t *tx) Payment(id int64) (core.Payment, error) {
 	return p, nil
 }
 
+func (t *tx) Paid(userID int64) (bool, error) {
+	for _, p := range t.st.pays {
+		if p.UserID == userID && p.Status == core.PayPaid {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (t *tx) PaymentByExt(gateway, externalID string) (core.Payment, error) {
 	for _, p := range t.st.pays {
 		if p.Gateway == gateway && p.ExternalID == externalID && externalID != "" {

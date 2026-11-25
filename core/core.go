@@ -80,6 +80,8 @@ type Tx interface {
 	CreatePayment(p Payment) (int64, error)
 	Payment(id int64) (Payment, error)
 	PaymentByExt(gateway, externalID string) (Payment, error)
+	// Paid говорит, есть ли у абонента хоть один оплаченный платёж: платил ли он настоящими деньгами.
+	Paid(userID int64) (bool, error)
 	// SetPaymentExt запоминает номер и сумму платежа в кассе.
 	SetPaymentExt(id int64, externalID string, extAmount int64, extCurrency string) error
 	// MarkPaid переводит платёж в «оплачен» из «ожидает», «истёк» или «ошибка»: деньги могли прийти позже срока.

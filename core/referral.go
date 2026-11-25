@@ -44,24 +44,37 @@ func (c *Core) registerTx(tx Tx, tgID int64, username, lang, refCode string, now
 			return u, ErrDuplicate
 		}
 	}
-	if err != nil {
-		return u, err
+	return u, err
+}
+
+// welcomeBonus начисляет приглашённому бонус после его первой настоящей оплаты, а не при входе:
+// иначе пачка новых аккаунтов по своей ссылке давала бы бесплатные деньги. Бонус уникален для абонента.
+func (c *Core) welcomeBonus(tx Tx, userID int64, now time.Time) error {
+	bonus := c.cfg.Int("ref.welcome_bonus")
+	if bonus <= 0 {
+		return nil
 	}
-	if bonus := c.cfg.Int("ref.welcome_bonus"); u.ReferrerID != 0 && bonus > 0 {
-		if _, err := move(tx, now, LedgerEntry{UserID: u.ID, Amount: bonus, Reason: ReasonReferral,
-			RefType: "ref_welcome", RefID: u.ID}); err != nil {
-			return u, err
-		}
-		u.Balance = bonus
+	u, err := tx.User(userID)
+	if err != nil || u.ReferrerID == 0 {
+		return err
 	}
-	return u, nil
+	_, err = move(tx, now, LedgerEntry{UserID: u.ID, Amount: bonus, Reason: ReasonReferral, RefType: "ref_welcome", RefID: u.ID})
+	if errors.Is(err, ErrDuplicate) {
+		return nil
+	}
+	return err
 }
 
 // referralBonus начисляет пригласившему бонус за покупку приглашённого. За первую покупку действуют
 // ref.first_percent и ref.first_fixed, за следующие ref.each_percent. Бонус уникален для каждой покупки.
+// Бонус идёт только за абонента, который хоть раз платил настоящими деньгами: свои аккаунты по своей
+// ссылке, купившие на подарки и промокоды, ничего не приносят.
 func (c *Core) referralBonus(tx Tx, buyer User, buy LedgerEntry, price int64, now time.Time) error {
 	if buyer.ReferrerID == 0 || price <= 0 {
 		return nil
+	}
+	if paid, err := tx.Paid(buyer.ID); err != nil || !paid {
+		return err
 	}
 	first, err := tx.AddNotice(buyer.ID, "ref_first_buy", "1", now)
 	if err != nil {

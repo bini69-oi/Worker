@@ -100,7 +100,7 @@ var base = []Def{
 	{Key: "ref.each_percent", Kind: KindInt, Default: "0", Group: "referral",
 		Desc: "Процент пригласившему с каждой следующей покупки приглашённого, 0 выключено"},
 	{Key: "ref.welcome_bonus", Kind: KindMoney, Default: "0", Group: "referral",
-		Desc: "Бонус приглашённому при первом входе, копейки"},
+		Desc: "Бонус приглашённому после его первой оплаты, копейки"},
 	{Key: "remind.days", Kind: KindString, Default: "3,1", Group: "notify",
 		Desc: "За сколько дней до окончания напоминать, через запятую"},
 	{Key: "stars.rate", Kind: KindMoney, Default: "150", Group: "pay",

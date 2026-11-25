@@ -6,6 +6,7 @@ import (
 
 	"github.com/bini69-oi/worker/core"
 	"github.com/bini69-oi/worker/core/coretest"
+	"github.com/bini69-oi/worker/pay/manual"
 	"github.com/bini69-oi/worker/settings"
 )
 
@@ -83,6 +84,26 @@ func (e *env) bought(t *testing.T) core.Subscription {
 		t.Fatal(err)
 	}
 	return sub
+}
+
+// pay проводит настоящую оплату абонента через ручную кассу: реферальные бонусы идут только за платящих.
+func (e *env) pay(t *testing.T, userID, amount int64) {
+	t.Helper()
+	ctx := context.Background()
+	for k, v := range map[string]string{"manual.enabled": "true", "manual.details": "Карта 0000"} {
+		if err := e.cfg.Set(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes, OwnerID: owner,
+		Gateways: []core.Gateway{manual.New(e.cfg)}})
+	p, _, err := c.CreatePayment(ctx, userID, "manual", amount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.ConfirmManual(ctx, owner, p.ID); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func (e *env) balance(t *testing.T) int64 {

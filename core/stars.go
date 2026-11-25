@@ -44,6 +44,9 @@ func (c *Core) ChargeRecurring(ctx context.Context, userID, tariffID int64, char
 			RefType: "payment", RefID: p.ID}); err != nil {
 			return err
 		}
+		if err := c.welcomeBonus(tx, userID, now); err != nil {
+			return err
+		}
 		return enqueueAdmin(tx, AdminTask{Topic: TopicPayments, Key: "admin.payment_recurring",
 			Vars: map[string]string{"user_id": itoa(userID), "stars": itoa(stars), "amount": itoa(amount)}}, now)
 	})

@@ -171,6 +171,9 @@ func (c *Core) creditTx(tx Tx, gateway string, ev GatewayEvent, now time.Time) (
 		RefType: "payment", RefID: p.ID}); err != nil {
 		return Payment{}, p, err
 	}
+	if err := c.welcomeBonus(tx, p.UserID, now); err != nil {
+		return Payment{}, p, err
+	}
 	return p, p, c.afterTopup(tx, p, now)
 }
 

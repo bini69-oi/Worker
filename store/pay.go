@@ -67,6 +67,13 @@ func (t *coreTx) CreatePayment(p core.Payment) (int64, error) {
 	return res.LastInsertId()
 }
 
+func (t *coreTx) Paid(userID int64) (bool, error) {
+	var ok bool
+	err := t.q.QueryRowContext(t.ctx,
+		"SELECT EXISTS (SELECT 1 FROM payments WHERE user_id = ? AND status = 'paid')", userID).Scan(&ok)
+	return ok, err
+}
+
 func (t *coreTx) Payment(id int64) (core.Payment, error) {
 	p, err := scanPayment(t.q.QueryRowContext(t.ctx, "SELECT "+payCols+" FROM payments WHERE id = ?", id))
 	if errors.Is(err, sql.ErrNoRows) {

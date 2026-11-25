@@ -5,11 +5,20 @@ import (
 	"testing"
 
 	"github.com/bini69-oi/worker/core"
+	"github.com/bini69-oi/worker/core/coretest"
+	"github.com/bini69-oi/worker/pay/manual"
 )
 
 func TestRefStatsOnSQLite(t *testing.T) {
-	c, _ := sqlCore(t)
+	c, s := sqlCore(t)
 	ctx := context.Background()
+	cfg := coretest.NewConfig(t)
+	for k, v := range map[string]string{"manual.enabled": "true", "manual.details": "Карта 0000"} {
+		if err := cfg.Set(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pc := core.New(core.Deps{Store: s, Clock: coretest.NewClock(tNow), Config: cfg, OwnerID: 1, Gateways: []core.Gateway{manual.New(cfg)}})
 	host, err := c.Register(ctx, 1, "host", "ru")
 	if err != nil {
 		t.Fatal(err)
@@ -26,7 +35,11 @@ func TestRefStatsOnSQLite(t *testing.T) {
 		if i == 2 {
 			continue
 		}
-		if _, err := c.AdminAdjust(ctx, 1, f.ID, 10000, "тест"); err != nil {
+		p, _, err := pc.CreatePayment(ctx, f.ID, "manual", 10000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := pc.ConfirmManual(ctx, 1, p.ID); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := c.Buy(ctx, f.ID, tr.ID, 30); err != nil {
