@@ -36,7 +36,7 @@ func fakeAPI(t *testing.T) *httptest.Server {
 				t.Errorf("счёт создан не так: %v", req)
 			}
 			id := int64(len(invoices) + 500)
-			inv := invoice{ID: id, Status: "active", Payload: req["payload"], Amount: req["amount"], Fiat: "RUB", BotURL: "https://t.me/CryptoBot?start=IV" + strconv.FormatInt(id, 10)}
+			inv := invoice{ID: id, Status: "active", Payload: req["payload"], Amount: amount(req["amount"]), Fiat: "RUB", BotURL: "https://t.me/CryptoBot?start=IV" + strconv.FormatInt(id, 10)}
 			invoices[id] = inv
 			reply, _ := json.Marshal(map[string]any{"ok": true, "result": inv})
 			_, _ = w.Write(reply)
@@ -58,7 +58,7 @@ func hook(token string, p core.Payment, extAmount int64) *http.Request {
 	id, _ := strconv.ParseInt(p.ExternalID, 10, 64)
 	body, _ := json.Marshal(map[string]any{
 		"update_id": 1, "update_type": "invoice_paid",
-		"payload": invoice{ID: id, Status: "paid", Payload: strconv.FormatInt(p.ID, 10), Amount: formatKopeks(extAmount), Fiat: "RUB"},
+		"payload": invoice{ID: id, Status: "paid", Payload: strconv.FormatInt(p.ID, 10), Amount: amount(formatKopeks(extAmount)), Fiat: "RUB"},
 	})
 	r := httptest.NewRequest(http.MethodPost, "/pay/cryptobot", strings.NewReader(string(body)))
 	r.Header.Set("crypto-pay-api-signature", hexSign(token, body))
@@ -114,6 +114,15 @@ func TestParseKopeks(t *testing.T) {
 	for _, in := range []string{"", "abc", "-5", "1.2.3", "1e3", "10.501", ".", "1,5"} {
 		if _, err := parseKopeks(in); err == nil {
 			t.Errorf("%q: ждали ошибку", in)
+		}
+	}
+}
+
+func TestAmountStringOrNumber(t *testing.T) {
+	for raw, want := range map[string]string{`{"amount":"300.00"}`: "300.00", `{"amount":300}`: "300", `{"amount":123.4}`: "123.4"} {
+		var inv invoice
+		if err := json.Unmarshal([]byte(raw), &inv); err != nil || string(inv.Amount) != want {
+			t.Errorf("%s: получили %q (%v)", raw, inv.Amount, err)
 		}
 	}
 }

@@ -68,12 +68,33 @@ func New(cfg Config, baseURL string, client *http.Client) *Gateway {
 func (g *Gateway) Name() string     { return "cryptobot" }
 func (g *Gateway) Configured() bool { return g.cfg.Secret(keyToken) != "" }
 
+// amount это сумма счёта. API шлёт её строкой ("300.00"), но число тоже принимаем,
+// чтобы смена формата не ломала приём оплат.
+type amount string
+
+func (a *amount) UnmarshalJSON(b []byte) error {
+	if len(b) > 0 && b[0] == '"' {
+		var s string
+		if err := json.Unmarshal(b, &s); err != nil {
+			return err
+		}
+		*a = amount(s)
+		return nil
+	}
+	var n json.Number
+	if err := json.Unmarshal(b, &n); err != nil {
+		return err
+	}
+	*a = amount(n.String())
+	return nil
+}
+
 // invoice это счёт в ответе API и в вебхуке (нужные нам поля).
 type invoice struct {
 	ID         int64  `json:"invoice_id"`
 	Status     string `json:"status"`
 	Payload    string `json:"payload"`
-	Amount     string `json:"amount"`
+	Amount     amount `json:"amount"`
 	Fiat       string `json:"fiat"`
 	BotURL     string `json:"bot_invoice_url"`
 	MiniAppURL string `json:"mini_app_invoice_url"`
@@ -186,7 +207,7 @@ func toEvent(inv invoice, fallback int64) (core.GatewayEvent, error) {
 		if inv.Fiat != "" && inv.Fiat != "RUB" {
 			return core.GatewayEvent{}, fmt.Errorf("cryptobot: счёт выставлен не в рублях (%s)", inv.Fiat)
 		}
-		k, err := parseKopeks(inv.Amount)
+		k, err := parseKopeks(string(inv.Amount))
 		if err != nil {
 			return core.GatewayEvent{}, err
 		}
