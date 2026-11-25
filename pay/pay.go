@@ -59,8 +59,10 @@ func Handler(c *core.Core, list []Gateway, log *slog.Logger) http.Handler {
 			// Платёж не наш или уже удалён: отвечаем 200, чтобы касса не повторяла вечно.
 			log.Warn("вебхук о неизвестном платеже", "gateway", name, "external_id", ev.ExternalID)
 			w.WriteHeader(http.StatusOK)
-		case errors.Is(err, core.ErrAmountMismatch):
-			http.Error(w, "amount mismatch", http.StatusBadRequest)
+		case errors.Is(err, core.ErrAmountMismatch), errors.Is(err, core.ErrInvalid):
+			// Сумма не та или номер кассы чужой: повтор не поможет, админ уже получил сообщение о сумме.
+			log.Warn("оплата отклонена", "gateway", name, "err", err)
+			http.Error(w, "rejected", http.StatusBadRequest)
 		default:
 			log.Error("оплата не зачислена", "gateway", name, "err", err)
 			http.Error(w, "retry later", http.StatusInternalServerError)
