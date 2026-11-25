@@ -9,13 +9,17 @@ import (
 	"time"
 )
 
-// Защита от перебора промокодов: не больше promoTries неверных кодов за promoWindow.
+// Защита от перебора промокодов: не больше promoTries неверных кодов за promoWindow с одного абонента
+// и не больше promoAllTries со всех вместе, чтобы перебор с пачки аккаунтов тоже упёрся в предел.
 const (
-	promoTries  = 10
-	promoWindow = 10 * time.Minute
+	promoTries    = 10
+	promoAllTries = 300
+	promoWindow   = 10 * time.Minute
+	promoAllKey   = "promo:all"
 )
 
-var promoCodeRe = regexp.MustCompile(`^[A-Z0-9_-]{3,32}$`)
+// promoCodeRe это вид кода. Не короче 6 знаков: короткий код подбирается перебором.
+var promoCodeRe = regexp.MustCompile(`^[A-Z0-9_-]{6,32}$`)
 
 // normCode приводит код к виду из базы: без пробелов по краям, заглавными.
 func normCode(code string) string { return strings.ToUpper(strings.TrimSpace(code)) }
@@ -52,19 +56,18 @@ func (c *Core) SavePromo(ctx context.Context, actorTg int64, p Promo) (Promo, er
 func (c *Core) ApplyPromo(ctx context.Context, userID int64, code string) (Promo, error) {
 	key := "promo:" + itoa(userID)
 	now := c.clock.Now()
+	alarm := false
 	if err := c.tx(ctx, func(tx Tx) error {
-		count, until, err := tx.Limit(key)
-		if err != nil {
+		if err := countTry(tx, key, promoTries, promoWindow, now); err != nil {
 			return err
 		}
-		if now.Before(until) && count >= promoTries {
-			return ErrTooManyTries
-		}
-		if !now.Before(until) {
-			count, until = 0, now.Add(promoWindow)
-		}
-		return tx.SetLimit(key, count+1, until)
+		err := countTry(tx, promoAllKey, promoAllTries, promoWindow, now)
+		alarm = errors.Is(err, ErrTooManyTries)
+		return err
 	}); err != nil {
+		if alarm {
+			c.promoAlarm(ctx, now)
+		}
 		return Promo{}, err
 	}
 
@@ -92,11 +95,10 @@ func (c *Core) ApplyPromo(ctx context.Context, userID int64, code string) (Promo
 		}
 		out = p
 		// Удачная попытка не в счёт.
-		count, until, err := tx.Limit(key)
-		if err != nil || count == 0 {
+		if err := untry(tx, key); err != nil {
 			return err
 		}
-		return tx.SetLimit(key, count-1, until)
+		return untry(tx, promoAllKey)
 	})
 	if errors.Is(err, ErrNotFound) {
 		return out, ErrPromoNotFound
@@ -153,4 +155,39 @@ func (c *Core) grantPromo(tx Tx, p Promo, u User, now time.Time) error {
 		return err
 	}
 	return enqueueSync(tx, sub.ID, now)
+}
+
+// countTry засчитывает попытку по ключу заранее. Больше max попыток за окно: ErrTooManyTries до конца окна.
+func countTry(tx Tx, key string, max int, window time.Duration, now time.Time) error {
+	count, until, err := tx.Limit(key)
+	if err != nil {
+		return err
+	}
+	if now.Before(until) && count >= max {
+		return ErrTooManyTries
+	}
+	if !now.Before(until) {
+		count, until = 0, now.Add(window)
+	}
+	return tx.SetLimit(key, count+1, until)
+}
+
+// untry возвращает удачную попытку назад.
+func untry(tx Tx, key string) error {
+	count, until, err := tx.Limit(key)
+	if err != nil || count == 0 {
+		return err
+	}
+	return tx.SetLimit(key, count-1, until)
+}
+
+// promoAlarm сообщает владельцу, что промокоды перебирают с многих аккаунтов. Один раз за окно.
+func (c *Core) promoAlarm(ctx context.Context, now time.Time) {
+	_ = c.tx(ctx, func(tx Tx) error {
+		first, err := tx.AddNotice(0, "promo_bruteforce", now.Truncate(promoWindow).Format(time.RFC3339), now)
+		if err != nil || !first {
+			return err
+		}
+		return c.alert(tx, "admin.promo_bruteforce", nil, now)
+	})
 }

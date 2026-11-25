@@ -45,8 +45,8 @@ func TestPromoDays(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	sub := e.bought(t)
-	e.promo(t, core.Promo{Code: "WEEK7", Kind: core.PromoDays, Value: 7})
-	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "week7"); err != nil {
+	e.promo(t, core.Promo{Code: "WEEK07", Kind: core.PromoDays, Value: 7})
+	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "week07"); err != nil {
 		t.Fatal(err)
 	}
 	after, _ := e.c.Sub(ctx, e.user.ID)
@@ -63,8 +63,8 @@ func TestPromoDaysWithoutSub(t *testing.T) {
 	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "NOTARIFF"); !errors.Is(err, core.ErrPromoNeedSub) {
 		t.Fatalf("код без тарифа и без подписки: ждали ErrPromoNeedSub, получили %v", err)
 	}
-	e.promo(t, core.Promo{Code: "FREE7", Kind: core.PromoDays, Value: 7, TariffID: tr.ID})
-	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "FREE7"); err != nil {
+	e.promo(t, core.Promo{Code: "FREE07", Kind: core.PromoDays, Value: 7, TariffID: tr.ID})
+	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "FREE07"); err != nil {
 		t.Fatal(err)
 	}
 	sub, err := e.c.Sub(ctx, e.user.ID)
@@ -76,18 +76,18 @@ func TestPromoDaysWithoutSub(t *testing.T) {
 func TestPromoLimits(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
-	e.promo(t, core.Promo{Code: "ONE", Kind: core.PromoMoney, Value: 100, MaxUses: 1})
-	e.promo(t, core.Promo{Code: "OLD", Kind: core.PromoMoney, Value: 100, ExpiresAt: t0.Add(-time.Second)})
+	e.promo(t, core.Promo{Code: "ONE001", Kind: core.PromoMoney, Value: 100, MaxUses: 1})
+	e.promo(t, core.Promo{Code: "OLD001", Kind: core.PromoMoney, Value: 100, ExpiresAt: t0.Add(-time.Second)})
 	e.promo(t, core.Promo{Code: "NEWBIE", Kind: core.PromoMoney, Value: 100, NewOnly: true})
 
-	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "ONE"); err != nil {
+	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "ONE001"); err != nil {
 		t.Fatal(err)
 	}
 	other, _ := e.c.Register(ctx, 2002, "petr", "ru")
-	if _, err := e.c.ApplyPromo(ctx, other.ID, "ONE"); !errors.Is(err, core.ErrPromoExhausted) {
+	if _, err := e.c.ApplyPromo(ctx, other.ID, "ONE001"); !errors.Is(err, core.ErrPromoExhausted) {
 		t.Fatalf("лимит исчерпан: ждали ErrPromoExhausted, получили %v", err)
 	}
-	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "OLD"); !errors.Is(err, core.ErrPromoExpired) {
+	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "OLD001"); !errors.Is(err, core.ErrPromoExpired) {
 		t.Fatalf("код истёк: ждали ErrPromoExpired, получили %v", err)
 	}
 	e.bought(t)
@@ -102,17 +102,17 @@ func TestPromoLimits(t *testing.T) {
 func TestPromoBruteForce(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
-	e.promo(t, core.Promo{Code: "REAL", Kind: core.PromoMoney, Value: 100})
+	e.promo(t, core.Promo{Code: "REAL01", Kind: core.PromoMoney, Value: 100})
 	for i := range 10 {
-		if _, err := e.c.ApplyPromo(ctx, e.user.ID, "GUESS"+string(rune('A'+i))); !errors.Is(err, core.ErrPromoNotFound) {
+		if _, err := e.c.ApplyPromo(ctx, e.user.ID, "GUESS1"+string(rune('A'+i))); !errors.Is(err, core.ErrPromoNotFound) {
 			t.Fatalf("попытка %d: ждали ErrPromoNotFound, получили %v", i+1, err)
 		}
 	}
-	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "REAL"); !errors.Is(err, core.ErrTooManyTries) {
+	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "REAL01"); !errors.Is(err, core.ErrTooManyTries) {
 		t.Fatalf("после 10 неверных верный код должен отклоняться: %v", err)
 	}
 	e.clock.Add(10 * time.Minute)
-	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "REAL"); err != nil {
+	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "REAL01"); err != nil {
 		t.Fatalf("после окна верный код должен пройти: %v", err)
 	}
 }
@@ -122,8 +122,8 @@ func TestPromoValidation(t *testing.T) {
 	for _, p := range []core.Promo{
 		{Code: "AB", Kind: core.PromoMoney, Value: 1},
 		{Code: "SPACE CODE", Kind: core.PromoMoney, Value: 1},
-		{Code: "ZERO", Kind: core.PromoMoney, Value: 0},
-		{Code: "KIND", Kind: "gift", Value: 1},
+		{Code: "ZERO00", Kind: core.PromoMoney, Value: 0},
+		{Code: "KIND01", Kind: "gift01", Value: 1},
 		{Code: "MONEYTARIFF", Kind: core.PromoMoney, Value: 1, TariffID: 1},
 	} {
 		if _, err := e.c.SavePromo(context.Background(), owner, p); !errors.Is(err, core.ErrInvalid) {
@@ -158,5 +158,40 @@ func TestPromoSuccessNotCounted(t *testing.T) {
 		if _, err := e.c.ApplyPromo(ctx, e.user.ID, fmt.Sprintf("good%02d", i)); err != nil {
 			t.Fatalf("верный код %d отклонён: %v", i, err)
 		}
+	}
+}
+
+func TestPromoBruteForceFromManyAccounts(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	e.promo(t, core.Promo{Code: "SECRET99", Kind: core.PromoMoney, Value: 100})
+	blocked := false
+	for i := range 40 {
+		u, err := e.c.Register(ctx, int64(5000+i), "bot", "ru")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for j := range 10 {
+			if _, err := e.c.ApplyPromo(ctx, u.ID, fmt.Sprintf("TRY%03d%02d", i, j)); errors.Is(err, core.ErrTooManyTries) {
+				blocked = true
+			}
+		}
+	}
+	if !blocked {
+		t.Fatal("перебор с 40 аккаунтов не упёрся в общий предел")
+	}
+	fresh, _ := e.c.Register(ctx, 9999, "real", "ru")
+	if _, err := e.c.ApplyPromo(ctx, fresh.ID, "SECRET99"); !errors.Is(err, core.ErrTooManyTries) {
+		t.Fatalf("во время перебора код должен быть закрыт для всех: %v", err)
+	}
+	e.process(t)
+	n := 0
+	for _, a := range e.notes.ToAdmins {
+		if a.Key == "admin.promo_bruteforce" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("тревог о переборе %d, ждали 1", n)
 	}
 }

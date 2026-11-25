@@ -234,8 +234,8 @@ func TestPromoSubCannotAutoRenewWithoutPeriod(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	tr := e.tariff(t, "Месяц", core.Period{Days: 30, Price: 100})
-	e.promo(t, core.Promo{Code: "FREE7", Kind: core.PromoDays, Value: 7, TariffID: tr.ID})
-	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "FREE7"); err != nil {
+	e.promo(t, core.Promo{Code: "FREE07", Kind: core.PromoDays, Value: 7, TariffID: tr.ID})
+	if _, err := e.c.ApplyPromo(ctx, e.user.ID, "FREE07"); err != nil {
 		t.Fatal(err)
 	}
 	if err := e.c.SetAutoRenew(ctx, e.user.ID, true); !errors.Is(err, core.ErrNoPeriod) {
