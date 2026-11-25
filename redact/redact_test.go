@@ -47,3 +47,16 @@ func TestErrorText(t *testing.T) {
 		t.Fatalf("ключ остался в тексте ошибки: %q", got)
 	}
 }
+
+func TestEncodedFormsHidden(t *testing.T) {
+	set := &Set{}
+	set.Add("123456:AAH/x+y=token")
+	for _, s := range []string{
+		"GET /bot123456%3AAAH%2Fx%2By%3Dtoken/getMe",
+		`{"token":"123456:AAH\/x+y=token"}`,
+	} {
+		if got := set.String(s); strings.Contains(got, "AAH") {
+			t.Errorf("секрет в закодированном виде остался: %q", got)
+		}
+	}
+}

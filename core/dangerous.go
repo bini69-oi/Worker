@@ -40,15 +40,33 @@ func (c *Core) request(ctx context.Context, actorTg int64, kind string, payload 
 	var cf Confirm
 	err = c.tx(ctx, func(tx Tx) error {
 		now := c.clock.Now()
-		if cf, err = c.newConfirm(tx, c.owner, kind, body, vars, now); err != nil {
+		if cf, err = c.newConfirm(tx, c.owner, kind, body, requestVars(ctx, actorTg, vars), now); err != nil {
 			return err
 		}
 		return c.audit(ctx, tx, actorTg, "request:"+kind, itoa(cf.ID), vars, now)
 	})
 	if err == nil && secret != "" {
-		c.secrets.put(cf.ID, secret, cf.ExpiresAt)
+		c.secrets.put(cf.ID, secret, cf.ExpiresAt, c.clock.Now())
 	}
 	return cf.ID, err
+}
+
+// requestVars дополняет сообщение владельцу: кто просит и с какого IP. Владелец видит, на что жмёт «Да».
+func requestVars(ctx context.Context, actorTg int64, vars map[string]string) map[string]string {
+	out := map[string]string{"by": itoa(actorTg), "ip": ipOf(ctx)}
+	for k, v := range vars {
+		out[k] = v
+	}
+	return out
+}
+
+// tail отдаёт последние 4 символа длинного секрета: по ним владелец узнаёт свой ключ.
+func tail(v string) string {
+	r := []rune(v)
+	if len(r) < 16 {
+		return ""
+	}
+	return string(r[len(r)-4:])
 }
 
 // RequestSecret просит сменить секретную настройку (ключ кассы, секрет вебхука). Только владелец,
@@ -61,7 +79,7 @@ func (c *Core) RequestSecret(ctx context.Context, actorTg int64, key, value stri
 	if !ok || !w.IsSecret(key) || value == "" {
 		return 0, ErrInvalid
 	}
-	return c.request(ctx, actorTg, "secret", secretPayload{Key: key}, map[string]string{"key": key}, value)
+	return c.request(ctx, actorTg, "secret", secretPayload{Key: key}, map[string]string{"key": key, "tail": tail(value)}, value)
 }
 
 // RequestBotToken просит заменить токен бота. Новый токен сначала проверяется в Telegram:
@@ -73,7 +91,7 @@ func (c *Core) RequestBotToken(ctx context.Context, actorTg int64, token string)
 	if c.telegram == nil || c.telegram.CheckToken(ctx, token) != nil {
 		return 0, ErrBadToken
 	}
-	return c.request(ctx, actorTg, "bot_token", struct{}{}, nil, token)
+	return c.request(ctx, actorTg, "bot_token", struct{}{}, map[string]string{"tail": tail(token)}, token)
 }
 
 // RequestAddHelper просит добавить помощника с правами и паролем. Пароль хэшируется сразу,
@@ -117,7 +135,12 @@ func (c *Core) RequestAction(ctx context.Context, actorTg int64, kind string, pe
 	if err != nil {
 		return 0, err
 	}
-	return c.request(ctx, actorTg, kind, payload, map[string]string{"admin": itoa(actorTg)}, "")
+	body, _ := json.Marshal(payload)
+	details := string(body)
+	if r := []rune(details); len(r) > 300 {
+		details = string(r[:300]) + "…"
+	}
+	return c.request(ctx, actorTg, kind, payload, map[string]string{"details": details}, "")
 }
 
 // runApproved выполняет опасное действие после «Да» владельца. Идёт после транзакции подтверждения:
@@ -146,6 +169,7 @@ func (c *Core) execute(ctx context.Context, cf Confirm, now time.Time) error {
 		if !ok || !can {
 			return ErrConfirmGone
 		}
+		c.rememberSecret(value)
 		return w.SetSecret(p.Key, value)
 	case "bot_token":
 		token, ok := c.secrets.take(cf.ID, now)
@@ -153,6 +177,7 @@ func (c *Core) execute(ctx context.Context, cf Confirm, now time.Time) error {
 		if !ok || !can || c.telegram == nil {
 			return ErrConfirmGone
 		}
+		c.rememberSecret(token)
 		if err := c.telegram.SetWebhook(ctx, token); err != nil {
 			return err
 		}
@@ -168,6 +193,13 @@ func (c *Core) execute(ctx context.Context, cf Confirm, now time.Time) error {
 		return fn(ctx, cf.Payload)
 	}
 	return ErrInvalid
+}
+
+// rememberSecret добавляет новый секрет в фильтр журнала до того, как с ним что-то случится.
+func (c *Core) rememberSecret(v string) {
+	if c.filter != nil {
+		c.filter.Add(v)
+	}
 }
 
 func (c *Core) changeAdmin(tx Tx, kind string, p adminPayload, now time.Time) error {

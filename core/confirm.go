@@ -109,11 +109,17 @@ type pendingSecret struct {
 	expires time.Time
 }
 
-func (p *pending) put(id int64, value string, expires time.Time) {
+// put запоминает секрет и заодно выбрасывает просроченные, чтобы неподтверждённые ключи не жили в памяти.
+func (p *pending) put(id int64, value string, expires, now time.Time) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.vals == nil {
 		p.vals = map[int64]pendingSecret{}
+	}
+	for k, v := range p.vals {
+		if now.After(v.expires) {
+			delete(p.vals, k)
+		}
 	}
 	p.vals[id] = pendingSecret{value, expires}
 }

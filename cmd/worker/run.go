@@ -80,6 +80,7 @@ func build(env Env, base slog.Handler) (*app, error) {
 		Panel:    panel.CoreAdapter{Client: panel.New(env.PanelURL, env.PanelToken, nil)},
 		Gateways: pay.CoreGateways(gws),
 		OwnerID:  env.OwnerID,
+		Secrets:  secrets,
 		Log:      log,
 	})
 

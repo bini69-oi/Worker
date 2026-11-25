@@ -152,7 +152,16 @@ type Deps struct {
 	Telegram TelegramAPI
 	// OwnerID это Telegram ID владельца из окружения. Изнутри системы он не меняется.
 	OwnerID int64
+	// Secrets это фильтр секретов журнала. Ядро добавляет в него новые ключи после их смены
+	// и пропускает через него тексты ошибок, которые пишет в базу. Может быть nil.
+	Secrets SecretFilter
 	Log     *slog.Logger
+}
+
+// SecretFilter это фильтр секретов: запомнить секрет и вычистить известные секреты из строки.
+type SecretFilter interface {
+	Add(vals ...string)
+	String(text string) string
 }
 
 // Core это сценарии ядра. Бот, Mini App и админка зовут только их.
@@ -168,6 +177,7 @@ type Core struct {
 	log      *slog.Logger
 	kick     chan struct{}
 	secrets  pending
+	filter   SecretFilter
 	actions  map[string]func(ctx context.Context, payload []byte) error
 }
 
@@ -186,7 +196,7 @@ func New(d Deps) *Core {
 	return &Core{
 		store: d.Store, clock: d.Clock, cfg: d.Config, panel: d.Panel,
 		notifier: d.Notifier, gateways: d.Gateways, telegram: d.Telegram, owner: d.OwnerID, log: d.Log,
-		kick: make(chan struct{}, 1), actions: map[string]func(context.Context, []byte) error{},
+		kick: make(chan struct{}, 1), actions: map[string]func(context.Context, []byte) error{}, filter: d.Secrets,
 	}
 }
 

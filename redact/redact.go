@@ -4,7 +4,10 @@ package redact
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"net/url"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -21,13 +24,23 @@ type Set struct {
 	vals []string
 }
 
-// Add добавляет секреты. Пустые и короткие значения пропускаются.
+// Add добавляет секреты. Пустые и короткие значения пропускаются. Вместе с секретом запоминаются его виды
+// в адресе (URL-кодирование) и в JSON, чтобы секрет не проскочил в журнал внутри ссылки или ответа.
 func (s *Set) Add(vals ...string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, v := range vals {
-		if len(v) >= minLen {
-			s.vals = append(s.vals, v)
+		if len(v) < minLen {
+			continue
+		}
+		forms := []string{v, url.QueryEscape(v), url.PathEscape(v), strings.ReplaceAll(v, "/", `\/`)}
+		if j, err := json.Marshal(v); err == nil {
+			forms = append(forms, strings.Trim(string(j), `"`))
+		}
+		for _, f := range forms {
+			if !slices.Contains(s.vals, f) {
+				s.vals = append(s.vals, f)
+			}
 		}
 	}
 }

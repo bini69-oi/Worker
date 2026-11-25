@@ -48,7 +48,8 @@ func TestMask(t *testing.T) {
 	}{
 		{"", Masked{}},
 		{"abc", Masked{IsSet: true}},
-		{"live_1234567890", Masked{IsSet: true, Last4: "7890"}},
+		{"live_1234567890", Masked{IsSet: true}},
+		{"live_12345678907890", Masked{IsSet: true, Last4: "7890"}},
 	}
 	for _, c := range cases {
 		if got := mask(c.in); got != c.want {
@@ -62,7 +63,7 @@ func TestSecretSettingAPI(t *testing.T) {
 	if m := s.Masked("yookassa.secret_key"); m.IsSet {
 		t.Fatal("по умолчанию секрет не задан")
 	}
-	const secret = "live_1234567890"
+	const secret = "live_12345678907890"
 	if err := s.SetSecret("yookassa.secret_key", secret); err != nil {
 		t.Fatal(err)
 	}

@@ -68,11 +68,11 @@ type Masked struct {
 	Last4 string
 }
 
-// mask коротким секретам (меньше 8 символов) хвост не показывает: четыре символа из семи это уже много.
+// mask показывает хвост только у длинных секретов (от 16 символов): у коротких 4 символа это уже заметная часть.
 func mask(plain string) Masked {
 	r := []rune(plain)
 	m := Masked{IsSet: len(r) > 0}
-	if len(r) >= 8 {
+	if len(r) >= 16 {
 		m.Last4 = string(r[len(r)-4:])
 	}
 	return m

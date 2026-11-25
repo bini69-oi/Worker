@@ -45,7 +45,7 @@ func (c *Core) ProcessDue(ctx context.Context) (int, error) {
 	for _, t := range tasks {
 		if err := c.runTask(ctx, t); err != nil {
 			attempts := t.Attempts + 1
-			if ferr := c.store.TaskFailed(ctx, t.ID, attempts, now.Add(backoff(attempts)), shortErr(err)); ferr != nil {
+			if ferr := c.store.TaskFailed(ctx, t.ID, attempts, now.Add(backoff(attempts)), c.shortErr(err)); ferr != nil {
 				return done, ferr
 			}
 			continue
@@ -111,9 +111,12 @@ func (c *Core) alertStuck(ctx context.Context, now time.Time) error {
 	})
 }
 
-// shortErr обрезает текст ошибки для очереди: это подсказка админу, а не журнал.
-func shortErr(err error) string {
+// shortErr чистит текст ошибки от секретов и обрезает его: он ложится в базу как подсказка админу.
+func (c *Core) shortErr(err error) string {
 	s := err.Error()
+	if c.filter != nil {
+		s = c.filter.String(s)
+	}
 	if len(s) > 300 {
 		s = s[:300]
 	}
