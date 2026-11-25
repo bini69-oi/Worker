@@ -86,6 +86,9 @@ type apiPayment struct {
 		Value    string `json:"value"`
 		Currency string `json:"currency"`
 	} `json:"amount"`
+	RefundedAmount struct {
+		Value string `json:"value"`
+	} `json:"refunded_amount"`
 	Confirmation struct {
 		URL string `json:"confirmation_url"`
 	} `json:"confirmation"`
@@ -183,6 +186,11 @@ func (g *Gateway) fetch(ctx context.Context, id string) (core.GatewayEvent, erro
 	switch r.Status {
 	case "succeeded":
 		ev.Status = core.PayPaid
+		// Платёж возвращён целиком: зачисление отменяется. Частичный возврат магазин делает сам
+		// и сам решает, что делать с балансом, поэтому оплата остаётся оплатой.
+		if back, err := parseMoney(r.RefundedAmount.Value); err == nil && back >= cents {
+			ev.Status = core.PayRefunded
+		}
 	case "canceled":
 		ev.Status = core.PayFailed
 	}
@@ -199,21 +207,32 @@ func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 	var hook struct {
 		Event  string `json:"event"`
 		Object struct {
-			ID string `json:"id"`
+			ID        string `json:"id"`
+			PaymentID string `json:"payment_id"` // у события возврата
 		} `json:"object"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&hook); err != nil {
 		return core.GatewayEvent{}, pay.ErrBadSignature
 	}
-	if !strings.HasPrefix(hook.Event, "payment.") || hook.Object.ID == "" || strings.ContainsAny(hook.Object.ID, "/?#") {
+	id := hook.Object.ID
+	if hook.Event == "refund.succeeded" {
+		id = hook.Object.PaymentID // возврат проверяем по самому платежу: API скажет, сколько возвращено
+	} else if !strings.HasPrefix(hook.Event, "payment.") {
 		return core.GatewayEvent{}, pay.ErrBadSignature
 	}
-	ev, err := g.fetch(r.Context(), hook.Object.ID)
+	if id == "" || strings.ContainsAny(id, "/?#") {
+		return core.GatewayEvent{}, pay.ErrBadSignature
+	}
+	ev, err := g.fetch(r.Context(), id)
 	if errors.Is(err, errNotFound) {
 		return core.GatewayEvent{}, pay.ErrBadSignature
 	}
 	if err != nil {
 		return core.GatewayEvent{}, err
+	}
+	if hook.Event == "refund.succeeded" && ev.Status != core.PayRefunded {
+		// Частичный возврат: отвечаем «принято», чтобы ЮKassa не повторяла, а зачисление не трогаем.
+		return core.GatewayEvent{ExternalID: ev.ExternalID, Status: core.PayPending}, nil
 	}
 	if ev.Status == core.PayPending {
 		return core.GatewayEvent{}, pay.ErrBadSignature

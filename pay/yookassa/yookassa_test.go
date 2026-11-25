@@ -23,9 +23,10 @@ func (c cfg) String(k string) string { return c[k] }
 func (c cfg) Secret(k string) string { return c[k] }
 
 type remote struct {
-	status string
-	value  string
-	meta   string
+	status   string
+	value    string
+	meta     string
+	refunded string
 }
 
 // fakeAPI это поддельный API ЮKassa.
@@ -82,9 +83,10 @@ func (f *fakeAPI) serve(w http.ResponseWriter, r *http.Request) {
 func writePay(w http.ResponseWriter, id string, p remote) {
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"id": id, "status": p.status,
-		"amount":       map[string]string{"value": p.value, "currency": "RUB"},
-		"confirmation": map[string]string{"type": "redirect", "confirmation_url": "https://pay.test/" + id},
-		"metadata":     map[string]string{"payment_id": p.meta},
+		"amount":          map[string]string{"value": p.value, "currency": "RUB"},
+		"confirmation":    map[string]string{"type": "redirect", "confirmation_url": "https://pay.test/" + id},
+		"metadata":        map[string]string{"payment_id": p.meta},
+		"refunded_amount": map[string]string{"value": p.refunded, "currency": "RUB"},
 	})
 }
 
@@ -187,7 +189,7 @@ func TestVerifyTrustsOnlyAPI(t *testing.T) {
 	if _, err := g.Verify(hook("payment.succeeded", "nope")); err != pay.ErrBadSignature {
 		t.Errorf("неизвестный платёж: %v", err)
 	}
-	if _, err := g.Verify(hook("refund.succeeded", "paid")); err != pay.ErrBadSignature {
+	if _, err := g.Verify(hook("payout.succeeded", "paid")); err != pay.ErrBadSignature {
 		t.Errorf("чужое событие: %v", err)
 	}
 	if _, err := g.Verify(httptest.NewRequest(http.MethodPost, "/", io.NopCloser(strings.NewReader("не json")))); err != pay.ErrBadSignature {
@@ -222,5 +224,27 @@ func TestSecretNotInError(t *testing.T) {
 	_, err := g.Create(t.Context(), core.Payment{ID: 1, Amount: 100})
 	if err == nil || strings.Contains(err.Error(), "wrong-secret") {
 		t.Errorf("ошибка не та: %v", err)
+	}
+}
+
+func refundHook(paymentID string) *http.Request {
+	body := fmt.Sprintf(`{"type":"notification","event":"refund.succeeded","object":{"id":"rf-1","payment_id":%q}}`, paymentID)
+	return httptest.NewRequest(http.MethodPost, "/pay/yookassa", strings.NewReader(body))
+}
+
+func TestRefund(t *testing.T) {
+	f := newFakeAPI(t)
+	g := newGateway(f)
+	f.set("full", remote{status: "succeeded", value: "5.00", meta: "9", refunded: "5.00"})
+	f.set("part", remote{status: "succeeded", value: "5.00", meta: "9", refunded: "1.00"})
+	ev, err := g.Verify(refundHook("full"))
+	if err != nil || ev.Status != core.PayRefunded || ev.ExternalID != "full" {
+		t.Fatalf("полный возврат: %+v %v", ev, err)
+	}
+	if ev, err := g.Verify(refundHook("part")); err != nil || ev.Status != core.PayPending {
+		t.Fatalf("частичный возврат не должен отменять зачисление: %+v %v", ev, err)
+	}
+	if _, err := g.Verify(refundHook("")); err != pay.ErrBadSignature {
+		t.Fatalf("возврат без платежа: %v", err)
 	}
 }
