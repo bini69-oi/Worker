@@ -44,7 +44,7 @@ func (e *env) topup(t *testing.T, amount int64) {
 
 func (e *env) tariff(t *testing.T, name string, periods ...core.Period) core.Tariff {
 	t.Helper()
-	tr, err := e.c.SaveTariff(context.Background(), core.Tariff{Name: name, Active: true, Periods: periods, Squads: []string{"a", "b"}})
+	tr, err := e.c.SaveTariff(context.Background(), owner, core.Tariff{Name: name, Active: true, Periods: periods, Squads: []string{"a", "b"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,4 +83,13 @@ func (e *env) bought(t *testing.T) core.Subscription {
 		t.Fatal(err)
 	}
 	return sub
+}
+
+func (e *env) balance(t *testing.T) int64 {
+	t.Helper()
+	u, err := e.st.User(context.Background(), e.user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u.Balance
 }

@@ -256,3 +256,73 @@ func TestForeignExternalIDNotSwallowed(t *testing.T) {
 		t.Fatal("платёж с чужим номером изменился")
 	}
 }
+
+func TestCreditRejectsOtherExternalID(t *testing.T) {
+	e := newPayEnv(t)
+	ctx := context.Background()
+	p, _, err := e.c.CreatePayment(ctx, e.user.ID, "fake", 30000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Наш номер платежа тот, а номер кассы от старой оплаты: так бывает после отката базы из бэкапа.
+	ev := core.GatewayEvent{PaymentID: p.ID, ExternalID: "fake-old", ExtAmount: 30000, Status: core.PayPaid}
+	if err := e.c.Credit(ctx, "fake", ev); !errors.Is(err, core.ErrInvalid) {
+		t.Fatalf("чужой номер кассы: ждали ErrInvalid, получили %v", err)
+	}
+	if b := e.balance(t); b != 0 {
+		t.Fatalf("зачислено по чужому номеру: %d", b)
+	}
+}
+
+func TestAmountMismatchAlertsOnce(t *testing.T) {
+	e := newPayEnv(t)
+	ctx := context.Background()
+	p, _, err := e.c.CreatePayment(ctx, e.user.ID, "fake", 30000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ev := core.GatewayEvent{ExternalID: p.ExternalID, ExtAmount: 100, Status: core.PayPaid}
+	for range 3 {
+		if err := e.c.Credit(ctx, "fake", ev); !errors.Is(err, core.ErrAmountMismatch) {
+			t.Fatalf("ждали ErrAmountMismatch, получили %v", err)
+		}
+	}
+	e.process(t)
+	n := 0
+	for _, a := range e.notes.ToAdmins {
+		if a.Key == "admin.amount_mismatch" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("тревог о сумме %d, ждали 1", n)
+	}
+}
+
+func TestRefundReversesCredit(t *testing.T) {
+	e := newPayEnv(t)
+	ctx := context.Background()
+	p, _, err := e.c.CreatePayment(ctx, e.user.ID, "fake", 30000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	paid := core.GatewayEvent{ExternalID: p.ExternalID, ExtAmount: 30000, Status: core.PayPaid}
+	if err := e.c.Credit(ctx, "fake", paid); err != nil {
+		t.Fatal(err)
+	}
+	back := core.GatewayEvent{ExternalID: p.ExternalID, Status: core.PayRefunded}
+	for range 2 {
+		if err := e.c.Credit(ctx, "fake", back); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if b := e.balance(t); b != 0 {
+		t.Fatalf("после возврата баланс %d, ждали 0", b)
+	}
+	if err := e.c.Credit(ctx, "fake", paid); err != nil {
+		t.Fatal(err)
+	}
+	if b := e.balance(t); b != 0 {
+		t.Fatalf("повтор оплаты после возврата зачислил: %d", b)
+	}
+}

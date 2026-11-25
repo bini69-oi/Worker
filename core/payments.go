@@ -113,47 +113,113 @@ func (c *Core) CreatePayment(ctx context.Context, userID int64, gateway string, 
 
 // Credit зачисляет оплату ровно один раз. Повтор вебхука и одновременная сверка ничего не добавят:
 // платёж переводится в «оплачен» условным обновлением, а строка истории денег уникальна для платежа.
+// Возврат или оспаривание оплаты (PayRefunded) отменяет зачисление.
 func (c *Core) Credit(ctx context.Context, gateway string, ev GatewayEvent) error {
-	if ev.Status != PayPaid {
+	switch ev.Status {
+	case PayPaid:
+	case PayRefunded:
+		return c.reverse(ctx, gateway, ev)
+	default:
 		return nil
 	}
-	var credited Payment
+	var credited, seen Payment
 	err := c.tx(ctx, func(tx Tx) error {
-		p, err := findPayment(tx, gateway, ev)
-		if err != nil {
-			return err
-		}
-		if p.Status == PayPaid || p.Status == PayRefunded {
-			return nil
-		}
-		if p.ExtAmount != 0 && ev.ExtAmount != p.ExtAmount {
-			c.log.Warn("сумма оплаты не совпала", "payment", p.ID, "want", p.ExtAmount, "got", ev.ExtAmount)
-			return ErrAmountMismatch
-		}
-		now := c.clock.Now()
-		ok, err := tx.MarkPaid(p.ID, ev.ExternalID, now)
-		if errors.Is(err, ErrDuplicate) {
-			// Этот номер кассы уже у другого платежа: касса прислала чужой номер. Это не «уже зачислено».
-			return fmt.Errorf("номер оплаты %q уже у другого платежа: %w", ev.ExternalID, ErrInvalid)
-		}
-		if err != nil || !ok {
-			return err
-		}
-		if _, err := move(tx, now, LedgerEntry{UserID: p.UserID, Amount: p.Amount, Reason: ReasonTopup,
-			RefType: "payment", RefID: p.ID}); err != nil {
-			return err
-		}
-		credited = p
-		return c.afterTopup(tx, p, now)
+		var err error
+		credited, seen, err = c.creditTx(tx, gateway, ev, c.clock.Now())
+		return err
 	})
 	if errors.Is(err, ErrDuplicate) {
 		return nil // строка зачисления уже есть: второй вебхук ничего не меняет
+	}
+	if errors.Is(err, ErrAmountMismatch) && seen.ID != 0 {
+		c.amountAlert(ctx, seen, ev.ExtAmount)
 	}
 	if err == nil && credited.ID != 0 {
 		c.log.Info("платёж зачислен", "payment", credited.ID, "gateway", gateway, "amount", credited.Amount)
 		c.buyFromCart(ctx, credited.UserID)
 	}
 	return err
+}
+
+// creditTx зачисляет платёж внутри транзакции. Отдаёт зачисленный платёж (пустой, если зачислять нечего)
+// и найденный платёж, чтобы при неверной сумме было кому прислать тревогу.
+func (c *Core) creditTx(tx Tx, gateway string, ev GatewayEvent, now time.Time) (Payment, Payment, error) {
+	p, err := findPayment(tx, gateway, ev)
+	if err != nil {
+		return Payment{}, Payment{}, err
+	}
+	if p.Status == PayPaid || p.Status == PayRefunded {
+		return Payment{}, p, nil
+	}
+	if err := sameExt(p, ev); err != nil {
+		return Payment{}, p, err
+	}
+	// Сумму без записи о том, сколько ждём, не зачисляем: сверять было бы не с чем.
+	if p.ExtAmount <= 0 || ev.ExtAmount != p.ExtAmount {
+		c.log.Warn("сумма оплаты не совпала", "payment", p.ID, "want", p.ExtAmount, "got", ev.ExtAmount)
+		return Payment{}, p, ErrAmountMismatch
+	}
+	ok, err := tx.MarkPaid(p.ID, ev.ExternalID, now)
+	if errors.Is(err, ErrDuplicate) {
+		// Этот номер кассы уже у другого платежа: касса прислала чужой номер. Это не «уже зачислено».
+		return Payment{}, p, fmt.Errorf("номер оплаты %q уже у другого платежа: %w", ev.ExternalID, ErrInvalid)
+	}
+	if err != nil || !ok {
+		return Payment{}, p, err
+	}
+	if _, err := move(tx, now, LedgerEntry{UserID: p.UserID, Amount: p.Amount, Reason: ReasonTopup,
+		RefType: "payment", RefID: p.ID}); err != nil {
+		return Payment{}, p, err
+	}
+	return p, p, c.afterTopup(tx, p, now)
+}
+
+// sameExt проверяет, что касса говорит о том же платеже, который она выдала при создании счёта.
+// Иначе старое настоящее уведомление можно приложить к новому платежу с тем же нашим номером
+// (база откатилась из бэкапа или две копии бота работают на одной кассе).
+func sameExt(p Payment, ev GatewayEvent) error {
+	if p.ExternalID != "" && ev.ExternalID != "" && ev.ExternalID != p.ExternalID {
+		return fmt.Errorf("номер оплаты %q не совпал с номером платежа: %w", ev.ExternalID, ErrInvalid)
+	}
+	return nil
+}
+
+// amountAlert сообщает админам, что пришла оплата не на ту сумму. Касса будет повторять уведомление,
+// поэтому тревога уходит один раз на платёж.
+func (c *Core) amountAlert(ctx context.Context, p Payment, got int64) {
+	now := c.clock.Now()
+	_ = c.tx(ctx, func(tx Tx) error {
+		first, err := tx.AddNotice(p.UserID, "amount_mismatch", itoa(p.ID), now)
+		if err != nil || !first {
+			return err
+		}
+		return enqueueAdmin(tx, AdminTask{Topic: TopicPayments, Key: "admin.amount_mismatch", Vars: map[string]string{
+			"payment": itoa(p.ID), "user_id": itoa(p.UserID), "gateway": p.Gateway,
+			"want": itoa(p.ExtAmount), "got": itoa(got)}}, now)
+	})
+}
+
+// reverse отменяет зачисление, когда касса сообщила о возврате или оспаривании оплаты: деньги снимаются
+// с баланса, а чего не хватило, срезается днями подписки. Админы получают сообщение.
+func (c *Core) reverse(ctx context.Context, gateway string, ev GatewayEvent) error {
+	return c.tx(ctx, func(tx Tx) error {
+		p, err := findPayment(tx, gateway, ev)
+		if err != nil {
+			return err
+		}
+		if p.Status != PayPaid {
+			return nil
+		}
+		if err := sameExt(p, ev); err != nil {
+			return err
+		}
+		now := c.clock.Now()
+		if err := c.undoPayment(tx, p, now); err != nil {
+			return err
+		}
+		return enqueueAdmin(tx, AdminTask{Topic: TopicPayments, Key: "admin.payment_reversed", Vars: map[string]string{
+			"payment": itoa(p.ID), "user_id": itoa(p.UserID), "gateway": p.Gateway, "amount": itoa(p.Amount)}}, now)
+	})
 }
 
 func findPayment(tx Tx, gateway string, ev GatewayEvent) (Payment, error) {
@@ -238,24 +304,34 @@ func (c *Core) CheckPayment(ctx context.Context, userID int64, gateway string, p
 
 // ConfirmManual подтверждает ручной платёж от имени админа: деньги пришли на реквизиты.
 // Работает только для ручной кассы, платежи настоящих касс зачисляет сама касса.
+// Право проверяется в той же транзакции, что и зачисление: отключённый помощник не успеет зачислить.
 func (c *Core) ConfirmManual(ctx context.Context, adminID, paymentID int64) error {
-	var p Payment
-	if err := c.tx(ctx, func(tx Tx) error {
-		if _, err := c.can(ctx, tx, adminID, PermGrant); err != nil {
-			return err
-		}
-		var err error
-		if p, err = tx.Payment(paymentID); err != nil {
-			return err
+	var credited Payment
+	err := c.asAdmin(ctx, adminID, PermGrant, "payment.confirm", func(tx Tx, a Admin, now time.Time) (string, map[string]string, error) {
+		p, err := tx.Payment(paymentID)
+		if err != nil {
+			return "", nil, err
 		}
 		if p.Gateway != "manual" {
-			return ErrForbidden
+			return "", nil, ErrForbidden
 		}
-		return c.audit(ctx, tx, adminID, "payment.confirm", itoa(p.ID), map[string]string{"amount": itoa(p.Amount)}, c.clock.Now())
-	}); err != nil {
-		return err
+		if credited, _, err = c.creditTx(tx, "manual", GatewayEvent{PaymentID: p.ID, ExtAmount: p.ExtAmount, Status: PayPaid}, now); err != nil {
+			return "", nil, err
+		}
+		if credited.ID != 0 {
+			if err := c.helperMoney(tx, a, "payment.confirm", p.UserID, p.Amount, now); err != nil {
+				return "", nil, err
+			}
+		}
+		return itoa(p.ID), map[string]string{"amount": itoa(p.Amount)}, nil
+	})
+	if errors.Is(err, ErrDuplicate) {
+		return nil
 	}
-	return c.Credit(ctx, "manual", GatewayEvent{PaymentID: p.ID, ExtAmount: p.ExtAmount, Status: PayPaid})
+	if err == nil && credited.ID != 0 {
+		c.buyFromCart(ctx, credited.UserID)
+	}
+	return err
 }
 
 // CreditOwn зачисляет оплату, которую абонент прислал сам (Stars через бота): платёж должен быть его.
