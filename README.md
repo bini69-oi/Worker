@@ -20,7 +20,7 @@
 (ЮKassa, Telegram Stars с автоподпиской, CryptoBot, Platega, ручное зачисление), фоновые задачи и безопасность.
 Всё под тестами. Следующая часть: текстовый бот. План в [docs/roadmap.md](docs/roadmap.md).
 
-Проверка перед коммитом: `make check` (gofmt, go vet, staticcheck, тесты с `-race`).
+Проверка перед коммитом: `make check` (gofmt, go vet, staticcheck, тесты с `-race`). Известные уязвимости: `make vuln` (govulncheck), CI запускает обе.
 
 ## Документация
 
