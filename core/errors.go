@@ -28,6 +28,7 @@ var (
 	ErrNotFound  = newErr("E1001", "err.not_found", "не найдено")
 	ErrForbidden = newErr("E1002", "err.forbidden", "нет прав")
 	ErrInvalid   = newErr("E1003", "err.invalid", "неверные данные")
+	ErrTooLong   = newErr("E1004", "err.too_long", "слишком длинный текст")
 )
 
 // Деньги

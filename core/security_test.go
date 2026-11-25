@@ -642,3 +642,74 @@ func TestOldOwnerCannotLogin(t *testing.T) {
 		t.Fatalf("прежний владелец: %v", err)
 	}
 }
+
+func TestExternalActionRechecksAuthor(t *testing.T) {
+	e := newSecEnv(t)
+	ctx := context.Background()
+	var sent []string
+	e.c.OnApproved("broadcast", core.PermBroadcast, func(_ context.Context, payload []byte) error {
+		var text string
+		if err := json.Unmarshal(payload, &text); err != nil {
+			return err
+		}
+		sent = append(sent, text)
+		return nil
+	})
+	e.addHelper(t, core.PermBroadcast)
+	if _, err := e.c.RequestAction(ctx, helper, "broadcast", strings.Repeat("я", 3001)); !errors.Is(err, core.ErrTooLong) {
+		t.Fatalf("текст длиннее сообщения владельцу: %v", err)
+	}
+	text := "Скидка " + strings.Repeat("!", 400) + " https://phish.example"
+	id, err := e.c.RequestAction(ctx, helper, "broadcast", text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := e.lastConfirm(t).Vars["details"]; !strings.Contains(got, "https://phish.example") {
+		t.Fatalf("владелец видит не весь текст: %q", got)
+	}
+	e.approve(t, id)
+	if len(sent) != 1 || sent[0] != text {
+		t.Fatalf("после «Да» ушло не то: %q", sent)
+	}
+
+	// Помощника отключили, пока владелец не нажал «Да»: действие не выполняется.
+	id, err = e.c.RequestAction(ctx, helper, "broadcast", "ещё")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rm, err := e.c.RequestRemoveHelper(ctx, owner, helper)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.approve(t, rm)
+	if err := e.c.AnswerConfirm(ctx, id, owner, true); !errors.Is(err, core.ErrForbidden) {
+		t.Fatalf("действие отключённого помощника: %v", err)
+	}
+	if len(sent) != 1 {
+		t.Fatalf("действие отключённого помощника выполнено: %q", sent)
+	}
+}
+
+func TestExternalActionNeedsItsPerm(t *testing.T) {
+	e := newSecEnv(t)
+	e.c.OnApproved("export", core.PermStats, func(context.Context, []byte) error { return nil })
+	e.addHelper(t, core.PermBroadcast)
+	if _, err := e.c.RequestAction(context.Background(), helper, "export", nil); !errors.Is(err, core.ErrForbidden) {
+		t.Fatalf("выгрузка без права: %v", err)
+	}
+}
+
+func TestSecretTailNotInAudit(t *testing.T) {
+	e := newSecEnv(t)
+	if _, err := e.c.RequestSecret(context.Background(), owner, "yookassa.secret_key", "live_0123456789abcdef"); err != nil {
+		t.Fatal(err)
+	}
+	if e.lastConfirm(t).Vars["tail"] != "cdef" {
+		t.Fatal("владелец не видит хвост ключа")
+	}
+	for _, a := range e.st.Audit() {
+		if _, ok := a.Details["tail"]; ok {
+			t.Fatalf("хвост ключа в журнале действий: %+v", a)
+		}
+	}
+}

@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"slices"
 	"time"
 )
@@ -37,13 +38,20 @@ func (c *Core) request(ctx context.Context, actorTg int64, kind string, payload 
 	if err != nil {
 		return 0, err
 	}
+	// Хвост ключа нужен только в сообщении владельцу. В журнал действий, который хранится вечно, он не идёт.
+	logged := map[string]string{}
+	for k, v := range vars {
+		if k != "tail" {
+			logged[k] = v
+		}
+	}
 	var cf Confirm
 	err = c.tx(ctx, func(tx Tx) error {
 		now := c.clock.Now()
 		if cf, err = c.newConfirm(tx, c.owner, kind, body, requestVars(ctx, actorTg, vars), now); err != nil {
 			return err
 		}
-		return c.audit(ctx, tx, actorTg, "request:"+kind, itoa(cf.ID), vars, now)
+		return c.audit(ctx, tx, actorTg, "request:"+kind, itoa(cf.ID), logged, now)
 	})
 	if err == nil && secret != "" {
 		c.secrets.put(cf.ID, secret, cf.ExpiresAt, c.clock.Now())
@@ -88,6 +96,8 @@ func (c *Core) RequestBotToken(ctx context.Context, actorTg int64, token string)
 	if err := c.ownerOnly(ctx, actorTg, "bot_token"); err != nil {
 		return 0, err
 	}
+	// Токен уходит в адрес запроса к Telegram и может оказаться в тексте ошибки: в фильтр журнала его кладём заранее.
+	c.rememberSecret(token)
 	if c.telegram == nil || c.telegram.CheckToken(ctx, token) != nil {
 		return 0, ErrBadToken
 	}
@@ -120,27 +130,56 @@ func (c *Core) RequestRemoveHelper(ctx context.Context, actorTg, helperTg int64)
 	return c.request(ctx, actorTg, "remove_admin", adminPayload{TgID: helperTg}, map[string]string{"admin": itoa(helperTg)}, "")
 }
 
+// action это внешнее опасное действие: какое право нужно автору и кто его выполняет.
+type action struct {
+	perm Perm
+	fn   func(ctx context.Context, payload []byte) error
+}
+
+// actionPayload это запрос внешнего действия: кто просит и с чем. Автор нужен, чтобы после «Да»
+// проверить его права ещё раз: за 2 минуты помощника могли отключить.
+type actionPayload struct {
+	By   int64           `json:"by"`
+	Data json.RawMessage `json:"data"`
+}
+
+// maxDetails это предел текста действия. Владелец видит в Telegram всё, что подтверждает, без обрезки,
+// а длиннее сообщение Telegram не уместит.
+const maxDetails = 3000
+
 // OnApproved подключает исполнителя для опасного действия, которое ядро само не делает
-// (выгрузка базы, рассылка всем). Зовётся при старте.
-func (c *Core) OnApproved(kind string, fn func(ctx context.Context, payload []byte) error) {
-	c.actions[kind] = fn
+// (выгрузка базы, рассылка всем), и право, которое нужно, чтобы его попросить. Зовётся при старте.
+func (c *Core) OnApproved(kind string, perm Perm, fn func(ctx context.Context, payload []byte) error) {
+	c.actions[kind] = action{perm: perm, fn: fn}
 }
 
 // RequestAction просит владельца подтвердить внешнее опасное действие (выгрузка базы, рассылка всем).
-func (c *Core) RequestAction(ctx context.Context, actorTg int64, kind string, perm Perm, payload any) (int64, error) {
-	if _, ok := c.actions[kind]; !ok {
+// Владелец видит данные действия целиком: что видит, то и подтверждает.
+func (c *Core) RequestAction(ctx context.Context, actorTg int64, kind string, payload any) (int64, error) {
+	act, ok := c.actions[kind]
+	if !ok {
 		return 0, ErrInvalid
 	}
-	err := c.store.Tx(ctx, func(tx Tx) error { _, err := c.can(ctx, tx, actorTg, perm); return err })
+	denied := false
+	err := c.store.Tx(ctx, func(tx Tx) error {
+		_, err := c.can(ctx, tx, actorTg, act.perm)
+		denied = errors.Is(err, ErrForbidden)
+		return err
+	})
+	if denied {
+		c.deny(ctx, actorTg, kind)
+	}
 	if err != nil {
 		return 0, err
 	}
-	body, _ := json.Marshal(payload)
-	details := string(body)
-	if r := []rune(details); len(r) > 300 {
-		details = string(r[:300]) + "…"
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return 0, err
 	}
-	return c.request(ctx, actorTg, kind, payload, map[string]string{"details": details}, "")
+	if len([]rune(string(data))) > maxDetails {
+		return 0, ErrTooLong
+	}
+	return c.request(ctx, actorTg, kind, actionPayload{By: actorTg, Data: data}, map[string]string{"details": string(data)}, "")
 }
 
 // runApproved выполняет опасное действие после «Да» владельца. Идёт после транзакции подтверждения:
@@ -179,7 +218,9 @@ func (c *Core) execute(ctx context.Context, cf Confirm, now time.Time) error {
 		}
 		c.rememberSecret(token)
 		if err := c.telegram.SetWebhook(ctx, token); err != nil {
-			return err
+			// Текст ошибки может содержать адрес с токеном: наружу только код, подробности в журнал через фильтр.
+			c.log.Error("вебхук на новый токен не поставлен", "err", err)
+			return ErrBadToken
 		}
 		return w.SetSecret("bot.token", token)
 	case "add_admin", "remove_admin":
@@ -189,10 +230,18 @@ func (c *Core) execute(ctx context.Context, cf Confirm, now time.Time) error {
 		}
 		return c.tx(ctx, func(tx Tx) error { return c.changeAdmin(tx, cf.Kind, p, now) })
 	}
-	if fn, ok := c.actions[cf.Kind]; ok {
-		return fn(ctx, cf.Payload)
+	act, ok := c.actions[cf.Kind]
+	if !ok {
+		return ErrInvalid
 	}
-	return ErrInvalid
+	var p actionPayload
+	if err := json.Unmarshal(cf.Payload, &p); err != nil {
+		return err
+	}
+	if err := c.store.Tx(ctx, func(tx Tx) error { _, err := c.can(ctx, tx, p.By, act.perm); return err }); err != nil {
+		return err
+	}
+	return act.fn(ctx, p.Data)
 }
 
 // rememberSecret добавляет новый секрет в фильтр журнала до того, как с ним что-то случится.

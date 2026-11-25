@@ -182,7 +182,7 @@ type Core struct {
 	kick     chan struct{}
 	secrets  pending
 	filter   SecretFilter
-	actions  map[string]func(ctx context.Context, payload []byte) error
+	actions  map[string]action
 }
 
 // New собирает ядро. Часы, уведомления и журнал можно не задавать: будут настоящие часы,
@@ -200,7 +200,7 @@ func New(d Deps) *Core {
 	return &Core{
 		store: d.Store, clock: d.Clock, cfg: d.Config, panel: d.Panel,
 		notifier: d.Notifier, gateways: d.Gateways, telegram: d.Telegram, owner: d.OwnerID, log: d.Log,
-		kick: make(chan struct{}, 1), actions: map[string]func(context.Context, []byte) error{}, filter: d.Secrets,
+		kick: make(chan struct{}, 1), actions: map[string]action{}, filter: d.Secrets,
 	}
 }
 
