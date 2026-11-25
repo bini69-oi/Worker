@@ -74,6 +74,9 @@ func lineReader(in io.Reader, out io.Writer) func(prompt string) (string, error)
 
 // rotate меняет мастер-ключ: перешифровывает все секреты новым ключом одной транзакцией и печатает новый ключ.
 // Процесс бота на это время надо остановить, а после команды вписать новый ключ в .env.
+//
+// Новый ключ сначала записывается в файл рядом с базой (права 600) и только потом идёт перешифровка:
+// если вывод в терминал потеряется (оборвался ssh), ключ останется в файле, а не пропадёт вместе с секретами.
 func rotate(env Env, out io.Writer) error {
 	db, err := store.Open(env.DBPath)
 	if err != nil {
@@ -81,13 +84,18 @@ func rotate(env Env, out io.Writer) error {
 	}
 	defer db.Close()
 	newKey := settings.NewKey()
+	line := "SECRET_KEY=" + base64.StdEncoding.EncodeToString(newKey) + "\n"
+	keyFile := env.DBPath + ".newkey"
+	if err := os.WriteFile(keyFile, []byte(line), 0o600); err != nil {
+		return fmt.Errorf("новый ключ не сохранён в файл, база не тронута: %w", err)
+	}
 	err = store.NewSettingsStore(db).Rotate(func(rows map[string]string) (map[string]string, error) {
 		return settings.Reencrypt(rows, env.SecretKey, newKey)
 	})
 	if err != nil {
+		_ = os.Remove(keyFile)
 		return fmt.Errorf("секреты не перешифрованы, база на старом ключе: %w", err)
 	}
-	fmt.Fprintf(out, "Готово. Новый ключ, впишите его в .env вместо старого:\nSECRET_KEY=%s\n",
-		base64.StdEncoding.EncodeToString(newKey))
+	fmt.Fprintf(out, "Готово. Новый ключ лежит в %s, впишите его в .env вместо старого и удалите файл:\n%s", keyFile, line)
 	return nil
 }

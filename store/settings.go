@@ -46,20 +46,34 @@ func (s *SettingsStore) Delete(key string) error {
 
 // Rotate заменяет строки настроек результатом fn в одной транзакции: при сбое не меняется ничего.
 // Нужен для смены мастер-ключа, когда все секреты перешифровываются разом.
+// Строки читаются внутри той же транзакции, поэтому запись в это время не испортит перешифровку.
 func (s *SettingsStore) Rotate(fn func(rows map[string]string) (map[string]string, error)) error {
-	rows, err := s.LoadAll()
+	tx, err := s.db.W.Begin()
 	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	rows := map[string]string{}
+	list, err := tx.Query("SELECT key, value FROM settings")
+	if err != nil {
+		return err
+	}
+	for list.Next() {
+		var k, v string
+		if err := list.Scan(&k, &v); err != nil {
+			list.Close()
+			return err
+		}
+		rows[k] = v
+	}
+	list.Close()
+	if err := list.Err(); err != nil {
 		return err
 	}
 	next, err := fn(rows)
 	if err != nil {
 		return err
 	}
-	tx, err := s.db.W.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 	for key, value := range next {
 		if value == rows[key] {
 			continue

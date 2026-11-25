@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -32,6 +33,13 @@ func TestRotateCommand(t *testing.T) {
 	var out bytes.Buffer
 	if err := command(env, []string{"rotate"}, nil, &out); err != nil {
 		t.Fatal(err)
+	}
+	saved, err := os.ReadFile(env.DBPath + ".newkey")
+	if err != nil || !strings.HasPrefix(string(saved), "SECRET_KEY=") {
+		t.Fatalf("новый ключ не сохранён в файл: %v", err)
+	}
+	if st, _ := os.Stat(env.DBPath + ".newkey"); st.Mode().Perm() != 0o600 {
+		t.Fatalf("файл ключа читают другие: %v", st.Mode())
 	}
 	line := out.String()[strings.Index(out.String(), "SECRET_KEY=")+len("SECRET_KEY="):]
 	newKey, err := base64.StdEncoding.DecodeString(strings.TrimSpace(line))
