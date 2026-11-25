@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -73,29 +74,52 @@ func lineReader(in io.Reader, out io.Writer) func(prompt string) (string, error)
 }
 
 // rotate меняет мастер-ключ: перешифровывает все секреты новым ключом одной транзакцией и печатает новый ключ.
-// Процесс бота на это время надо остановить, а после команды вписать новый ключ в .env.
+// Бот на это время должен быть остановлен: rotate берёт замок базы и при работающем боте отказывает.
+// После команды новый ключ вписывается в .env, а файл с ним бот удалит сам при следующем старте.
 //
 // Новый ключ сначала записывается в файл рядом с базой (права 600) и только потом идёт перешифровка:
-// если вывод в терминал потеряется (оборвался ssh), ключ останется в файле, а не пропадёт вместе с секретами.
+// если вывод в терминал потеряется (оборвался ssh), ключ останется в файле. Файл создаётся только новым:
+// если он уже есть, прошлая смена ключа не закончена, и затереть её ключ нельзя.
 func rotate(env Env, out io.Writer) error {
-	db, err := store.Open(env.DBPath)
+	unlock, err := lockDB(env.DBPath)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer unlock()
+	path := keyFile(env.DBPath)
 	newKey := settings.NewKey()
 	line := "SECRET_KEY=" + base64.StdEncoding.EncodeToString(newKey) + "\n"
-	keyFile := env.DBPath + ".newkey"
-	if err := os.WriteFile(keyFile, []byte(line), 0o600); err != nil {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if errors.Is(err, fs.ErrExist) {
+		return fmt.Errorf("прошлая смена ключа не закончена: впишите SECRET_KEY из %s в .env и запустите бота, "+
+			"он удалит файл сам", path)
+	}
+	if err != nil {
 		return fmt.Errorf("новый ключ не сохранён в файл, база не тронута: %w", err)
 	}
+	if _, err := f.WriteString(line); err != nil {
+		f.Close()
+		_ = os.Remove(path)
+		return fmt.Errorf("новый ключ не сохранён в файл, база не тронута: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(path)
+		return err
+	}
+	db, err := store.Open(env.DBPath)
+	if err != nil {
+		_ = os.Remove(path)
+		return err
+	}
+	defer db.Close()
 	err = store.NewSettingsStore(db).Rotate(func(rows map[string]string) (map[string]string, error) {
 		return settings.Reencrypt(rows, env.SecretKey, newKey)
 	})
 	if err != nil {
-		_ = os.Remove(keyFile)
-		return fmt.Errorf("секреты не перешифрованы, база на старом ключе: %w", err)
+		// Файл создан этим запуском, а транзакция откатилась: база на прежнем ключе, новый ключ не нужен.
+		_ = os.Remove(path)
+		return fmt.Errorf("секреты не перешифрованы, база на прежнем ключе: %w", err)
 	}
-	fmt.Fprintf(out, "Готово. Новый ключ лежит в %s, впишите его в .env вместо старого и удалите файл:\n%s", keyFile, line)
+	fmt.Fprintf(out, "Готово. Новый ключ лежит в %s, впишите его в .env вместо старого и запустите бота:\n%s", path, line)
 	return nil
 }

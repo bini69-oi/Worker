@@ -83,3 +83,59 @@ func TestAdminPasswordCommand(t *testing.T) {
 		t.Fatalf("вход с заданным паролем: %v", err)
 	}
 }
+
+// Повторный rotate, когда новый ключ ещё не перенесён в .env, не должен терять ключ прошлого запуска.
+func TestRotateTwiceKeepsKey(t *testing.T) {
+	env := Env{DBPath: filepath.Join(t.TempDir(), "w.db"), SecretKey: settings.NewKey()}
+	db, err := store.Open(env.DBPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := settings.New(store.NewSettingsStore(db), env.SecretKey, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetSecret("yookassa.secret_key", "live_key_one"); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	if err := command(env, []string{"rotate"}, nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	first, _ := os.ReadFile(keyFile(env.DBPath))
+	if err := command(env, []string{"rotate"}, nil, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "не закончена") {
+		t.Fatalf("второй rotate должен отказать: %v", err)
+	}
+	if again, _ := os.ReadFile(keyFile(env.DBPath)); !bytes.Equal(first, again) {
+		t.Fatal("второй rotate затёр ключ первого")
+	}
+
+	// Старт со старым ключом отказывает и подсказывает, что делать.
+	if _, err := checkKeyFile(env); err == nil {
+		t.Fatal("старт со старым ключом при незаконченной смене")
+	}
+	// Ключ перенесён в .env: файл удаляется при старте.
+	newKey, _ := base64.StdEncoding.DecodeString(strings.TrimSpace(strings.TrimPrefix(string(first), "SECRET_KEY=")))
+	env.SecretKey = newKey
+	if msg, err := checkKeyFile(env); err != nil || msg == "" {
+		t.Fatalf("файл с перенесённым ключом: %q %v", msg, err)
+	}
+	if _, err := os.Stat(keyFile(env.DBPath)); !os.IsNotExist(err) {
+		t.Fatal("файл ключа остался рядом с базой")
+	}
+}
+
+func TestRotateRefusesWhileBotRuns(t *testing.T) {
+	env := Env{DBPath: filepath.Join(t.TempDir(), "w.db"), SecretKey: settings.NewKey()}
+	unlock, err := lockDB(env.DBPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	if err := command(env, []string{"rotate"}, nil, &bytes.Buffer{}); err != errLocked {
+		t.Fatalf("rotate при работающем боте: %v", err)
+	}
+	if _, err := os.Stat(keyFile(env.DBPath)); !os.IsNotExist(err) {
+		t.Fatal("rotate при работающем боте оставил файл ключа")
+	}
+}

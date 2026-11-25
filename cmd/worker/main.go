@@ -20,6 +20,7 @@ import (
 )
 
 func main() {
+	privateFiles()
 	base := slog.NewJSONHandler(os.Stdout, nil)
 	log := slog.New(base)
 
@@ -51,6 +52,18 @@ func main() {
 }
 
 func run(ctx context.Context, env Env, base slog.Handler) error {
+	unlock, err := lockDB(env.DBPath)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	msg, err := checkKeyFile(env)
+	if err != nil {
+		return err
+	}
+	if msg != "" {
+		slog.New(base).Info(msg)
+	}
 	a, err := build(env, base)
 	if err != nil {
 		return err
