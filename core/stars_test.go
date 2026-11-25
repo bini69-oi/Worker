@@ -171,14 +171,14 @@ func TestRecurringKeepsMoneyWhenRenewFails(t *testing.T) {
 	if b := balance(t, e.st, e.user.ID); b != 15000 {
 		t.Fatalf("деньги за списанные звёзды пропали: баланс %d", b)
 	}
-	if _, err := e.c.ChargeRecurring(ctx, e.user.ID, e.tariff.ID, "charge-x", 100); err != nil {
-		t.Fatalf("повтор того же списания: %v", err)
+	if _, err := e.c.ChargeRecurring(ctx, e.user.ID, e.tariff.ID, "charge-x", 100); !errors.Is(err, core.ErrTariffHidden) {
+		t.Fatalf("повтор при всё ещё скрытом тарифе: %v", err)
 	}
 	if b := balance(t, e.st, e.user.ID); b != 15000 {
 		t.Fatalf("повтор списания зачислил второй раз: %d", b)
 	}
 	e.process(t)
-	if notified(e.env, "notify.recurring_failed") != 1 {
+	if notified(e.env, "notify.recurring_failed") == 0 {
 		t.Fatalf("абонент не узнал, что продления нет: %+v", e.notes.ToUsers)
 	}
 }
@@ -215,5 +215,31 @@ func TestRefundAlreadyDoneInTelegram(t *testing.T) {
 	}
 	if e.st.Payment(p.ID).Status != core.PayRefunded || balance(t, e.st, e.user.ID) != 0 {
 		t.Fatal("отмена зачисления не доведена")
+	}
+}
+
+func TestRecurringRetryFinishesRenewal(t *testing.T) {
+	e := newStarsEnv(t)
+	ctx := context.Background()
+	hidden := e.tariff
+	hidden.Active = false
+	if _, err := e.c.SaveTariff(ctx, hidden); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.c.ChargeRecurring(ctx, e.user.ID, e.tariff.ID, "charge-y", 100); err == nil {
+		t.Fatal("ждали сбой продления")
+	}
+	hidden.Active = true
+	if _, err := e.c.SaveTariff(ctx, hidden); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if _, err := e.c.ChargeRecurring(ctx, e.user.ID, e.tariff.ID, "charge-y", 100); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sub, err := e.c.Sub(ctx, e.user.ID)
+	if err != nil || !sub.ExpiresAt.Equal(t0.Add(30*24*time.Hour)) || balance(t, e.st, e.user.ID) != 0 {
+		t.Fatalf("повтор не довёл продление или продлил дважды: %+v, баланс %d", sub, balance(t, e.st, e.user.ID))
 	}
 }

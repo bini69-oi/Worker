@@ -96,7 +96,7 @@ func (c *Core) SetAutoRenew(ctx context.Context, userID int64, on bool) error {
 
 // permanent говорит, что ошибка покупки не пройдёт сама: тариф удалён или скрыт, срока нет, бан, другой тариф.
 func permanent(err error) bool {
-	for _, e := range []error{ErrNoPeriod, ErrNotFound, ErrTariffHidden, ErrOtherTariff, ErrBanned} {
+	for _, e := range []error{ErrNoPeriod, ErrNotFound, ErrTariffHidden, ErrOtherTariff} {
 		if errors.Is(err, e) {
 			return true
 		}
@@ -125,7 +125,7 @@ func (c *Core) AutoRenewDue(ctx context.Context) (int, error) {
 		if !s.AutoRenew || s.Trial || !s.ExpiresAt.After(now) || s.ExpiresAt.Sub(now) > window {
 			continue
 		}
-		ok, err := c.renewOne(ctx, s, now)
+		ok, err := c.renewOne(ctx, s, window, now)
 		if err != nil {
 			c.log.Warn("автопродление не прошло", "sub", s.ID, "err", err)
 			continue
@@ -138,10 +138,20 @@ func (c *Core) AutoRenewDue(ctx context.Context) (int, error) {
 }
 
 // renewOne продлевает одну подписку. После продления дата окончания уходит за окно, повтора нет.
-func (c *Core) renewOne(ctx context.Context, s Subscription, now time.Time) (bool, error) {
+// Окно проверяется заново внутри транзакции по свежей подписке: если абонент сам продлил её, пока шёл
+// прогон, второго списания не будет.
+func (c *Core) renewOne(ctx context.Context, s Subscription, window time.Duration, now time.Time) (bool, error) {
 	var sub Subscription
+	skipped := false
 	err := c.tx(ctx, func(tx Tx) error {
-		var err error
+		cur, err := tx.Sub(s.ID)
+		if err != nil {
+			return err
+		}
+		if !cur.AutoRenew || cur.Status != SubActive || cur.ExpiresAt.Sub(now) > window {
+			skipped = true
+			return nil
+		}
 		sub, err = c.buyTx(tx, s.UserID, s.TariffID, s.PeriodDays, now)
 		if err != nil {
 			return err
@@ -150,7 +160,10 @@ func (c *Core) renewOne(ctx context.Context, s Subscription, now time.Time) (boo
 			Vars: map[string]string{"until": sub.ExpiresAt.Format("02.01.2006")}}, now)
 	})
 	if err == nil {
-		return true, nil
+		return !skipped, nil
+	}
+	if errors.Is(err, ErrBanned) {
+		return false, nil // забаненного не продлеваем, но и автопродление не выключаем: бан могут снять
 	}
 	var need *NeedMoney
 	switch {

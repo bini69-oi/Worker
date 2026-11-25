@@ -242,3 +242,45 @@ func TestPromoSubCannotAutoRenewWithoutPeriod(t *testing.T) {
 		t.Fatalf("автопродление на 7 дней без такого срока: ждали ErrNoPeriod, получили %v", err)
 	}
 }
+
+func TestAutoRenewSkipsIfUserRenewedMeanwhile(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	tr := e.tariff(t, "Месяц", core.Period{Days: 30, Price: 100})
+	e.topup(t, 1000)
+	if _, err := e.c.Buy(ctx, e.user.ID, tr.ID, 30); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.c.SetAutoRenew(ctx, e.user.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	e.clock.Add(29 * 24 * time.Hour)
+	if _, err := e.c.Buy(ctx, e.user.ID, tr.ID, 30); err != nil { // абонент продлил сам
+		t.Fatal(err)
+	}
+	if n, _ := e.c.AutoRenewDue(ctx); n != 0 {
+		t.Fatal("автопродление списало второй раз после ручного продления")
+	}
+	if b := balance(t, e.st, e.user.ID); b != 800 {
+		t.Fatalf("баланс %d, ждали 800", b)
+	}
+}
+
+func TestBanDoesNotTurnOffAutoRenew(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	e.bought(t)
+	if err := e.c.SetAutoRenew(ctx, e.user.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	u := e.user
+	u.BannedAt = t0
+	e.st.SetUser(u)
+	e.clock.Add(29 * 24 * time.Hour)
+	if _, err := e.c.AutoRenewDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if sub, _ := e.c.Sub(ctx, e.user.ID); !sub.AutoRenew {
+		t.Fatal("бан выключил автопродление навсегда")
+	}
+}

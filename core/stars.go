@@ -47,24 +47,34 @@ func (c *Core) ChargeRecurring(ctx context.Context, userID, tariffID int64, char
 		return enqueueAdmin(tx, AdminTask{Topic: TopicPayments, Key: "admin.payment_recurring",
 			Vars: map[string]string{"user_id": itoa(userID), "stars": itoa(stars), "amount": itoa(amount)}}, now)
 	})
-	if errors.Is(err, ErrDuplicate) {
-		// Это списание уже проведено. Подписки может и не быть, если продлить тогда не вышло.
-		sub, serr := c.store.SubByUser(ctx, userID)
-		if errors.Is(serr, ErrNotFound) {
-			return Subscription{}, nil
-		}
-		return sub, serr
-	}
-	if err != nil {
+	// Деньги этого списания уже на балансе (сейчас или при прошлой попытке). Повтор после сбоя
+	// продления доводит его до конца, а отметка по номеру списания не даёт продлить дважды.
+	if err != nil && !errors.Is(err, ErrDuplicate) {
 		return Subscription{}, err
 	}
 
 	var sub Subscription
+	done := false
 	err = c.tx(ctx, func(tx Tx) error {
-		var err error
-		sub, err = c.buyTx(tx, userID, tariffID, recurringDays, c.clock.Now())
+		now := c.clock.Now()
+		fresh, err := tx.AddNotice(userID, "recurring_renew", chargeID, now)
+		if err != nil {
+			return err
+		}
+		if !fresh {
+			done = true
+			return nil
+		}
+		sub, err = c.buyTx(tx, userID, tariffID, recurringDays, now)
 		return err
 	})
+	if done {
+		cur, serr := c.store.SubByUser(ctx, userID)
+		if errors.Is(serr, ErrNotFound) {
+			return Subscription{}, nil
+		}
+		return cur, serr
+	}
 	if err != nil {
 		c.log.Warn("автоподписка: деньги зачислены, продлить не вышло", "user", userID, "tariff", tariffID, "err", err)
 		_ = c.tx(ctx, func(tx Tx) error {
