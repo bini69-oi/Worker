@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -174,5 +175,23 @@ func TestBalanceCannotGoNegative(t *testing.T) {
 	_, err := db.W.Exec("INSERT INTO users (tg_id, ref_code, balance, created_at) VALUES (1, 'a', -1, 0)")
 	if err == nil {
 		t.Fatal("отрицательный баланс должен быть запрещён схемой")
+	}
+}
+
+func TestDBFilesPrivate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "w.db")
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, f := range []string{path, path + "-wal", path + "-shm"} {
+		st, err := os.Stat(f)
+		if err != nil {
+			continue
+		}
+		if st.Mode().Perm() != 0o600 {
+			t.Errorf("%s: права %v, ждали 0600", filepath.Base(f), st.Mode().Perm())
+		}
 	}
 }

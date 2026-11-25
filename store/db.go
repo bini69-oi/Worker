@@ -2,8 +2,11 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/url"
+	"os"
 
 	_ "modernc.org/sqlite" // драйвер SQLite на чистом Go, без CGO
 )
@@ -36,6 +39,14 @@ func Open(path string) (*DB, error) {
 		return nil, err
 	}
 	r.SetMaxOpenConns(readConns)
+	// В базе хэши паролей, шифротексты ключей и ссылки подписок: читать её может только владелец процесса.
+	for _, f := range []string{path, path + "-wal", path + "-shm"} {
+		if err := os.Chmod(f, 0o600); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			w.Close()
+			r.Close()
+			return nil, fmt.Errorf("права на файл базы: %w", err)
+		}
+	}
 	return &DB{W: w, R: r}, nil
 }
 
