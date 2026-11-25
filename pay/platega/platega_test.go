@@ -122,3 +122,27 @@ func TestKopecks(t *testing.T) {
 		t.Error("rubles")
 	}
 }
+
+func TestChargebackAndCurrency(t *testing.T) {
+	api := &fakeAPI{txs: map[string]map[string]any{
+		"cb":  {"id": "cb", "status": "CHARGEBACKED"},
+		"usd": {"id": "usd", "status": "CONFIRMED", "paymentDetails": map[string]any{"amount": 300, "currency": "USD"}},
+		"nil": {"id": "nil", "status": "CONFIRMED"},
+	}}
+	srv := httptest.NewServer(api)
+	defer srv.Close()
+	g := New(cfg{"platega.merchant_id": "shop", "platega.secret": "s3cret"}, srv.URL, srv.Client())
+	body, _ := json.Marshal(map[string]any{"id": "cb", "status": "CHARGEBACKED"})
+	r := httptest.NewRequest(http.MethodPost, "/pay/platega", strings.NewReader(string(body)))
+	r.Header.Set("X-MerchantId", "shop")
+	r.Header.Set("X-Secret", "s3cret")
+	if ev, err := g.Verify(r); err != nil || ev.Status != core.PayRefunded {
+		t.Fatalf("оспаривание должно стать возвратом: %+v %v", ev, err)
+	}
+	if _, err := g.Status(t.Context(), core.Payment{ExternalID: "usd", ExtAmount: 30000}); err == nil {
+		t.Fatal("оплата в долларах принята как рубли")
+	}
+	if _, err := g.Status(t.Context(), core.Payment{ExternalID: "nil", ExtAmount: 30000}); err == nil {
+		t.Fatal("оплата без суммы принята с нашей суммой")
+	}
+}

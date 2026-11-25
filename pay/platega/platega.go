@@ -97,6 +97,7 @@ type apiTx struct {
 	URL           string      `json:"url"`
 	Status        string      `json:"status"`
 	Amount        json.Number `json:"amount"`
+	Currency      string      `json:"currency"`
 	Payload       string      `json:"payload"`
 	Details       *details    `json:"paymentDetails"`
 }
@@ -119,6 +120,26 @@ func (t apiTx) amount() (int64, bool, error) {
 	}
 	k, err := kopecks(string(n))
 	return k, err == nil, err
+}
+
+// rubAmount отдаёт сумму из ответа API для зачисления: сумма обязана быть, валюта, если указана, только рубли.
+// Без суммы зачислять нечего: подставлять свою значило бы поверить кассе на слово.
+func (t apiTx) rubAmount() (int64, error) {
+	cur := t.Currency
+	if cur == "" && t.Details != nil {
+		cur = t.Details.Currency
+	}
+	if cur != "" && !strings.EqualFold(cur, "RUB") {
+		return 0, fmt.Errorf("платёж Platega не в рублях: %s", cur)
+	}
+	k, ok, err := t.amount()
+	if err != nil {
+		return 0, err
+	}
+	if !ok {
+		return 0, errors.New("в ответе Platega нет суммы")
+	}
+	return k, nil
 }
 
 func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, error) {
@@ -152,14 +173,12 @@ func (g *Gateway) Status(ctx context.Context, p core.Payment) (core.GatewayEvent
 	if err != nil {
 		return core.GatewayEvent{}, err
 	}
-	amount, ok, err := tx.amount()
-	if err != nil {
-		return core.GatewayEvent{}, err
+	ev := core.GatewayEvent{ExternalID: p.ExternalID, Status: mapStatus(tx.Status)}
+	if ev.Status != core.PayPaid {
+		return ev, nil
 	}
-	if !ok {
-		amount = p.ExtAmount
-	}
-	return core.GatewayEvent{ExternalID: p.ExternalID, ExtAmount: amount, Status: mapStatus(tx.Status)}, nil
+	ev.ExtAmount, err = tx.rubAmount()
+	return ev, err
 }
 
 func (g *Gateway) fetch(ctx context.Context, id string) (apiTx, error) {
@@ -192,20 +211,22 @@ func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 	if err != nil {
 		return ev, err
 	}
-	if ev.Status != core.PayPaid {
+	if ev.Status != core.PayPaid && ev.Status != core.PayRefunded {
 		ev.ExtAmount = hookAmount
 		return ev, nil
 	}
-	// Оплату подтверждает сам API: статус и сумма берутся оттуда.
+	// Оплату и возврат подтверждает сам API: статус и сумма берутся оттуда.
 	remote, err := g.fetch(r.Context(), ev.ExternalID)
 	if err != nil {
 		return ev, err
 	}
-	if mapStatus(remote.Status) != core.PayPaid {
-		return ev, errors.New("касса Platega не подтвердила оплату")
+	if mapStatus(remote.Status) != ev.Status {
+		return ev, errors.New("касса Platega не подтвердила статус из вебхука")
 	}
-	ev.ExtAmount, _, err = remote.amount()
-	if err != nil {
+	if ev.Status == core.PayRefunded {
+		return ev, nil
+	}
+	if ev.ExtAmount, err = remote.rubAmount(); err != nil {
 		return ev, err
 	}
 	if hasHook && hookAmount != ev.ExtAmount {
@@ -220,6 +241,8 @@ func mapStatus(s string) core.PayStatus {
 		return core.PayPaid
 	case "CANCELED", "FAILED", "EXPIRED":
 		return core.PayFailed
+	case "CHARGEBACKED", "CHARGEBACK", "REFUNDED":
+		return core.PayRefunded // оспаривание или возврат после оплаты: ядро отменит зачисление
 	}
 	return core.PayPending
 }
