@@ -128,8 +128,8 @@ func build(env Env, base slog.Handler) (*app, error) {
 	mux.Handle("POST /panel/webhook", hooks.Wrap(panel.WebhookHandler(c, func() string { return cfg.Secret("panel.webhook_secret") }, log)))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.Handle("POST /tg/webhook", tg.NewWebhook(t.secret, t.updates, t.bot.Urgent))
-	mux.Handle("GET /dl/{app}/{token}", apps.Handler(c, env.SecretKey, time.Now,
-		func(key string) string { return tx.Render(key, cfg.String("lang.default"), nil) }))
+	mux.Handle("GET /dl/{app}/{token}", hooks.Wrap(apps.Handler(c, env.SecretKey, time.Now,
+		func(key string) string { return tx.Render(key, cfg.String("lang.default"), nil) })))
 
 	return &app{
 		db: db, cfg: cfg, texts: tx, core: c, tg: t, handler: guard.RealIP(mux), log: log,

@@ -2,6 +2,7 @@ package apps
 
 import (
 	"context"
+	"crypto/hmac"
 	"errors"
 	"html"
 	"net/http"
@@ -16,8 +17,9 @@ type Subs interface {
 }
 
 // Handler отвечает на GET /dl/{app}/{token}: проверяет токен, берёт текущую ссылку подписки
-// и отправляет браузер в приложение. Ссылка берётся каждый раз из ядра, поэтому после перевыпуска
-// старая кнопка ведёт на новую ссылку. text отдаёт текст страницы по ключу (dl.expired, dl.pending, dl.gone).
+// и отправляет браузер в приложение. Ссылку перевыпустили после выдачи токена: кнопка устарела,
+// новую абонент получит, открыв экран подключения заново. text отдаёт текст страницы по ключу
+// (dl.expired, dl.pending, dl.gone).
 func Handler(subs Subs, key []byte, now func() time.Time, text func(key string) string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		app, ok := Find(r.PathValue("app"))
@@ -25,7 +27,7 @@ func Handler(subs Subs, key []byte, now func() time.Time, text func(key string) 
 			http.NotFound(w, r)
 			return
 		}
-		userID, err := Parse(key, r.PathValue("token"), now())
+		userID, fp, err := Parse(key, r.PathValue("token"), now())
 		if errors.Is(err, ErrExpired) {
 			page(w, http.StatusGone, text("dl.expired"))
 			return
@@ -45,6 +47,10 @@ func Handler(subs Subs, key []byte, now func() time.Time, text func(key string) 
 		}
 		if sub.SubURL == "" {
 			page(w, http.StatusOK, text("dl.pending"))
+			return
+		}
+		if !hmac.Equal(fp, Fingerprint(sub.SubURL)) {
+			page(w, http.StatusGone, text("dl.expired"))
 			return
 		}
 		w.Header().Set("Cache-Control", "no-store")

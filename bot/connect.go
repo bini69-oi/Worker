@@ -21,7 +21,7 @@ func (b *Bot) showConnect(ctx context.Context, r *req) error {
 		return b.show(ctx, r, Screen{Text: b.t(r, "sub.pending", nil), Rows: [][]Button{{b.btn(r, "btn.check", "con")}, b.back(r, "m")}})
 	}
 	s := Screen{Text: b.t(r, "connect.title", nil)}
-	tok := apps.Token(b.dlKey, r.user.ID, b.now())
+	tok := apps.Token(b.dlKey, r.user.ID, sub.SubURL, b.now())
 	for _, a := range apps.List(b.cfg.String("connect.apps")) {
 		var stores []Button
 		for _, p := range apps.Platforms {

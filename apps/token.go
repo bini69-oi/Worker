@@ -18,38 +18,49 @@ var (
 	ErrExpired = errors.New("токен устарел")
 )
 
-// tokenLen это 8 байт id абонента, 8 байт срока и 16 байт подписи.
-const tokenLen = 32
+// Части токена: 8 байт id абонента, 8 байт срока, 4 байта отпечатка ссылки подписки, 16 байт подписи.
+const (
+	bodyLen  = 20
+	tokenLen = bodyLen + 16
+)
 
-// Token делает токен перехода: id абонента и срок, подписанные HMAC. Ссылки подписки и id
-// открытым текстом в адресе нет.
-func Token(key []byte, userID int64, now time.Time) string {
-	b := make([]byte, 16, tokenLen)
+// Token делает токен перехода: id абонента, срок и отпечаток текущей ссылки подписки, подписанные HMAC.
+// Ссылки подписки и id открытым текстом в адресе нет. После перевыпуска ссылки отпечаток не сходится,
+// и утёкшая кнопка больше ничего не выдаёт.
+func Token(key []byte, userID int64, subURL string, now time.Time) string {
+	b := make([]byte, bodyLen, tokenLen)
 	binary.BigEndian.PutUint64(b[:8], uint64(userID))
-	binary.BigEndian.PutUint64(b[8:], uint64(now.Add(TokenTTL).Unix()))
+	binary.BigEndian.PutUint64(b[8:16], uint64(now.Add(TokenTTL).Unix()))
+	copy(b[16:], Fingerprint(subURL))
 	b = append(b, sign(key, b)...)
-	return base64.RawURLEncoding.EncodeToString(xor(key, b[:16], b[16:]))
+	return base64.RawURLEncoding.EncodeToString(xor(key, b[:bodyLen], b[bodyLen:]))
 }
 
-// Parse проверяет токен и отдаёт id абонента.
-func Parse(key []byte, tok string, now time.Time) (int64, error) {
+// Fingerprint это 4 байта хэша ссылки подписки: по ним видно, что ссылку перевыпустили.
+func Fingerprint(subURL string) []byte {
+	sum := sha256.Sum256([]byte(subURL))
+	return sum[:4]
+}
+
+// Parse проверяет токен и отдаёт id абонента и отпечаток ссылки, для которой токен выдан.
+func Parse(key []byte, tok string, now time.Time) (int64, []byte, error) {
 	raw, err := base64.RawURLEncoding.DecodeString(tok)
 	if err != nil || len(raw) != tokenLen {
-		return 0, ErrToken
+		return 0, nil, ErrToken
 	}
-	mac := raw[16:]
-	body := xor(key, raw[:16], mac)[:16]
+	mac := raw[bodyLen:]
+	body := xor(key, raw[:bodyLen], mac)[:bodyLen]
 	if !hmac.Equal(mac, sign(key, body)) {
-		return 0, ErrToken
+		return 0, nil, ErrToken
 	}
-	if now.Unix() > int64(binary.BigEndian.Uint64(body[8:])) {
-		return 0, ErrExpired
+	if now.Unix() > int64(binary.BigEndian.Uint64(body[8:16])) {
+		return 0, nil, ErrExpired
 	}
 	id := int64(binary.BigEndian.Uint64(body[:8]))
 	if id <= 0 {
-		return 0, ErrToken
+		return 0, nil, ErrToken
 	}
-	return id, nil
+	return id, body[16:], nil
 }
 
 func sign(key, body []byte) []byte {
