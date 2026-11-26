@@ -71,6 +71,9 @@ func (b *Bot) onTariff(ctx context.Context, r *req, d Data) error {
 		s.Rows = append(s.Rows, []Button{{Text: b.t(r, "btn.period", map[string]string{"days": strconv.Itoa(p.Days), "price": money(p.Price)}),
 			Data: data("bp", t.ID, p.Days)}})
 	}
+	if b.core.StarsFor30(t) > 0 {
+		s.Rows = append(s.Rows, []Button{b.btn(r, "btn.stars_sub", data("ss", t.ID))})
+	}
 	s.Rows = append(s.Rows, b.back(r, "buy"))
 	return b.show(ctx, r, s)
 }

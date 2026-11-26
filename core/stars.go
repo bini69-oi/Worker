@@ -185,3 +185,14 @@ func (c *Core) undoPayment(tx Tx, p Payment, now time.Time) error {
 	}
 	return enqueueSync(tx, sub.ID, now)
 }
+
+// StarsFor30 отдаёт цену автоподписки Stars на тариф: 30-дневный срок по текущему курсу, с округлением вверх.
+// 0 значит, что автоподписка недоступна: выключена, нет 30-дневного срока или курс не задан.
+func (c *Core) StarsFor30(t Tariff) int64 {
+	rate := c.cfg.Int("stars.rate")
+	p, ok := t.period(30)
+	if !c.cfg.Bool("stars.subscription") || !c.cfg.Bool("stars.enabled") || !ok || rate <= 0 || p.Price <= 0 {
+		return 0
+	}
+	return (p.Price + rate - 1) / rate
+}
