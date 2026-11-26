@@ -36,7 +36,7 @@
 - [x] 5.5 Donut; проверка: `go test ./pay/donut`
 
 ## 6. Волна 6: по документации
-- [ ] 6.1 T-Bank; проверка: `go test ./pay/tbank`
+- [x] 6.1 T-Bank; проверка: `go test ./pay/tbank`
 - [ ] 6.2 Stripe; проверка: `go test ./pay/stripe`
 
 ## 7. Подключение и ревью
