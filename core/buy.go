@@ -22,35 +22,55 @@ func (c *Core) Buy(ctx context.Context, userID, tariffID int64, days int) (Subsc
 	return out, err
 }
 
-// buyTx это покупка внутри уже открытой транзакции. Её зовут Buy и списание автоподписки Stars.
-func (c *Core) buyTx(tx Tx, userID, tariffID int64, days int, now time.Time) (Subscription, error) {
-	buyer, err := activeUser(tx, userID)
-	if err != nil {
-		return Subscription{}, err
+// buyPlan это проверенная покупка: кто, что, за сколько и что у него уже есть.
+type buyPlan struct {
+	buyer  User
+	tariff Tariff
+	period Period
+	sub    Subscription
+	exists bool // у абонента есть подписка
+	live   bool // и она ещё идёт
+}
+
+// planBuy проверяет покупку без списания. Её зовут покупка и расчёт цены, поэтому правила одни.
+func planBuy(tx Tx, userID, tariffID int64, days int, now time.Time) (buyPlan, error) {
+	var b buyPlan
+	var err error
+	if b.buyer, err = activeUser(tx, userID); err != nil {
+		return b, err
 	}
-	t, err := tx.Tariff(tariffID)
-	if err != nil {
-		return Subscription{}, err
+	if b.tariff, err = tx.Tariff(tariffID); err != nil {
+		return b, err
 	}
-	p, ok := t.period(days)
-	if !ok {
-		return Subscription{}, ErrNoPeriod
+	var ok bool
+	if b.period, ok = b.tariff.period(days); !ok {
+		return b, ErrNoPeriod
 	}
-	sub, err := tx.SubByUser(userID)
+	b.sub, err = tx.SubByUser(userID)
 	if err != nil && !errors.Is(err, ErrNotFound) {
-		return Subscription{}, err
+		return b, err
 	}
-	exists := err == nil
-	live := exists && sub.Status == SubActive && sub.ExpiresAt.After(now)
-	same := exists && !sub.Trial && sub.TariffID == tariffID
+	b.exists = err == nil
+	b.live = b.exists && b.sub.Status == SubActive && b.sub.ExpiresAt.After(now)
+	same := b.exists && !b.sub.Trial && b.sub.TariffID == tariffID
 
 	// Скрытый тариф продлевает только тот, у кого он уже есть.
-	if !t.Active && !same {
-		return Subscription{}, ErrTariffHidden
+	if !b.tariff.Active && !same {
+		return b, ErrTariffHidden
 	}
-	if live && !sub.Trial && !same {
-		return Subscription{}, ErrOtherTariff
+	if b.live && !b.sub.Trial && !same {
+		return b, ErrOtherTariff
 	}
+	return b, nil
+}
+
+// buyTx это покупка внутри уже открытой транзакции. Её зовут Buy и списание автоподписки Stars.
+func (c *Core) buyTx(tx Tx, userID, tariffID int64, days int, now time.Time) (Subscription, error) {
+	b, err := planBuy(tx, userID, tariffID, days, now)
+	if err != nil {
+		return Subscription{}, err
+	}
+	buyer, t, p, sub, exists, live := b.buyer, b.tariff, b.period, b.sub, b.exists, b.live
 
 	if p.Price > 0 {
 		buy, err := move(tx, now, LedgerEntry{UserID: userID, Amount: -p.Price, Reason: ReasonBuy, RefType: "tariff", Comment: t.Name})
