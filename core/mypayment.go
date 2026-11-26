@@ -62,3 +62,37 @@ func (c *Core) mayCheck(ctx context.Context, paymentID int64) bool {
 	})
 	return ok
 }
+
+// FindPending ищет ожидающий платёж кассы по абоненту и сумме. Нужен кассам, которые не знают нашего номера
+// платежа (донат Tribute): абонент сам вводит сумму на странице кассы. Платёж с этим номером в кассе уже есть:
+// отдаём его, это повтор уведомления. Иначе самый старый ожидающий с точно той же суммой. Нет: ErrNotFound.
+func (c *Core) FindPending(ctx context.Context, gateway string, tgID, extAmount int64, externalID string) (Payment, error) {
+	var found Payment
+	err := c.store.Tx(ctx, func(tx Tx) error {
+		if externalID == "" {
+			return nil
+		}
+		p, err := tx.PaymentByExt(gateway, externalID)
+		if err == nil {
+			found = p
+		}
+		return nil
+	})
+	if err != nil || found.ID != 0 {
+		return found, err
+	}
+	u, err := c.store.UserByTg(ctx, tgID)
+	if err != nil {
+		return Payment{}, err
+	}
+	list, err := c.store.PendingPayments(ctx, c.clock.Now().Add(time.Second))
+	if err != nil {
+		return Payment{}, err
+	}
+	for _, p := range list { // список идёт по возрастанию номера: первый подходящий самый старый
+		if p.Gateway == gateway && p.UserID == u.ID && p.ExtAmount == extAmount {
+			return p, nil
+		}
+	}
+	return Payment{}, ErrNotFound
+}

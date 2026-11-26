@@ -8,7 +8,7 @@
 - [x] 1.5 Cryptomus; проверка: `go test ./pay/cryptomus`
 
 ## 2. Волна 2
-- [ ] 2.1 Tribute; проверка: `go test ./pay/tribute`
+- [x] 2.1 Tribute; проверка: `go test ./pay/tribute`
 - [ ] 2.2 Robokassa; проверка: `go test ./pay/robokassa`
 - [ ] 2.3 Lava; проверка: `go test ./pay/lava`
 - [ ] 2.4 CloudPayments; проверка: `go test ./pay/cloudpayments`
