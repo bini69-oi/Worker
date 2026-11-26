@@ -1,0 +1,12 @@
+{
+  "id": "cs_test_a1B2c3D4e5F6g7H8i9J0",
+  "object": "checkout.session",
+  "amount_total": 316,
+  "currency": "usd",
+  "mode": "payment",
+  "payment_status": "unpaid",
+  "status": "open",
+  "client_reference_id": "7",
+  "metadata": {"payment_id": "7"},
+  "url": "https://checkout.stripe.com/c/pay/cs_test_a1B2c3D4e5F6g7H8i9J0#fid"
+}
