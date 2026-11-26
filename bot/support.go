@@ -151,8 +151,8 @@ func (b *Bot) fromSupportChat(ctx context.Context, m *tg.Message) error {
 		return nil
 	}
 	ch, err := b.core.AdminChat(ctx)
-	if err != nil || ch.ChatID != m.Chat.ID || !b.core.IsAdmin(ctx, m.From.ID, core.PermSupport) {
-		return nil
+	if err != nil || !b.core.IsAdmin(ctx, m.From.ID, core.PermSupport) {
+		return err
 	}
 	uid, err := b.core.SupportUser(ctx, m.Chat.ID, int64(m.ReplyToMessage.MessageID))
 	if errors.Is(err, core.ErrNotFound) {

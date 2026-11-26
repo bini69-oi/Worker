@@ -63,8 +63,12 @@ func TestBindGroup(t *testing.T) {
 		t.Fatalf("группа без тем: %s", got)
 	}
 	e.group(t, chat, 777, true, "/bind "+code, nil)
+	if c := e.api.take(); len(c) != 0 {
+		t.Fatalf("посторонний привязал или получил ответ: %s", render(c))
+	}
+	e.group(t, chat, owner, true, "/bind wrong-code", nil)
 	if got := render(e.api.take()); !strings.Contains(got, "Код не подошёл") {
-		t.Fatalf("чужой привязал: %s", got)
+		t.Fatalf("неверный код владельца: %s", got)
 	}
 	e.group(t, chat, owner, true, "/bind "+code, nil)
 	golden(t, "bind", e.api.take())
@@ -253,5 +257,22 @@ func TestStrangerButtonNoAlert(t *testing.T) {
 	e.sync(t)
 	if got := render(e.api.take()); strings.Contains(got, "без прав") {
 		t.Fatalf("нажатие постороннего подняло тревогу: %s", got)
+	}
+}
+
+func TestLeaveForeignGroupAfterRestart(t *testing.T) {
+	e := newEnv(t)
+	e.bind(t, chat)
+	e.group(t, -777, 555, true, "всем привет", nil) // бот не помнит, что его сюда добавили
+	if c := e.api.take(); len(c) != 1 || c[0].method != "leave" || c[0].chat != -777 {
+		t.Fatalf("из чужой группы не вышел: %s", render(c))
+	}
+	e.group(t, chat, 555, true, "болтовня в своей группе", nil)
+	if c := e.api.take(); len(c) != 0 {
+		t.Fatalf("в своей группе что-то сделал: %s", render(c))
+	}
+	e.group(t, -778, 555, true, "/bind abc", nil)
+	if c := e.api.take(); len(c) != 0 {
+		t.Fatalf("ответил постороннему на /bind: %s", render(c))
 	}
 }

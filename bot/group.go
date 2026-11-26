@@ -18,9 +18,27 @@ func (b *Bot) onGroup(ctx context.Context, m *tg.Message) error {
 		return nil
 	}
 	if cmd, arg, ok := command(m.Text); ok && cmd == "bind" {
+		if m.From.ID != b.owner {
+			return nil // привязывает только владелец, остальным не отвечаем
+		}
 		return b.bindChat(ctx, m, arg)
 	}
-	return b.fromSupportChat(ctx, m)
+	ch, err := b.core.AdminChat(ctx)
+	if err != nil && !errors.Is(err, core.ErrNotFound) {
+		return err
+	}
+	if ch.ChatID == m.Chat.ID {
+		return b.fromSupportChat(ctx, m)
+	}
+	// Чужая группа. Только что добавили: ждём код. Иначе выходим, в том числе после перезапуска,
+	// когда бот уже не помнит, что его добавляли.
+	b.mu.Lock()
+	at, waiting := b.joined[m.Chat.ID]
+	b.mu.Unlock()
+	if waiting && b.now().Sub(at) < joinWait {
+		return nil
+	}
+	return b.api.LeaveChat(ctx, m.Chat.ID)
 }
 
 // bindChat привязывает группу кодом из админки и создаёт темы. Темы нужны, поэтому сначала проверяем форум:
@@ -86,6 +104,7 @@ func (b *Bot) sweepGroups(ctx context.Context) {
 	b.mu.Unlock()
 	for _, id := range leave {
 		if err := b.api.LeaveChat(ctx, id); err != nil {
+			// Не вышли: следующее сообщение в этой группе снова попросит выйти (onGroup).
 			b.log.Warn("не вышел из чужой группы", "chat", id, "err", err)
 		}
 	}
