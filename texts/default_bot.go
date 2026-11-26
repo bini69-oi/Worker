@@ -133,5 +133,11 @@ var botDefs = []Def{
 	{Key: "stars.sub_desc", Params: []string{"tariff"}, Default: "Telegram будет списывать звёзды раз в 30 дней, подписка продлится сама. Отменить можно в настройках Telegram."},
 	{Key: "stars.sub_ready", Params: []string{"tariff"}, Default: "⭐ Автоподписка на <b>{tariff}</b>: звёзды списываются раз в 30 дней, подписка продлевается сама."},
 	{Key: "btn.subscribe", Default: "⭐ Оформить"},
+	{Key: "support.sent", Default: "💬 Отправлено в поддержку. Ответ придёт сюда."},
+	{Key: "support.limit", Default: "Слишком много сообщений, подождите. Поддержка ответит на уже отправленные."},
+	{Key: "support.card", Params: []string{"user", "tg_id", "tariff", "until", "balance"},
+		Default: "👤 {user} · ID {tg_id}\nТариф: {tariff}, до {until}\nБаланс: {balance}"},
+	{Key: "support.blocked", Default: "Абонент заблокировал бота, ответ не доставлен."},
+	{Key: "support.too_old", Default: "Сообщение слишком старое. Ответьте на новое сообщение абонента."},
 	{Key: "support.contact", Params: []string{"contact"}, Default: "Напишите в поддержку: {contact}"},
 }

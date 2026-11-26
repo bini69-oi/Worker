@@ -383,3 +383,17 @@ func (e *env) bind(t *testing.T, chat int64) {
 	e.group(t, chat, owner, true, "/bind "+code, nil)
 	e.api.take()
 }
+
+// groupIn шлёт сообщение в тему thread группы. reply 0 значит обычное сообщение в теме:
+// Telegram ставит реплай на первое сообщение темы.
+func (e *env) groupIn(t *testing.T, chat, from int64, thread, reply int, text string) {
+	t.Helper()
+	if reply == 0 {
+		reply = thread
+	}
+	m := &tg.Message{MessageID: int(e.next()), From: &tg.User{ID: from}, Chat: tg.Chat{ID: chat, Type: "supergroup", IsForum: true},
+		ThreadID: thread, IsTopicMessage: true, Text: text, ReplyToMessage: &tg.Message{MessageID: reply}}
+	if err := e.b.handle(context.Background(), tg.Update{UpdateID: e.upd, Message: m}); err != nil {
+		t.Fatal(err)
+	}
+}
