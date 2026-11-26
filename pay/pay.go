@@ -62,9 +62,14 @@ func Handler(c *core.Core, list []Gateway, log *slog.Logger) http.Handler {
 		}
 		accept := func() {
 			if a, is := g.(Acker); is {
-				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				body := a.Ack(ev)
+				ctype := "text/plain; charset=utf-8"
+				if strings.HasPrefix(body, "{") { // CloudPayments, SeverPay и подобные ждут JSON
+					ctype = "application/json"
+				}
+				w.Header().Set("Content-Type", ctype)
 				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write([]byte(a.Ack(ev)))
+				_, _ = w.Write([]byte(body))
 				return
 			}
 			w.WriteHeader(http.StatusOK)

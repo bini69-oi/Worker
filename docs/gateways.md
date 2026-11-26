@@ -23,3 +23,8 @@
 | CloudPayments | карты | `cloudpayments.public_id`, `cloudpayments.api_secret` | подпись HMAC-SHA256, ответ `{"code":0}`, адрес Pay, Fail, Refund в кабинете | нет |
 | PayPalych | карты, СБП | `paypalych.token`, `paypalych.shop_id` | подпись md5, Result URL в кабинете | нет |
 | Tribute | донат через Telegram | `tribute.api_key`, `tribute.link` | подпись HMAC-SHA256; сумму абонент вводит сам, платёж находится по Telegram ID и сумме | нет |
+| MulenPay | карты, СБП | `mulenpay.api_key`, `mulenpay.shop_id`, `mulenpay.secret_key` | подпись sha1 в теле, сумма и статус только из API | нет |
+| Antilopay | СБП, карты, SberPay | `antilopay.project_id`, `antilopay.secret_id`, `antilopay.private_key`, `antilopay.public_key` | подпись RSA | нет |
+| SeverPay | карты, СБП | `severpay.mid`, `severpay.token` | подпись HMAC-SHA256, ответ `{"status":true}` | нет |
+| RollyPay | СБП, карты | `rollypay.api_key`, `rollypay.signing_secret` | подпись HMAC-SHA256, оплата подтверждается API | нет |
+| AuraPay | СБП, карты | `aurapay.api_key`, `aurapay.shop_id`, `aurapay.secret_key` | подпись HMAC-SHA256 по полям | нет |

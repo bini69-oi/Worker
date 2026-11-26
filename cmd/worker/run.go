@@ -17,6 +17,8 @@ import (
 	"github.com/bini69-oi/worker/jobs"
 	"github.com/bini69-oi/worker/panel"
 	"github.com/bini69-oi/worker/pay"
+	"github.com/bini69-oi/worker/pay/antilopay"
+	"github.com/bini69-oi/worker/pay/aurapay"
 	"github.com/bini69-oi/worker/pay/cloudpayments"
 	"github.com/bini69-oi/worker/pay/cryptobot"
 	"github.com/bini69-oi/worker/pay/cryptomus"
@@ -24,9 +26,12 @@ import (
 	"github.com/bini69-oi/worker/pay/heleket"
 	"github.com/bini69-oi/worker/pay/lava"
 	"github.com/bini69-oi/worker/pay/manual"
+	"github.com/bini69-oi/worker/pay/mulenpay"
 	"github.com/bini69-oi/worker/pay/paypalych"
 	"github.com/bini69-oi/worker/pay/platega"
 	"github.com/bini69-oi/worker/pay/robokassa"
+	"github.com/bini69-oi/worker/pay/rollypay"
+	"github.com/bini69-oi/worker/pay/severpay"
 	"github.com/bini69-oi/worker/pay/stars"
 	"github.com/bini69-oi/worker/pay/tribute"
 	"github.com/bini69-oi/worker/pay/wata"
@@ -77,6 +82,16 @@ func gateways(cfg *settings.Settings, t *telegram, publicURL string) []pay.Gatew
 	cp.Return = t.paidURL
 	pp := paypalych.New(cfg, "", nil)
 	pp.Return = t.paidURL
+	mp := mulenpay.New(cfg, "", nil)
+	mp.Return = t.paidURL
+	ap := antilopay.New(cfg, "", nil)
+	ap.Return = t.paidURL
+	sv := severpay.New(cfg, "", nil)
+	sv.Return = t.paidURL
+	rp := rollypay.New(cfg, "", nil)
+	rp.Return = t.paidURL
+	ar := aurapay.New(cfg, "", nil)
+	ar.Return, ar.Hook = t.paidURL, publicURL+"/pay/aurapay"
 	return []pay.Gateway{
 		manual.New(cfg),
 		st,
@@ -93,6 +108,11 @@ func gateways(cfg *settings.Settings, t *telegram, publicURL string) []pay.Gatew
 		cp,
 		pp,
 		tribute.New(cfg), // поиск платежа по донату ставит build: ему нужно ядро
+		mp,
+		ap,
+		sv,
+		rp,
+		ar,
 	}
 }
 
