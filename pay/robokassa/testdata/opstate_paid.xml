@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<OperationStateResponse xmlns="http://merchant.roboxchange.com/WebService/">
+  <Result><Code>0</Code></Result>
+  <State><Code>100</Code><RequestDate>2026-11-27T12:00:00.0000000+03:00</RequestDate><StateDate>2026-11-27T12:00:05.0000000+03:00</StateDate></State>
+  <Info><IncCurrLabel>BankCardPSR</IncCurrLabel><IncSum>300.000000</IncSum><IncAccount>427600**0000</IncAccount><PaymentMethod><Code>BankCard</Code><Description>Банковская карта</Description></PaymentMethod><OutCurrLabel>RUB</OutCurrLabel><OutSum>300.000000</OutSum><OpKey>abc</OpKey></Info>
+</OperationStateResponse>

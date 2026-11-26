@@ -9,7 +9,7 @@
 
 ## 2. Волна 2
 - [x] 2.1 Tribute; проверка: `go test ./pay/tribute`
-- [ ] 2.2 Robokassa; проверка: `go test ./pay/robokassa`
+- [x] 2.2 Robokassa; проверка: `go test ./pay/robokassa`
 - [ ] 2.3 Lava; проверка: `go test ./pay/lava`
 - [ ] 2.4 CloudPayments; проверка: `go test ./pay/cloudpayments`
 - [ ] 2.5 PayPalych; проверка: `go test ./pay/paypalych`
