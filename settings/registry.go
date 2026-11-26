@@ -140,6 +140,8 @@ var base = []Def{
 		Desc: "Приложения на экране подключения через запятую, первое главное. Лучше одно-два"},
 	{Key: "app.miniapp", Kind: KindBool, Default: "false", Group: "bot",
 		Desc: "Кнопка меню бота открывает Mini App (кабинет). Выключено: обычный список команд"},
+	{Key: "bot.polling", Kind: KindBool, Default: "false", Group: "bot",
+		Desc: "Опрос getUpdates вместо вебхука: для запуска на своём компьютере без https. Применяется после перезапуска"},
 	{Key: "support.contact", Kind: KindString, Default: "", Group: "bot",
 		Desc: "Контакт поддержки, если админ-группа не привязана: @имя или ссылка"},
 	{Key: "maintenance.on", Kind: KindBool, Default: "false", Group: "bot",

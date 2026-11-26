@@ -164,3 +164,16 @@ func (b *Bot) safeHandle(ctx context.Context, u tg.Update) {
 		b.log.Warn("обновление не обработано", "update", u.UpdateID, "err", err)
 	}
 }
+
+// SetName задаёт имя бота, когда Telegram его сообщил: оно нужно для ссылок t.me.
+func (b *Bot) SetName(name string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.name = name
+}
+
+func (b *Bot) botName() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.name
+}

@@ -24,6 +24,8 @@ type Env struct {
 	PanelToken string
 	SecretKey  []byte // мастер-ключ, 32 байта, им шифруются секреты в базе
 	DBPath     string
+	// TelegramURL это адрес Bot API. Пусто: боевой api.telegram.org. Нужен для своего сервера Bot API.
+	TelegramURL string
 }
 
 var requiredKeys = []string{"BOT_TOKEN", "OWNER_TG_ID", "PUBLIC_URL", "PANEL_URL", "PANEL_TOKEN", "SECRET_KEY"}
@@ -62,6 +64,11 @@ func loadEnv(path string, getenv func(string) string) (Env, []string, error) {
 	}
 	if env.DBPath == "" {
 		env.DBPath = defaultDBPath
+	}
+	if raw := get("TELEGRAM_API_URL"); raw != "" {
+		if env.TelegramURL, err = cleanURL(raw, false); err != nil {
+			return Env{}, warns, fmt.Errorf("TELEGRAM_API_URL: %w", err)
+		}
 	}
 
 	env.OwnerID, err = strconv.ParseInt(get("OWNER_TG_ID"), 10, 64)
@@ -137,7 +144,7 @@ func unquote(s string) string {
 }
 
 func knownKey(key string) bool {
-	return key == "DB_PATH" || slices.Contains(requiredKeys, key)
+	return key == "DB_PATH" || key == "TELEGRAM_API_URL" || slices.Contains(requiredKeys, key)
 }
 
 // cleanURL проверяет адрес и убирает слэш в конце. Публичный адрес только https: иначе Telegram не примет вебхук.

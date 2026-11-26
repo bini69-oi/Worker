@@ -40,7 +40,7 @@ func (b *Bot) showRef(ctx context.Context, r *req) error {
 	if err != nil {
 		return err
 	}
-	link := "https://t.me/" + b.name + "?start=ref_" + r.user.RefCode
+	link := "https://t.me/" + b.botName() + "?start=ref_" + r.user.RefCode
 	return b.show(ctx, r, Screen{Text: b.t(r, "ref.show", map[string]string{"link": link,
 		"invited": strconv.Itoa(st.Invited), "bought": strconv.Itoa(st.Bought), "earned": money(st.Earned)}),
 		Rows: [][]Button{{{Text: b.t(r, "btn.copy_ref", nil), Copy: link}}, b.back(r, "m")}})

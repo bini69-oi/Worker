@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bini69-oi/worker/apps"
+	"github.com/bini69-oi/worker/bot"
 	"github.com/bini69-oi/worker/core"
 	"github.com/bini69-oi/worker/guard"
 	"github.com/bini69-oi/worker/jobs"
@@ -23,28 +25,38 @@ import (
 	"github.com/bini69-oi/worker/redact"
 	"github.com/bini69-oi/worker/settings"
 	"github.com/bini69-oi/worker/store"
+	"github.com/bini69-oi/worker/texts"
+	"github.com/bini69-oi/worker/tg"
 )
 
 // app это собранный процесс: база, настройки, ядро, HTTP и фоновые задачи.
 type app struct {
 	db      *store.DB
 	cfg     *settings.Settings
+	texts   *texts.Texts
 	core    *core.Core
+	tg      *telegram
 	handler http.Handler
 	jobs    *jobs.Scheduler
 	log     *slog.Logger
 }
 
-// gateways это все кассы. Новая касса добавляется сюда одной строкой.
-func gateways(cfg *settings.Settings) []pay.Gateway {
+// gateways это все кассы. Новая касса добавляется сюда одной строкой. t даёт кассам адрес возврата в бота
+// и возврат звёзд через Telegram.
+func gateways(cfg *settings.Settings, t *telegram) []pay.Gateway {
 	kassa := yookassa.New(cfg, "", nil)
 	kassa.RestrictIPs(yookassa.OfficialNets()) // уведомления ЮKassa только с её адресов
+	kassa.Return = t.paidURL
+	pl := platega.New(cfg, "", nil)
+	pl.Return = t.paidURL
+	st := stars.New(cfg)
+	st.Refunder = t.client.RefundStarPayment
 	return []pay.Gateway{
 		manual.New(cfg),
-		stars.New(cfg),
+		st,
 		kassa,
 		cryptobot.New(cfg, "", nil),
-		platega.New(cfg, "", nil),
+		pl,
 	}
 }
 
@@ -84,26 +96,43 @@ func build(env Env, base slog.Handler) (*app, error) {
 		return nil, err
 	}
 	secrets.Add(secretValues(env, cfg)...)
+	tx, err := texts.New(store.NewTextsStore(db), func() string { return cfg.String("lang.default") }, time.Now)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
 
-	gws := gateways(cfg)
+	t := newTelegram(env.BotToken, env.TelegramURL, env.PublicURL, func() bool { return cfg.Bool("bot.polling") }, log)
+	secrets.Add(t.secret)
+	gws := gateways(cfg, t)
+	notes := &notifier{}
 	c := core.New(core.Deps{
 		Store:    store.NewCoreStore(db),
 		Config:   cfg,
 		Panel:    panel.CoreAdapter{Client: panel.New(env.PanelURL, env.PanelToken, nil)},
 		Gateways: pay.CoreGateways(gws),
+		Notifier: notes,
+		Telegram: bot.Tokens{BaseURL: env.TelegramURL, Hook: t.hook, Secret: func() string { return t.secret }},
+		Channels: bot.Channels{API: t.client},
 		OwnerID:  env.OwnerID,
 		Secrets:  secrets,
 		Log:      log,
 	})
+	t.bot = bot.New(bot.Options{Core: c, Texts: tx, API: t.client, Config: cfg, Log: log, Name: "", URL: env.PublicURL,
+		Owner: env.OwnerID, DLKey: env.SecretKey})
+	notes.b = t.bot
 
 	hooks := &guard.Limiter{Max: hookLimit, Window: time.Minute}
 	mux := http.NewServeMux()
 	mux.Handle("POST /pay/{name}", hooks.Wrap(pay.Handler(c, gws, log)))
 	mux.Handle("POST /panel/webhook", hooks.Wrap(panel.WebhookHandler(c, func() string { return cfg.Secret("panel.webhook_secret") }, log)))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	mux.Handle("POST /tg/webhook", tg.NewWebhook(t.secret, t.updates))
+	mux.Handle("GET /dl/{app}/{token}", apps.Handler(c, env.SecretKey, time.Now,
+		func(key string) string { return tx.Render(key, cfg.String("lang.default"), nil) }))
 
 	return &app{
-		db: db, cfg: cfg, core: c, handler: guard.RealIP(mux), log: log,
+		db: db, cfg: cfg, texts: tx, core: c, tg: t, handler: guard.RealIP(mux), log: log,
 		jobs: &jobs.Scheduler{Jobs: jobs.CoreJobs(c, cfg), Log: log},
 	}, nil
 }
@@ -124,7 +153,11 @@ func (a *app) serve(ctx context.Context, ln net.Listener) error {
 	tick := time.NewTicker(settings.RefreshEvery)
 	defer tick.Stop()
 	wg.Go(func() { a.cfg.Run(ctx, tick.C) })
+	textTick := time.NewTicker(texts.RefreshEvery)
+	defer textTick.Stop()
+	wg.Go(func() { a.texts.Run(ctx, textTick.C) })
 	wg.Go(func() { a.jobs.Run(ctx) })
+	wg.Go(func() { a.tg.start(ctx, wg.Go) })
 
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()

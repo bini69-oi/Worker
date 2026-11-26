@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -33,11 +34,38 @@ func (s *syncBuf) String() string {
 	return s.b.String()
 }
 
+// fakeTelegram отвечает «ок» на любой метод Bot API и запоминает, какие методы звали.
+func fakeTelegram(t *testing.T) (*httptest.Server, func() string) {
+	var mu sync.Mutex
+	var calls []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		calls = append(calls, r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:])
+		mu.Unlock()
+		if strings.HasSuffix(r.URL.Path, "/getMe") {
+			_, _ = w.Write([]byte(`{"ok":true,"result":{"id":1,"is_bot":true,"username":"workerbot"}}`))
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/getUpdates") {
+			_, _ = w.Write([]byte(`{"ok":true,"result":[]}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"ok":true,"result":true}`))
+	}))
+	t.Cleanup(srv.Close)
+	return srv, func() string {
+		mu.Lock()
+		defer mu.Unlock()
+		return strings.Join(calls, ",")
+	}
+}
+
 func TestServeAndStop(t *testing.T) {
+	tgSrv, tgCalls := fakeTelegram(t)
 	env := Env{
 		BotToken: "123456:secret-bot-token", OwnerID: 1, PublicURL: "https://bot.example.com",
 		PanelURL: "http://127.0.0.1:1", PanelToken: "secret-panel-token",
-		SecretKey: settings.NewKey(), DBPath: filepath.Join(t.TempDir(), "w.db"),
+		SecretKey: settings.NewKey(), DBPath: filepath.Join(t.TempDir(), "w.db"), TelegramURL: tgSrv.URL,
 	}
 	var logs syncBuf
 	a, err := build(env, slog.NewJSONHandler(&logs, nil))
@@ -66,6 +94,8 @@ func TestServeAndStop(t *testing.T) {
 		}
 	}
 	check("GET", "/healthz", 200)
+	check("POST", "/tg/webhook", 401) // без секрета Telegram
+	check("GET", "/dl/happ/garbage", 404)
 	check("POST", "/pay/unknown", 404)
 	check("POST", "/pay/stars", 401)
 	check("POST", "/panel/webhook", 401)
@@ -86,6 +116,9 @@ func TestServeAndStop(t *testing.T) {
 	check("POST", "/pay/unknown", 429)
 	check("GET", "/healthz", 200)
 
+	for !strings.Contains(tgCalls(), "setWebhook") {
+		time.Sleep(10 * time.Millisecond) // бот ставит вебхук и команды при старте
+	}
 	a.log.Warn("проверка фильтра", "token", env.BotToken, "panel", env.PanelToken)
 	cancel()
 	select {
