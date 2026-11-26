@@ -109,6 +109,8 @@ var base = []Def{
 		Desc: "За сколько дней до окончания напоминать, через запятую"},
 	{Key: "stars.rate", Kind: KindMoney, Default: "150", Group: "pay",
 		Desc: "Сколько копеек стоит одна звезда Telegram"},
+	{Key: "support.contact", Kind: KindString, Default: "", Group: "bot",
+		Desc: "Контакт поддержки, если админ-группа не привязана: @имя или ссылка"},
 	{Key: "maintenance.on", Kind: KindBool, Default: "false", Group: "bot",
 		Desc: "Техработы: абоненты видят текст о работах, админы пользуются ботом. Оплаты и панель работают"},
 	{Key: "lang.default", Kind: KindString, Default: "ru", Group: "texts",

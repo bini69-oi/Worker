@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -149,6 +150,22 @@ func (t *Texts) Reset(key, lang string) error {
 	delete(t.vals, cacheKey{key, lang})
 	t.mu.Unlock()
 	return nil
+}
+
+// Langs отдаёт языки, на которых есть тексты: язык умолчаний из кода и языки правок админа.
+func (t *Texts) Langs() []string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	seen := map[string]bool{codeLang: true}
+	out := []string{codeLang}
+	for k := range t.vals {
+		if !seen[k.lang] {
+			seen[k.lang] = true
+			out = append(out, k.lang)
+		}
+	}
+	sort.Strings(out[1:])
+	return out
 }
 
 // Raw отдаёт текст без подстановок. Порядок: язык абонента, язык по умолчанию из настроек,

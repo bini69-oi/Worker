@@ -13,16 +13,21 @@ func (c *Core) serving(ctx context.Context, userID int64) error {
 	if err != nil {
 		return err
 	}
-	staff := false
-	_ = c.store.Tx(ctx, func(tx Tx) error {
-		_, err := c.admin(tx, u.TgID)
-		staff = err == nil
-		return nil
-	})
-	if staff {
+	if c.IsStaff(ctx, u.TgID) {
 		return nil
 	}
 	return ErrMaintenance
+}
+
+// IsStaff говорит, админ ли это: владелец или помощник хоть с одним правом.
+func (c *Core) IsStaff(ctx context.Context, tgID int64) bool {
+	staff := false
+	_ = c.store.Tx(ctx, func(tx Tx) error {
+		_, err := c.admin(tx, tgID)
+		staff = err == nil
+		return nil
+	})
+	return staff
 }
 
 // Maintenance говорит, идут ли техработы. Бот и кабинет по нему показывают текст о работах.

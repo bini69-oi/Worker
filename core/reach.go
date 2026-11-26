@@ -31,3 +31,8 @@ func (c *Core) MarkReachable(ctx context.Context, userID int64) error {
 func (c *Core) SetScreen(ctx context.Context, userID, msgID int64) error {
 	return c.tx(ctx, func(tx Tx) error { return tx.SetScreenMsg(userID, msgID) })
 }
+
+// UserByTg находит абонента по Telegram ID. Только чтение: бот зовёт его на каждое обновление.
+func (c *Core) UserByTg(ctx context.Context, tgID int64) (User, error) {
+	return c.store.UserByTg(ctx, tgID)
+}
