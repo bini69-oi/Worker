@@ -1,0 +1,26 @@
+{
+ "state": 0,
+ "result": {
+  "uuid": "6f8a4c1e-1b2d-4e7a-9c3b-5d0e8f7a1b2c",
+  "order_id": "worker_7",
+  "amount": "300.00",
+  "payment_amount": null,
+  "payer_amount": null,
+  "discount_percent": null,
+  "discount": "0.00000000",
+  "payer_currency": null,
+  "currency": "RUB",
+  "comments": null,
+  "merchant_amount": null,
+  "network": null,
+  "address": null,
+  "from": null,
+  "txid": null,
+  "payment_status": "check",
+  "url": "https://pay.cryptomus.com/pay/6f8a4c1e-1b2d-4e7a-9c3b-5d0e8f7a1b2c",
+  "expired_at": 1790000000,
+  "status": "check",
+  "is_final": false,
+  "additional_data": null
+ }
+}

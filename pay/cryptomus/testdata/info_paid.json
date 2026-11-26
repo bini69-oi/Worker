@@ -1,0 +1,16 @@
+{
+ "state": 0,
+ "result": {
+  "uuid": "6f8a4c1e-1b2d-4e7a-9c3b-5d0e8f7a1b2c",
+  "order_id": "worker_7",
+  "amount": "300.00",
+  "payment_amount": "3.21",
+  "payer_amount": "3.21",
+  "payer_currency": "USDT",
+  "currency": "RUB",
+  "network": "tron_trc20",
+  "payment_status": "paid",
+  "url": "https://pay.cryptomus.com/pay/6f8a4c1e-1b2d-4e7a-9c3b-5d0e8f7a1b2c",
+  "is_final": true
+ }
+}
