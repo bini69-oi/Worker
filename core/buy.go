@@ -19,8 +19,11 @@ func (c *Core) Buy(ctx context.Context, userID, tariffID int64, days int) (Subsc
 	var out Subscription
 	err := c.tx(ctx, func(tx Tx) error {
 		var err error
-		out, err = c.buyTx(tx, userID, tariffID, days, c.clock.Now())
-		return err
+		if out, err = c.buyTx(tx, userID, tariffID, days, c.clock.Now()); err != nil {
+			return err
+		}
+		// Купил сам: запомненная корзина больше не нужна, иначе следующее пополнение купило бы ещё раз.
+		return tx.DeletePendingBuy(userID)
 	})
 	return out, err
 }

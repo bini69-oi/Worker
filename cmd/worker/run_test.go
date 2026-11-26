@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -131,5 +133,24 @@ func TestServeAndStop(t *testing.T) {
 	}
 	if out := logs.String(); strings.Contains(out, "secret-bot-token") || strings.Contains(out, "secret-panel-token") {
 		t.Fatalf("секрет попал в журнал:\n%s", out)
+	}
+}
+
+func TestTelegramRetry(t *testing.T) {
+	fails := 2
+	tg := &telegram{log: slog.New(slog.NewTextHandler(io.Discard, nil)), retryWait: time.Millisecond}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	start := time.Now()
+	n := 0
+	tg.retry(ctx, "test", func() error {
+		n++
+		if n <= fails {
+			return errors.New("нет сети")
+		}
+		return nil
+	})
+	if n != 3 || time.Since(start) > 5*time.Second {
+		t.Fatalf("попыток %d, ждали 3", n)
 	}
 }

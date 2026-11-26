@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strconv"
 	"sync/atomic"
+	"time"
 
 	"github.com/bini69-oi/worker/bot"
 	"github.com/bini69-oi/worker/core"
@@ -23,13 +24,15 @@ type telegram struct {
 	polling func() bool
 	hook    string
 	log     *slog.Logger
+	// retryWait это первая пауза между повторами шагов связи с Telegram.
+	retryWait time.Duration
 }
 
 func newTelegram(token, apiURL, publicURL string, polling func() bool, log *slog.Logger) *telegram {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	t := &telegram{client: &tg.Client{Token: token, BaseURL: apiURL}, updates: make(chan tg.Update, 256), secret: hex.EncodeToString(b),
-		polling: polling, hook: publicURL + "/tg/webhook", log: log}
+		polling: polling, hook: publicURL + "/tg/webhook", log: log, retryWait: 5 * time.Second}
 	t.name.Store("")
 	return t
 }
@@ -45,27 +48,45 @@ func (t *telegram) paidURL(paymentID int64) string {
 	return "https://t.me/" + t.botName() + "?start=paid_" + strconv.FormatInt(paymentID, 10)
 }
 
-// start узнаёт имя бота, ставит вебхук (или снимает его для опроса), команды и запускает разбор обновлений.
-// Telegram недоступен при старте: процесс работает дальше, кассы и панель не ждут Telegram.
+// start запускает разбор обновлений сразу, а связь с Telegram (имя бота, вебхук или опрос, команды)
+// настраивает в фоне с повторами: Telegram недоступен при старте, кассы и панель его не ждут.
 func (t *telegram) start(ctx context.Context, run func(func())) {
-	if me, err := t.client.GetMe(ctx); err != nil {
-		t.log.Warn("Telegram не ответил на getMe", "err", err)
-	} else {
-		t.name.Store(me.Username)
-		t.bot.SetName(me.Username)
-	}
-	if t.polling() {
-		if err := t.client.DeleteWebhook(ctx); err != nil {
-			t.log.Warn("не снят вебхук для опроса", "err", err)
-		}
-		run(func() { _ = tg.Poll(ctx, t.client, t.updates) })
-	} else if err := t.client.SetWebhook(ctx, t.hook, t.secret, bot.Allowed); err != nil {
-		t.log.Warn("вебхук не поставлен", "err", err)
-	}
-	if err := t.bot.Setup(ctx); err != nil {
-		t.log.Warn("команды бота не поставлены", "err", err)
-	}
 	run(func() { t.bot.Run(ctx, t.updates) })
+	run(func() {
+		t.retry(ctx, "getMe", func() error {
+			me, err := t.client.GetMe(ctx)
+			if err == nil {
+				t.name.Store(me.Username)
+				t.bot.SetName(me.Username)
+			}
+			return err
+		})
+		if t.polling() {
+			t.retry(ctx, "deleteWebhook", func() error { return t.client.DeleteWebhook(ctx) })
+			run(func() { _ = tg.Poll(ctx, t.client, t.updates) })
+		} else {
+			t.retry(ctx, "setWebhook", func() error { return t.client.SetWebhook(ctx, t.hook, t.secret, bot.Allowed) })
+		}
+		t.retry(ctx, "setMyCommands", func() error { return t.bot.Setup(ctx) })
+	})
+}
+
+// retry повторяет шаг с паузой от retryWait до минуты, пока он не пройдёт или процесс не остановят.
+func (t *telegram) retry(ctx context.Context, step string, fn func() error) {
+	wait := t.retryWait
+	for {
+		err := fn()
+		if err == nil || ctx.Err() != nil {
+			return
+		}
+		t.log.Warn("Telegram: шаг не прошёл, повтор", "step", step, "wait", wait.String(), "err", err)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
+		}
+		wait = min(wait*2, time.Minute)
+	}
 }
 
 // notifier отдаёт уведомления ядра боту, который собирается после ядра.

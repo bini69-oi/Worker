@@ -284,3 +284,22 @@ func TestBanDoesNotTurnOffAutoRenew(t *testing.T) {
 		t.Fatal("бан выключил автопродление навсегда")
 	}
 }
+
+func TestBuyClearsCart(t *testing.T) {
+	ctx := context.Background()
+	e := newPayEnv(t)
+	tr := e.tariff(t, "Месяц", core.Period{Days: 7, Price: 100}, core.Period{Days: 30, Price: 30000})
+	if err := e.c.RememberBuy(ctx, e.user.ID, tr.ID, 30); err != nil {
+		t.Fatal(err)
+	}
+	e.topup(t, 100)
+	if _, err := e.c.Buy(ctx, e.user.ID, tr.ID, 7); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := e.c.Sub(ctx, e.user.ID)
+	e.pay(t, 30000)
+	after, _ := e.c.Sub(ctx, e.user.ID)
+	if !after.ExpiresAt.Equal(before.ExpiresAt) || e.balance(t) != 30000 {
+		t.Fatalf("старая корзина купила после пополнения: срок %v → %v, баланс %d", before.ExpiresAt, after.ExpiresAt, e.balance(t))
+	}
+}
