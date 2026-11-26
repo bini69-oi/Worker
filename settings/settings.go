@@ -115,6 +115,11 @@ func (s *Settings) set(def Def, raw string) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", key, err)
 	}
+	if check := checks[key]; check != nil {
+		if err := check(norm); err != nil {
+			return fmt.Errorf("%s: %w: %w", key, ErrBadValue, err)
+		}
+	}
 	if norm == def.Default {
 		return s.Reset(key)
 	}
