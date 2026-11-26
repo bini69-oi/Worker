@@ -139,7 +139,7 @@ func (g *Gateway) Status(ctx context.Context, p core.Payment) (core.GatewayEvent
 		}
 		// В истории amount это сумма на кошельке получателя, то есть за вычетом комиссии карты. Сверяется как есть:
 		// не сошлась, значит ядро не зачислит, и админ получит тревогу. Подгонять сумму под счёт нельзя.
-		if ev.ExtAmount, err = kopecks(string(op.Amount)); err != nil {
+		if ev.ExtAmount, err = pay.Kopecks(string(op.Amount)); err != nil {
 			return ev, err
 		}
 		ev.Status = core.PayPaid
@@ -233,42 +233,29 @@ func parse(f url.Values) (core.GatewayEvent, error) {
 	if f.Get("test_notification") == "true" || f.Get("codepro") == "true" || f.Get("unaccepted") == "true" {
 		return ev, nil
 	}
-	// withdraw_amount есть не во всех уведомлениях. Без него берём amount: у перевода из кошелька комиссии нет,
-	// а при комиссии сумма меньше счёта, и ядро отклонит зачисление, но не зачислит лишнего.
-	raw := f.Get("withdraw_amount")
-	if raw == "" {
-		raw = f.Get("amount")
-	}
-	k, err := kopecks(raw)
+	// Подписан только amount: сколько пришло на кошелёк после комиссии. Счёт выставлен на withdraw_amount
+	// (сколько списано с плательщика), но это поле в подпись не входит. Поэтому верим ему, только если оно
+	// не меньше amount и больше него не дальше комиссии ЮMoney: подменить его на заметно большую сумму нельзя.
+	got, err := pay.Kopecks(f.Get("amount"))
 	if err != nil {
 		return ev, err
+	}
+	k := got
+	if raw := f.Get("withdraw_amount"); raw != "" {
+		w, err := pay.Kopecks(raw)
+		if err != nil || w < got || (w-got)*100 > w*maxFeePercent {
+			return core.GatewayEvent{}, errors.New("сумма списания в уведомлении ЮMoney не сходится с подписанной суммой")
+		}
+		k = w
 	}
 	ev.ExtAmount, ev.Status = k, core.PayPaid
 	return ev, nil
 }
 
+// maxFeePercent это предел комиссии ЮMoney при оплате картой, с запасом: разница сумм больше считается подменой.
+const maxFeePercent = 5
+
 // rubles превращает копейки в строку рублей без float: 12345 это "123.45".
 func rubles(kop int64) string {
 	return fmt.Sprintf("%d.%02d", kop/100, kop%100)
-}
-
-// kopecks разбирает рубли вида "300", "300.5" или "300.00" в копейки без float.
-func kopecks(s string) (int64, error) {
-	whole, frac, _ := strings.Cut(strings.TrimSpace(s), ".")
-	if len(frac) > 2 {
-		if strings.Trim(frac[2:], "0") != "" {
-			return 0, errors.New("сумма ЮMoney с долями копейки")
-		}
-		frac = frac[:2]
-	}
-	frac += strings.Repeat("0", 2-len(frac))
-	w, err := strconv.ParseInt(whole, 10, 64)
-	if err != nil || w < 0 {
-		return 0, errors.New("сумма ЮMoney не разобрана")
-	}
-	f, err := strconv.ParseInt(frac, 10, 64)
-	if err != nil || f < 0 || w == 0 && f == 0 {
-		return 0, errors.New("сумма ЮMoney не разобрана")
-	}
-	return w*100 + f, nil
 }

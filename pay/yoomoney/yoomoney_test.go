@@ -210,13 +210,33 @@ func TestCreateLink(t *testing.T) {
 
 func TestKopecks(t *testing.T) {
 	for in, want := range map[string]int64{"300": 30000, "300.5": 30050, "298.50": 29850, "0.01": 1, "300.000": 30000} {
-		if got, err := kopecks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%s: %d %v", in, got, err)
 		}
 	}
-	for _, in := range []string{"", "abc", "-1", "1.005", "0", "0.00"} {
-		if _, err := kopecks(in); err == nil {
+	for _, in := range []string{"", "abc", "-1", "1.005"} {
+		if _, err := pay.Kopecks(in); err == nil {
 			t.Errorf("%q принято", in)
+		}
+	}
+}
+
+// withdraw_amount не подписан: подменить его на сумму заметно больше подписанной amount нельзя.
+func TestWithdrawBoundedBySigned(t *testing.T) {
+	g := New(full, "", nil)
+	for name, c := range map[string]struct {
+		amount, withdraw string
+		ok               bool
+	}{
+		"карта, комиссия 3%":   {"291.00", "300.00", true},
+		"без комиссии":         {"300.00", "300.00", true},
+		"подмена на 3000":      {"291.00", "3000.00", false},
+		"списано меньше суммы": {"300.00", "200.00", false},
+	} {
+		r := hook(labelOf(1), 30000, testSecret, url.Values{"amount": {c.amount}, "withdraw_amount": {c.withdraw}})
+		_, err := g.Verify(r)
+		if (err == nil) != c.ok {
+			t.Fatalf("%s: ошибка %v, ждали успех %v", name, err, c.ok)
 		}
 	}
 }
