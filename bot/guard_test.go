@@ -62,6 +62,7 @@ func TestInputResetByCommandAndTime(t *testing.T) {
 
 func TestFlood(t *testing.T) {
 	e := newEnv(t)
+	e.step = 0
 	hits := 0
 	e.b.acts["hit"] = func(context.Context, *req, Data) error { hits++; return nil }
 	for range 20 {
@@ -94,7 +95,6 @@ func TestBannedSeesOnlyNotice(t *testing.T) {
 	}
 	e.api.take()
 	e.press(t, userTg, 5, "hit")
-	e.clock.Add(time.Second)
 	e.press(t, userTg, 5, "hit")
 	notices := 0
 	for _, c := range e.api.take() {

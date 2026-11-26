@@ -1,0 +1,9 @@
+== edit chat=1001 msg=5
+<b>Устройства</b>: 2 из 3
+
+1. iOS iPhone
+2. Android Pixel
+[❌ 1 → devdel:1:2] | [❌ 2 → devdel:2:2]
+[Отвязать все → devrst]
+[← Назад → sub]
+== answer chat=0 msg=0
