@@ -50,6 +50,11 @@ func (c *Core) Trial(ctx context.Context, userID int64) (Subscription, error) {
 		if err := tx.SetTrialUsed(userID); err != nil {
 			return err
 		}
+		vars := userVars(u)
+		vars["days"] = itoa(int64(days))
+		if err := enqueueAdmin(tx, AdminTask{Topic: TopicTrials, Key: "admin.trial", Vars: vars}, now); err != nil {
+			return err
+		}
 		return enqueueSync(tx, out.ID, now)
 	})
 	if full {

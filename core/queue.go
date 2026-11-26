@@ -15,13 +15,19 @@ const (
 	KindNotifyAdmin = "notify.admin"
 )
 
-// Темы админ-чата.
+// Темы админ-чата: по видам событий, не по абонентам.
 const (
 	TopicPayments = "payments"
+	TopicTrials   = "trials"
 	TopicNew      = "new"
+	TopicSupport  = "support"
 	TopicErrors   = "errors"
 	TopicSecurity = "security"
+	TopicSummary  = "summary"
 )
+
+// Topics это все темы в порядке, в котором бот создаёт их в группе.
+var Topics = []string{TopicPayments, TopicTrials, TopicNew, TopicSupport, TopicErrors, TopicSecurity, TopicSummary}
 
 // AdminTask это событие для админов: тема, ключ текста и подстановки.
 type AdminTask struct {

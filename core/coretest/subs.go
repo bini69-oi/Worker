@@ -51,6 +51,13 @@ func (s *Store) Tasks() []core.Task {
 	return out
 }
 
+// DropTasks очищает очередь. Тесты так начинают с чистого листа после подготовки данных.
+func (s *Store) DropTasks() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.st.tasks = nil
+}
+
 // Pending считает невыполненные задачи вида kind.
 func (s *Store) Pending(kind string) int {
 	s.mu.Lock()

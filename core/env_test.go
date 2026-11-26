@@ -33,6 +33,7 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	e.user = u
+	e.st.DropTasks() // событие «новый абонент» к тестам отношения не имеет
 	return e
 }
 

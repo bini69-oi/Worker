@@ -44,7 +44,15 @@ func (c *Core) registerTx(tx Tx, tgID int64, username, lang, refCode string, now
 			return u, ErrDuplicate
 		}
 	}
-	return u, err
+	if err != nil {
+		return u, err
+	}
+	return u, enqueueAdmin(tx, AdminTask{Topic: TopicNew, Key: "admin.new_user", Vars: userVars(u)}, now)
+}
+
+// userVars это подстановки об абоненте для событий админам: бот делает из них ссылку на человека.
+func userVars(u User) map[string]string {
+	return map[string]string{"user_id": itoa(u.ID), "tg_id": itoa(u.TgID), "username": u.Username}
 }
 
 // welcomeBonus начисляет приглашённому бонус после его первой настоящей оплаты, а не при входе:
