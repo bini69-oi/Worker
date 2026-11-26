@@ -38,7 +38,7 @@ func init() {
 		settings.Def{Key: "platega.method", Kind: settings.KindInt, Default: strconv.Itoa(methodSBP), Group: "pay.platega",
 			Desc: "Код способа оплаты в Platega (2 это СБП)"},
 		settings.Def{Key: "platega.return_url", Kind: settings.KindString, Group: "pay.platega",
-			Desc: "Куда вернуть абонента после оплаты, можно пусто"},
+			Desc: "Куда вернуть абонента после оплаты, {payment} заменится номером платежа. Пусто: обратно в бота"},
 	)
 }
 
@@ -54,6 +54,8 @@ type Gateway struct {
 	cfg     Config
 	baseURL string
 	client  *http.Client
+	// Return это адрес возврата по умолчанию, если настройка пустая. Ставит сборка: диплинк в бота.
+	Return func(paymentID int64) string
 }
 
 var _ pay.Gateway = (*Gateway)(nil)
@@ -147,7 +149,7 @@ func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, err
 		PaymentMethod:  g.cfg.Int("platega.method"),
 		PaymentDetails: details{Amount: json.Number(rubles(p.Amount)), Currency: "RUB"},
 		Description:    fmt.Sprintf("Пополнение %d", p.ID),
-		Return:         g.cfg.String("platega.return_url"),
+		Return:         pay.ReturnURL(g.cfg.String("platega.return_url"), g.Return, p.ID),
 		Payload:        payloadPrefix + strconv.FormatInt(p.ID, 10),
 	}
 	if req.PaymentMethod == 0 {

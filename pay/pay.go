@@ -4,6 +4,8 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/bini69-oi/worker/core"
 )
@@ -69,4 +71,17 @@ func Handler(c *core.Core, list []Gateway, log *slog.Logger) http.Handler {
 		}
 	})
 	return mux
+}
+
+// ReturnURL это адрес, куда касса вернёт абонента после оплаты. Адрес из настройки главнее: в нём {payment}
+// заменяется номером платежа. Пустая настройка: адрес по умолчанию от бота (диплинк paid_<номер>).
+func ReturnURL(setting string, def func(paymentID int64) string, paymentID int64) string {
+	id := strconv.FormatInt(paymentID, 10)
+	if setting != "" {
+		return strings.ReplaceAll(setting, "{payment}", id)
+	}
+	if def != nil {
+		return def(paymentID)
+	}
+	return ""
 }

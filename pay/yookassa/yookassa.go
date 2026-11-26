@@ -28,8 +28,8 @@ func init() {
 	settings.AddGateway("yookassa", "Банковская карта и СБП",
 		settings.Def{Key: "yookassa.shop_id", Kind: settings.KindString, Default: "", Group: "pay",
 			Desc: "Номер магазина в ЮKassa (shopId)"},
-		settings.Def{Key: "yookassa.return_url", Kind: settings.KindString, Default: "https://t.me", Group: "pay",
-			Desc: "Куда вернуть абонента после оплаты (ЮKassa требует адрес возврата)"},
+		settings.Def{Key: "yookassa.return_url", Kind: settings.KindString, Default: "", Group: "pay",
+			Desc: "Куда вернуть абонента после оплаты, {payment} заменится номером платежа. Пусто: обратно в бота"},
 	)
 }
 
@@ -45,6 +45,8 @@ type Gateway struct {
 	baseURL string
 	client  *http.Client
 	nets    []*net.IPNet
+	// Return это адрес возврата по умолчанию, если настройка пустая. Ставит сборка: диплинк в бота.
+	Return func(paymentID int64) string
 }
 
 // New собирает кассу. Пустой baseURL означает боевой API, nil вместо клиента означает клиент с таймаутом.
@@ -145,7 +147,7 @@ func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, err
 	body := map[string]any{
 		"amount":       map[string]string{"value": formatMoney(p.Amount), "currency": "RUB"},
 		"capture":      true,
-		"confirmation": map[string]string{"type": "redirect", "return_url": g.cfg.String("yookassa.return_url")},
+		"confirmation": map[string]string{"type": "redirect", "return_url": g.returnURL(p.ID)},
 		"description":  fmt.Sprintf("Пополнение баланса, платёж %d", p.ID),
 		"metadata":     map[string]string{"payment_id": strconv.FormatInt(p.ID, 10)},
 	}
@@ -272,4 +274,12 @@ func parseMoney(s string) (int64, error) {
 		return 0, errors.New("сумма в ответе ЮKassa не разобрана")
 	}
 	return w*100 + f, nil
+}
+
+// returnURL это адрес возврата. ЮKassa без него не создаёт платёж, поэтому есть последний запасной адрес.
+func (g *Gateway) returnURL(id int64) string {
+	if u := pay.ReturnURL(g.cfg.String("yookassa.return_url"), g.Return, id); u != "" {
+		return u
+	}
+	return "https://t.me"
 }
