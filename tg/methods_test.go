@@ -101,6 +101,11 @@ func TestMethods(t *testing.T) {
 			func(c *Client) (any, error) { return c.GetChatMember(ctx, "-100", 4242) }, "administrator"},
 		{"leaveChat", "leaveChat", `{"ok":true,"result":true}`, `{"chat_id":-100}`,
 			func(c *Client) (any, error) { return nil, c.LeaveChat(ctx, -100) }, nil},
+		{"editMessageReplyMarkup", "editMessageReplyMarkup", `{"ok":true,"result":true}`,
+			`{"chat_id":1,"message_id":2,"reply_markup":{"inline_keyboard":[[{"text":"ok","callback_data":"m"}]]}}`,
+			func(c *Client) (any, error) {
+				return nil, c.EditMessageReplyMarkup(ctx, 1, 2, &InlineKeyboardMarkup{InlineKeyboard: [][]InlineKeyboardButton{{{Text: "ok", CallbackData: "m"}}}})
+			}, nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

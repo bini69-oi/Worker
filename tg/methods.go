@@ -176,3 +176,12 @@ func (c *Client) GetChatMember(ctx context.Context, chat string, user int64) (st
 func (c *Client) LeaveChat(ctx context.Context, chat int64) error {
 	return c.call(ctx, "leaveChat", map[string]any{"chat_id": chat}, nil)
 }
+
+// EditMessageReplyMarkup меняет только кнопки сообщения, текст и его разметка остаются.
+func (c *Client) EditMessageReplyMarkup(ctx context.Context, chatID int64, messageID int, markup *InlineKeyboardMarkup) error {
+	req := map[string]any{"chat_id": chatID, "message_id": messageID}
+	if markup != nil {
+		req["reply_markup"] = markup
+	}
+	return c.call(ctx, "editMessageReplyMarkup", req, nil)
+}

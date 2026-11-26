@@ -10,6 +10,7 @@ import (
 type API interface {
 	SendMessage(ctx context.Context, p tg.SendParams) (tg.Message, error)
 	EditMessageText(ctx context.Context, p tg.EditParams) error
+	EditMessageReplyMarkup(ctx context.Context, chatID int64, messageID int, markup *tg.InlineKeyboardMarkup) error
 	AnswerCallbackQuery(ctx context.Context, id, text string, showAlert bool) error
 	CopyMessage(ctx context.Context, toChat int64, thread int, fromChat int64, msgID, replyTo int) (int, error)
 	SendInvoice(ctx context.Context, p tg.InvoiceParams) (tg.Message, error)

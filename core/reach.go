@@ -56,3 +56,6 @@ func validLang(s string) bool {
 	}
 	return true
 }
+
+// User отдаёт абонента по id. Только чтение.
+func (c *Core) User(ctx context.Context, id int64) (User, error) { return c.store.User(ctx, id) }

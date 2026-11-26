@@ -54,17 +54,24 @@ func (c *Core) newConfirm(tx Tx, adminTg int64, kind string, payload []byte, var
 // и только один раз, пока не истекли 2 минуты. «Нет» шлёт владельцу тревогу. «Да» на опасное действие
 // выполняет его. Вход «Да» так не подтверждается: только кнопкой с кодом через AnswerLogin.
 func (c *Core) AnswerConfirm(ctx context.Context, confirmID, pressedBy int64, yes bool) error {
-	return c.answer(ctx, confirmID, pressedBy, func(cf Confirm) (bool, error) {
+	_, err := c.answer(ctx, confirmID, pressedBy, func(cf Confirm) (bool, error) {
 		if yes && cf.Kind == "login" {
 			return false, ErrInvalid
 		}
 		return yes, nil
 	})
+	return err
 }
 
 // AnswerLogin принимает нажатие кнопки с кодом на сообщении о входе. Код тот, что показал браузер:
 // вход подтверждён. Код другой: это «Нет», то есть тревога и блок адреса, с которого входили.
 func (c *Core) AnswerLogin(ctx context.Context, confirmID, pressedBy int64, code string) error {
+	_, err := c.AnswerLoginCode(ctx, confirmID, pressedBy, code)
+	return err
+}
+
+// AnswerLoginCode как AnswerLogin, но говорит, подтверждён ли вход: бот пишет итог в сообщении.
+func (c *Core) AnswerLoginCode(ctx context.Context, confirmID, pressedBy int64, code string) (bool, error) {
 	return c.answer(ctx, confirmID, pressedBy, func(cf Confirm) (bool, error) {
 		if cf.Kind != "login" {
 			return false, ErrInvalid
@@ -78,7 +85,8 @@ func (c *Core) AnswerLogin(ctx context.Context, confirmID, pressedBy int64, code
 }
 
 // answer записывает ответ на подтверждение. decide по подтверждению говорит, «Да» это или «Нет».
-func (c *Core) answer(ctx context.Context, confirmID, pressedBy int64, decide func(Confirm) (bool, error)) error {
+// Отдаёт, каким вышел ответ.
+func (c *Core) answer(ctx context.Context, confirmID, pressedBy int64, decide func(Confirm) (bool, error)) (bool, error) {
 	var cf Confirm
 	yes := false
 	err := c.tx(ctx, func(tx Tx) error {
@@ -126,9 +134,9 @@ func (c *Core) answer(ctx context.Context, confirmID, pressedBy int64, decide fu
 	})
 	if err != nil || !yes || cf.Kind == "login" {
 		c.secrets.drop(confirmID, !yes)
-		return err
+		return yes && err == nil, err
 	}
-	return c.runApproved(ctx, cf)
+	return true, c.runApproved(ctx, cf)
 }
 
 // pending держит в памяти новые секреты, которые ждут «Да» владельца. В базу открытый секрет не пишется,
