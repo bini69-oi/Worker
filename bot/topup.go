@@ -109,7 +109,7 @@ func (b *Bot) onGateway(ctx context.Context, r *req, d Data) error {
 }
 
 // Данные счёта Stars: p:<платёж> для пополнения, s:<тариф> для автоподписки.
-func payPayload(id int64) string    { return "p:" + strconv.FormatInt(id, 10) }
+func payPayload(id int64) string     { return "p:" + strconv.FormatInt(id, 10) }
 func subPayload(tariff int64) string { return "s:" + strconv.FormatInt(tariff, 10) }
 
 // parsePayload разбирает данные счёта. Это строка, которую Telegram вернул нам, но проверяем как чужую.
