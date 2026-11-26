@@ -38,6 +38,9 @@ func (c *Core) Devices(ctx context.Context, userID int64) ([]PanelDevice, error)
 
 // DeleteDevice отвязывает одно устройство абонента.
 func (c *Core) DeleteDevice(ctx context.Context, userID int64, hwid string) error {
+	if err := c.serving(ctx, userID); err != nil {
+		return err
+	}
 	if hwid == "" {
 		return ErrInvalid
 	}
@@ -50,6 +53,9 @@ func (c *Core) DeleteDevice(ctx context.Context, userID int64, hwid string) erro
 
 // ResetDevices отвязывает все устройства абонента.
 func (c *Core) ResetDevices(ctx context.Context, userID int64) error {
+	if err := c.serving(ctx, userID); err != nil {
+		return err
+	}
 	s, err := c.panelSub(ctx, userID)
 	if err != nil {
 		return err
@@ -59,6 +65,9 @@ func (c *Core) ResetDevices(ctx context.Context, userID int64) error {
 
 // RevokeLink перевыпускает ссылку подписки. Старая перестаёт работать, новая сохраняется в базе.
 func (c *Core) RevokeLink(ctx context.Context, userID int64) (Subscription, error) {
+	if err := c.serving(ctx, userID); err != nil {
+		return Subscription{}, err
+	}
 	s, err := c.panelSub(ctx, userID)
 	if err != nil {
 		return s, err

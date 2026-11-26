@@ -85,6 +85,9 @@ const (
 
 // CreatePayment создаёт платёж «ожидает» и счёт в кассе.
 func (c *Core) CreatePayment(ctx context.Context, userID int64, gateway string, amount int64) (Payment, Invoice, error) {
+	if err := c.serving(ctx, userID); err != nil {
+		return Payment{}, Invoice{}, err
+	}
 	g, ok := c.gateway(gateway)
 	if !ok || !c.visible(g) {
 		return Payment{}, Invoice{}, ErrNoGateway

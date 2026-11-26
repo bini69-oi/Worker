@@ -54,6 +54,9 @@ func (c *Core) SavePromo(ctx context.Context, actorTg int64, p Promo) (Promo, er
 // своей транзакцией, а удачная возвращает попытку назад. После 10 неудачных за 10 минут любые попытки
 // отклоняются до конца окна, даже верные. Так пачка параллельных запросов счётчик не обходит.
 func (c *Core) ApplyPromo(ctx context.Context, userID int64, code string) (Promo, error) {
+	if err := c.serving(ctx, userID); err != nil {
+		return Promo{}, err
+	}
 	key := "promo:" + itoa(userID)
 	now := c.clock.Now()
 	alarm := false

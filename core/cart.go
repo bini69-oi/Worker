@@ -21,6 +21,9 @@ const cartTTL = 24 * time.Hour
 
 // RememberBuy запоминает выбор абонента, которому не хватило денег. Новый выбор заменяет старый.
 func (c *Core) RememberBuy(ctx context.Context, userID, tariffID int64, days int) error {
+	if err := c.serving(ctx, userID); err != nil {
+		return err
+	}
 	return c.tx(ctx, func(tx Tx) error {
 		t, err := tx.Tariff(tariffID)
 		if err != nil {
@@ -70,6 +73,9 @@ func (c *Core) buyFromCart(ctx context.Context, userID int64) {
 
 // SetAutoRenew включает или выключает автопродление подписки с баланса.
 func (c *Core) SetAutoRenew(ctx context.Context, userID int64, on bool) error {
+	if err := c.serving(ctx, userID); err != nil {
+		return err
+	}
 	return c.tx(ctx, func(tx Tx) error {
 		s, err := tx.SubByUser(userID)
 		if err != nil {

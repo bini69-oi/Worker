@@ -13,6 +13,9 @@ import (
 // Пробный период заменяется купленным тарифом, оставшиеся дни сохраняются.
 // Другой тариф при живой подписке не продаётся: смена тарифа с пересчётом будет позже.
 func (c *Core) Buy(ctx context.Context, userID, tariffID int64, days int) (Subscription, error) {
+	if err := c.serving(ctx, userID); err != nil {
+		return Subscription{}, err
+	}
 	var out Subscription
 	err := c.tx(ctx, func(tx Tx) error {
 		var err error

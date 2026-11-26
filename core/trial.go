@@ -10,6 +10,9 @@ import (
 // Всем вместе не больше trial.max_per_hour за час: пачка новых аккаунтов Telegram не разберёт серверы,
 // а владелец узнает о потоке тревогой.
 func (c *Core) Trial(ctx context.Context, userID int64) (Subscription, error) {
+	if err := c.serving(ctx, userID); err != nil {
+		return Subscription{}, err
+	}
 	if !c.cfg.Bool("trial.enabled") {
 		return Subscription{}, ErrTrialOff
 	}
