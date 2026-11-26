@@ -3,7 +3,7 @@ package yoomoney
 
 import (
 	"context"
-	"crypto/sha1" //nolint:gosec // sha1 задан официальной документацией ЮMoney, это не наш выбор
+	"crypto/sha1" // sha1 задан официальной документацией ЮMoney, это не наш выбор
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
@@ -212,7 +212,7 @@ func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 func signature(f url.Values, secret string) string {
 	parts := []string{f.Get("notification_type"), f.Get("operation_id"), f.Get("amount"), f.Get("currency"),
 		f.Get("datetime"), f.Get("sender"), f.Get("codepro"), secret, f.Get("label")}
-	sum := sha1.Sum([]byte(strings.Join(parts, "&"))) //nolint:gosec // см. импорт
+	sum := sha1.Sum([]byte(strings.Join(parts, "&")))
 	return hex.EncodeToString(sum[:])
 }
 

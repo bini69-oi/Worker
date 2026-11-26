@@ -17,13 +17,18 @@ import (
 	"github.com/bini69-oi/worker/jobs"
 	"github.com/bini69-oi/worker/panel"
 	"github.com/bini69-oi/worker/pay"
+	"github.com/bini69-oi/worker/pay/cloudpayments"
 	"github.com/bini69-oi/worker/pay/cryptobot"
 	"github.com/bini69-oi/worker/pay/cryptomus"
 	"github.com/bini69-oi/worker/pay/freekassa"
 	"github.com/bini69-oi/worker/pay/heleket"
+	"github.com/bini69-oi/worker/pay/lava"
 	"github.com/bini69-oi/worker/pay/manual"
+	"github.com/bini69-oi/worker/pay/paypalych"
 	"github.com/bini69-oi/worker/pay/platega"
+	"github.com/bini69-oi/worker/pay/robokassa"
 	"github.com/bini69-oi/worker/pay/stars"
+	"github.com/bini69-oi/worker/pay/tribute"
 	"github.com/bini69-oi/worker/pay/wata"
 	"github.com/bini69-oi/worker/pay/yookassa"
 	"github.com/bini69-oi/worker/pay/yoomoney"
@@ -66,6 +71,12 @@ func gateways(cfg *settings.Settings, t *telegram, publicURL string) []pay.Gatew
 	fk.RestrictIPs(freekassa.OfficialNets()) // уведомления FreeKassa только с её адресов
 	wt := wata.New(cfg, "", nil)
 	wt.Return = t.paidURL
+	lv := lava.New(cfg, "", nil)
+	lv.Return, lv.Hook = t.paidURL, publicURL+"/pay/lava"
+	cp := cloudpayments.New(cfg, "", nil)
+	cp.Return = t.paidURL
+	pp := paypalych.New(cfg, "", nil)
+	pp.Return = t.paidURL
 	return []pay.Gateway{
 		manual.New(cfg),
 		st,
@@ -77,6 +88,11 @@ func gateways(cfg *settings.Settings, t *telegram, publicURL string) []pay.Gatew
 		ym,
 		fk,
 		wt,
+		robokassa.New(cfg, "", nil),
+		lv,
+		cp,
+		pp,
+		tribute.New(cfg), // поиск платежа по донату ставит build: ему нужно ядро
 	}
 }
 
@@ -138,6 +154,13 @@ func build(env Env, base slog.Handler) (*app, error) {
 		Secrets:  secrets,
 		Log:      log,
 	})
+	for _, g := range gws {
+		if tr, ok := g.(*tribute.Gateway); ok {
+			tr.Pending = func(ctx context.Context, tgID, amount int64, key string) (core.Payment, error) {
+				return c.FindPending(ctx, "tribute", tgID, amount, key)
+			}
+		}
+	}
 	t.bot = bot.New(bot.Options{Core: c, Texts: tx, API: t.client, Config: cfg, Log: log, Name: "", URL: env.PublicURL,
 		Owner: env.OwnerID, DLKey: env.SecretKey})
 	notes.b = t.bot

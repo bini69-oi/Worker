@@ -2,7 +2,7 @@ package heleket
 
 import (
 	"bytes"
-	"crypto/md5" //nolint:gosec // подпись Heleket это md5, схему задаёт касса
+	"crypto/md5" // подпись Heleket это md5, схему задаёт касса
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
@@ -13,7 +13,7 @@ import (
 
 // sign считает подпись Heleket: hex(md5(base64(тело) + ключ)).
 func sign(body []byte, key string) string {
-	sum := md5.Sum(append([]byte(base64.StdEncoding.EncodeToString(body)), key...)) //nolint:gosec // см. выше
+	sum := md5.Sum(append([]byte(base64.StdEncoding.EncodeToString(body)), key...))
 	return hex.EncodeToString(sum[:])
 }
 

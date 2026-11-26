@@ -11,7 +11,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
-	"crypto/md5" //nolint:gosec // MD5 требует сама касса, это не наш выбор
+	"crypto/md5" // MD5 требует сама касса, это не наш выбор
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -96,7 +96,7 @@ func (g *Gateway) Configured() bool {
 }
 
 func md5hex(s string) string {
-	sum := md5.Sum([]byte(s)) //nolint:gosec // см. импорт
+	sum := md5.Sum([]byte(s))
 	return hex.EncodeToString(sum[:])
 }
 
