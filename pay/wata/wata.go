@@ -102,14 +102,14 @@ func (t tx) rub() (int64, error) {
 	if t.Amount == "" {
 		return 0, errors.New("в ответе WATA нет суммы")
 	}
-	return kopecks(string(t.Amount))
+	return pay.Kopecks(string(t.Amount))
 }
 
 func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, error) {
 	back := pay.ReturnURL(g.cfg.String("wata.return_url"), g.Return, p.ID)
 	in := map[string]any{
 		"type":        "OneTime",
-		"amount":      json.Number(rubles(p.Amount)),
+		"amount":      json.Number(pay.Rubles(p.Amount)),
 		"currency":    "RUB",
 		"description": fmt.Sprintf("Пополнение %d", p.ID),
 		"orderId":     strconv.FormatInt(p.ID, 10),
@@ -152,7 +152,7 @@ func (g *Gateway) Status(ctx context.Context, p core.Payment) (core.GatewayEvent
 }
 
 // Verify проверяет RSA-подпись в заголовке X-Signature по сырому телу и разбирает вебхук.
-// Деньги берутся из подписанного тела: подделать его без закрытого ключа WATA нельзя.
+// Оплату подтверждает API нашим токеном: подпись WATA общая для всех магазинов.
 func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
@@ -171,10 +171,27 @@ func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 	}
 	// Номер ссылки кладём как внешний, только если WATA его прислала: у транзакции он другой.
 	ev := core.GatewayEvent{PaymentID: id, ExternalID: hook.LinkID, Status: hook.status()}
-	if ev.Status == core.PayPaid {
-		ev.ExtAmount, err = hook.rub()
+	if ev.Status != core.PayPaid {
+		return ev, nil
 	}
-	return ev, err
+	sum, err := hook.rub() // не рубли или нет суммы: отказ ещё до запроса к API
+	if err != nil {
+		return core.GatewayEvent{}, err
+	}
+	// Ключ подписи у WATA один на всех магазинов: подпись доказывает «это WATA», но не «это наш магазин».
+	// Владелец другого магазина мог бы оплатить у себя счёт с нашим номером и переслать вебхук нам.
+	// Поэтому оплату подтверждает только запрос транзакций нашим токеном.
+	confirmed, err := g.Status(r.Context(), core.Payment{ID: id, ExternalID: hook.LinkID})
+	if err != nil {
+		return core.GatewayEvent{}, err
+	}
+	if confirmed.Status != core.PayPaid {
+		return core.GatewayEvent{}, errors.New("WATA не подтвердила оплату из вебхука")
+	}
+	if sum != confirmed.ExtAmount {
+		confirmed.ExtAmount = sum // сумма вебхука не сошлась с API: ядро отклонит зачисление
+	}
+	return confirmed, nil
 }
 
 // mapStatus переводит статус транзакции WATA: Paid оплачена, Declined отклонена, остальное ждёт.

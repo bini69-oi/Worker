@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"github.com/bini69-oi/worker/pay"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -35,7 +36,7 @@ func sample(t *testing.T, name string, order int64, amount int64) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return strings.NewReplacer("{{ORDER}}", strconv.FormatInt(order, 10), "{{AMOUNT}}", rubles(amount)).Replace(string(b))
+	return strings.NewReplacer("{{ORDER}}", strconv.FormatInt(order, 10), "{{AMOUNT}}", pay.Rubles(amount)).Replace(string(b))
 }
 
 func newKey(t *testing.T) *rsa.PrivateKey {
@@ -94,7 +95,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = json.NewDecoder(r.Body).Decode(&in)
 		n, _ := strconv.ParseInt(in.OrderID, 10, 64)
-		f.amount.Store(func() int64 { k, _ := kopecks(string(in.Amount)); return k }())
+		f.amount.Store(func() int64 { k, _ := pay.Kopecks(string(in.Amount)); return k }())
 		_, _ = io.WriteString(w, sample(f.t, "links_created.json", n, 0))
 	case r.URL.Path == "/public-key":
 		f.keyCalls.Add(1)
@@ -120,6 +121,7 @@ func TestSuite(t *testing.T) {
 	g := New(cfg{"wata.token": "tok3n"}, srv.URL, srv.Client())
 	mk := func(k *rsa.PrivateKey) func(core.Payment, int64) *http.Request {
 		return func(p core.Payment, a int64) *http.Request {
+			api.paid.Store(p.ID) // касса знает об оплате: вебхук подтверждается API
 			body := sample(t, "webhook_paid.json", p.ID, a)
 			return hookReq(body, sign(t, k, body))
 		}
@@ -141,6 +143,8 @@ func TestVerifyTable(t *testing.T) {
 	defer srv.Close()
 	g := New(cfg{"wata.token": "tok3n"}, srv.URL, srv.Client())
 	paid, declined := sample(t, "webhook_paid.json", 7, 30050), sample(t, "webhook_declined.json", 7, 0)
+	api.paid.Store(7)
+	api.amount.Store(30050)
 	usd := strings.Replace(paid, `"RUB"`, `"USD"`, 1)
 	noOrder := strings.Replace(paid, `"orderId":"7"`, `"orderId":""`, 1)
 	for _, c := range []struct {
@@ -212,6 +216,8 @@ func TestKeyCache(t *testing.T) {
 	now := time.Now()
 	g.now = func() time.Time { return now }
 	body := sample(t, "webhook_paid.json", 1, 100)
+	api.paid.Store(1)
+	api.amount.Store(100)
 	for range 3 {
 		if _, err := g.Verify(hookReq(body, sign(t, k1, body))); err != nil {
 			t.Fatal(err)
@@ -264,14 +270,29 @@ func TestParseKeyAndMoney(t *testing.T) {
 		t.Error("мусор принят за ключ")
 	}
 	for in, want := range map[string]int64{"300": 30000, "300.5": 30050, "0.01": 1, "12.3400": 1234} {
-		if got, err := kopecks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%s: %d %v", in, got, err)
 		}
 	}
-	if _, err := kopecks("1.005"); err == nil {
+	if _, err := pay.Kopecks("1.005"); err == nil {
 		t.Error("доли копейки приняты")
 	}
-	if rubles(12305) != "123.05" {
+	if pay.Rubles(12305) != "123.05" {
 		t.Error("rubles")
+	}
+}
+
+// Подпись WATA общая для всех магазинов: подписанный вебхук об оплате, о которой наш API не знает,
+// не зачисляется. Так чужой магазин WATA не перешлёт нам свой вебхук с нашим номером платежа.
+func TestForeignMerchantHook(t *testing.T) {
+	api := &fakeAPI{t: t}
+	key := newKey(t)
+	api.key.Store(key)
+	srv := httptest.NewServer(api)
+	defer srv.Close()
+	g := New(cfg{"wata.token": "tok3n"}, srv.URL, srv.Client())
+	body := sample(t, "webhook_paid.json", 9, 30000) // наш API про платёж 9 ничего не знает
+	if ev, err := g.Verify(hookReq(body, sign(t, key, body))); err == nil {
+		t.Fatalf("вебхук без оплаты у нашего магазина принят: %+v", ev)
 	}
 }
