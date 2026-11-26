@@ -235,3 +235,13 @@ func (t *tx) SetBanned(userID int64, at time.Time) error {
 	t.st.users[userID] = u
 	return nil
 }
+
+func (t *tx) SetLang(userID int64, lang string) error {
+	u, ok := t.st.users[userID]
+	if !ok {
+		return core.ErrNotFound
+	}
+	u.Lang = lang
+	t.st.users[userID] = u
+	return nil
+}

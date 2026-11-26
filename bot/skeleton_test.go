@@ -99,18 +99,10 @@ func FuzzParseData(f *testing.F) {
 		if len(s) > maxData || d.Act == "" {
 			t.Fatalf("принято плохое: %q", s)
 		}
-		if data(d.Act, toAny(d.Args)...) != s {
+		if data(d.Act, toArgs(d.Args)...) != s {
 			t.Fatalf("сборка не повторяет разбор: %q", s)
 		}
 	})
-}
-
-func toAny(ss []string) []any {
-	out := make([]any, len(ss))
-	for i, s := range ss {
-		out[i] = s
-	}
-	return out
 }
 
 func TestUnknownButtonShowsMenu(t *testing.T) {

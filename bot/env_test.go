@@ -115,7 +115,7 @@ func (f *fakeAPI) CreateForumTopic(_ context.Context, chat int64, name string) (
 	return id, nil
 }
 
-func (f *fakeAPI) GetChatMember(_ context.Context, chat, user int64) (string, error) {
+func (f *fakeAPI) GetChatMember(_ context.Context, chat string, user int64) (string, error) {
 	return f.member, nil
 }
 
@@ -202,6 +202,7 @@ type env struct {
 	panel *coretest.Panel
 	db    *store.DB
 	upd   int64
+	step  time.Duration // часы сдвигаются перед каждым действием, чтобы тесты не упирались во флуд
 }
 
 func newEnv(t *testing.T) *env {
@@ -211,7 +212,7 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	e := &env{api: &fakeAPI{member: "member"}, clock: coretest.NewClock(t0), panel: coretest.NewPanel(), db: db}
+	e := &env{api: &fakeAPI{member: "member"}, clock: coretest.NewClock(t0), panel: coretest.NewPanel(), db: db, step: time.Second}
 	key := []byte(strings.Repeat("k", 32))
 	if e.cfg, err = settings.New(store.NewSettingsStore(db), key, e.clock.Now); err != nil {
 		t.Fatal(err)
@@ -220,7 +221,7 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	e.c = core.New(core.Deps{Store: store.NewCoreStore(db), Clock: e.clock, Config: e.cfg, Panel: e.panel,
-		Notifier: &coretest.Notifier{}, OwnerID: owner})
+		Notifier: &coretest.Notifier{}, OwnerID: owner, Channels: Channels{API: e.api}})
 	e.b = New(Options{Core: e.c, Texts: e.tx, API: e.api, Config: e.cfg, Now: e.clock.Now,
 		Name: "workerbot", URL: "https://vpn.example", Owner: owner})
 	return e
@@ -236,6 +237,7 @@ func (e *env) set(t *testing.T, kv ...string) {
 }
 
 func (e *env) next() int64 {
+	e.clock.Add(e.step)
 	e.upd++
 	return e.upd
 }
@@ -256,6 +258,43 @@ func (e *env) press(t *testing.T, from int64, msg int, data string) {
 	q := &tg.CallbackQuery{ID: fmt.Sprint(e.next()), From: tg.User{ID: from, FirstName: "Иван", LanguageCode: "ru"},
 		Message: &tg.Message{MessageID: msg, Chat: tg.Chat{ID: from, Type: "private"}}, Data: data}
 	if err := e.b.handle(context.Background(), tg.Update{UpdateID: e.upd, CallbackQuery: q}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// start шлёт /start и отдаёт абонента.
+func (e *env) start(t *testing.T) core.User {
+	t.Helper()
+	e.text(t, userTg, "/start")
+	u, err := e.c.UserByTg(context.Background(), userTg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.api.take()
+	return u
+}
+
+func (e *env) tariff(t *testing.T, name string, periods ...core.Period) core.Tariff {
+	t.Helper()
+	tr, err := e.c.SaveTariff(context.Background(), owner, core.Tariff{Name: name, Active: true, Periods: periods,
+		TrafficBytes: 100 << 30, Devices: 3, Squads: []string{"a"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tr
+}
+
+func (e *env) topup(t *testing.T, userID, amount int64) {
+	t.Helper()
+	if _, err := e.c.AdminAdjust(context.Background(), owner, userID, amount, "тест"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// sync прогоняет очередь ядра: панель создаёт абонента и выдаёт ссылку подписки.
+func (e *env) sync(t *testing.T) {
+	t.Helper()
+	if _, err := e.c.ProcessDue(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 }

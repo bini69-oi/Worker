@@ -97,8 +97,8 @@ func TestMethods(t *testing.T) {
 			`{"chat_id":-100,"name":"Ivan"}`,
 			func(c *Client) (any, error) { return c.CreateForumTopic(ctx, -100, "Ivan") }, 12},
 		{"getChatMember", "getChatMember", `{"ok":true,"result":{"status":"administrator","user":{"id":4242}}}`,
-			`{"chat_id":-100,"user_id":4242}`,
-			func(c *Client) (any, error) { return c.GetChatMember(ctx, -100, 4242) }, "administrator"},
+			`{"chat_id":"-100","user_id":4242}`,
+			func(c *Client) (any, error) { return c.GetChatMember(ctx, "-100", 4242) }, "administrator"},
 		{"leaveChat", "leaveChat", `{"ok":true,"result":true}`, `{"chat_id":-100}`,
 			func(c *Client) (any, error) { return nil, c.LeaveChat(ctx, -100) }, nil},
 	}

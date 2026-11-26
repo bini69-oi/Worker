@@ -29,3 +29,7 @@ func (t *coreTx) SetScreenMsg(userID, msgID int64) error {
 func (t *coreTx) SetBanned(userID int64, at time.Time) error {
 	return t.execOne("UPDATE users SET banned_at = ? WHERE id = ?", nullTime(at), userID)
 }
+
+func (t *coreTx) SetLang(userID int64, lang string) error {
+	return t.execOne("UPDATE users SET lang = ? WHERE id = ?", lang, userID)
+}

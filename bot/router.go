@@ -39,7 +39,7 @@ func (b *Bot) onCallback(ctx context.Context, q *tg.CallbackQuery) error {
 	if q.Message == nil || q.Message.Chat.Type != "private" {
 		return b.api.AnswerCallbackQuery(ctx, q.ID, "", false)
 	}
-	r, ok, err := b.enter(ctx, q.From, q.Message.Chat.ID, q.ID)
+	r, ok, err := b.enter(ctx, q.From, q.Message.Chat.ID, q.ID, "")
 	if err != nil || !ok {
 		return err
 	}
@@ -64,7 +64,7 @@ func (b *Bot) onPrivate(ctx context.Context, m *tg.Message) error {
 	if m.SuccessfulPayment != nil || m.RefundedPayment != nil {
 		return b.onPayment(ctx, m)
 	}
-	r, ok, err := b.enter(ctx, *m.From, m.Chat.ID, "")
+	r, ok, err := b.enter(ctx, *m.From, m.Chat.ID, "", refFromStart(m.Text))
 	if err != nil || !ok {
 		return err
 	}
@@ -83,7 +83,8 @@ func (b *Bot) onPrivate(ctx context.Context, m *tg.Message) error {
 }
 
 // enter пускает абонента: флуд, регистрация, бан, техработы. ok=false значит дальше не идём.
-func (b *Bot) enter(ctx context.Context, from tg.User, chatID int64, cbID string) (*req, bool, error) {
+// ref это код реферальной ссылки: он учитывается, только если абонент новый.
+func (b *Bot) enter(ctx context.Context, from tg.User, chatID int64, cbID, ref string) (*req, bool, error) {
 	r := &req{from: from, chatID: chatID, cbID: cbID, lang: from.LanguageCode}
 	ok, warn := b.flood.allow(from.ID, b.now())
 	if !ok {
@@ -94,7 +95,7 @@ func (b *Bot) enter(ctx context.Context, from tg.User, chatID int64, cbID string
 	}
 	u, err := b.core.UserByTg(ctx, from.ID)
 	if errors.Is(err, core.ErrNotFound) {
-		u, err = b.core.Register(ctx, from.ID, from.Username, b.lang(from.LanguageCode))
+		u, err = b.core.RegisterRef(ctx, from.ID, from.Username, b.lang(from.LanguageCode), ref)
 	}
 	if err != nil {
 		return r, false, err

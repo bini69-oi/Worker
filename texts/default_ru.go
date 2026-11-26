@@ -18,8 +18,6 @@ var coreDefs = []Def{
 		Default: "Подписка оплачена. Она действует ещё {days} дн."},
 	{Key: "sub.expiring", Params: []string{"days"},
 		Default: "Осталось {days} дн."},
-	{Key: "balance.show", Params: []string{"balance"},
-		Default: "Ваш баланс: {balance}"},
 }
 
 // defs это все тексты: по файлу на часть, чтобы ни один файл не разрастался.

@@ -23,3 +23,14 @@ func activeUser(tx Tx, userID int64) (User, error) {
 	}
 	return u, nil
 }
+
+// Tariff отдаёт тариф по id, в том числе скрытый: абонент с ним видит, что купил.
+func (c *Core) Tariff(ctx context.Context, id int64) (Tariff, error) {
+	var t Tariff
+	err := c.store.Tx(ctx, func(tx Tx) error {
+		var err error
+		t, err = tx.Tariff(id)
+		return err
+	})
+	return t, err
+}

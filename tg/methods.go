@@ -165,7 +165,8 @@ func (c *Client) CreateForumTopic(ctx context.Context, chat int64, name string) 
 }
 
 // GetChatMember возвращает статус участника чата.
-func (c *Client) GetChatMember(ctx context.Context, chat, user int64) (string, error) {
+// chat это @имя канала или его числовой id строкой: Telegram принимает оба.
+func (c *Client) GetChatMember(ctx context.Context, chat string, user int64) (string, error) {
 	var m ChatMember
 	err := c.call(ctx, "getChatMember", map[string]any{"chat_id": chat, "user_id": user}, &m)
 	return m.Status, err

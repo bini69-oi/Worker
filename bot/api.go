@@ -18,7 +18,7 @@ type API interface {
 	SetMyCommands(ctx context.Context, cmds []tg.BotCommand, lang string) error
 	SetChatMenuButton(ctx context.Context, chatID int64, text, webAppURL string) error
 	CreateForumTopic(ctx context.Context, chat int64, name string) (int, error)
-	GetChatMember(ctx context.Context, chat, user int64) (string, error)
+	GetChatMember(ctx context.Context, chat string, user int64) (string, error)
 	LeaveChat(ctx context.Context, chat int64) error
 }
 

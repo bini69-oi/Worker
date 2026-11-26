@@ -36,3 +36,23 @@ func (c *Core) SetScreen(ctx context.Context, userID, msgID int64) error {
 func (c *Core) UserByTg(ctx context.Context, tgID int64) (User, error) {
 	return c.store.UserByTg(ctx, tgID)
 }
+
+// SetLang меняет язык абонента. Код языка вида ru, en или pt-br.
+func (c *Core) SetLang(ctx context.Context, userID int64, lang string) error {
+	if !validLang(lang) {
+		return ErrInvalid
+	}
+	return c.tx(ctx, func(tx Tx) error { return tx.SetLang(userID, lang) })
+}
+
+func validLang(s string) bool {
+	if len(s) < 2 || len(s) > 8 {
+		return false
+	}
+	for i, r := range s {
+		if !(r >= 'a' && r <= 'z' || i > 1 && (r == '-' || r >= '0' && r <= '9')) {
+			return false
+		}
+	}
+	return true
+}

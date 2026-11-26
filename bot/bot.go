@@ -48,7 +48,8 @@ type Bot struct {
 	dedup  *tg.Dedup
 
 	mu      sync.Mutex
-	noticed map[int64]time.Time // кому и когда показан текст о бане
+	noticed map[int64]time.Time  // кому и когда показан текст о бане
+	pressed map[string]time.Time // нажатые кнопки оплаты, чтобы второй клик не платил
 }
 
 // action это обработчик нажатия кнопки абонента.
@@ -78,7 +79,7 @@ func New(o Options) *Bot {
 	b := &Bot{core: o.Core, tx: o.Texts, api: o.API, cfg: o.Config, log: o.Log, now: o.Now,
 		workers: o.Workers, name: o.Name, url: o.URL, owner: o.Owner,
 		flood: newFlood(5, 5), waits: newWaits(), acts: map[string]action{}, inputs: map[waitKind]inputFn{},
-		dedup: tg.NewDedup(tg.DedupSize), noticed: map[int64]time.Time{}}
+		dedup: tg.NewDedup(tg.DedupSize), noticed: map[int64]time.Time{}, pressed: map[string]time.Time{}}
 	b.register()
 	return b
 }

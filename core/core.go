@@ -62,6 +62,8 @@ type Tx interface {
 	SetUnreachable(userID int64, at time.Time) error
 	// SetBanned ставит бан. Нулевое время снимает его.
 	SetBanned(userID int64, at time.Time) error
+	// SetLang меняет язык абонента.
+	SetLang(userID int64, lang string) error
 	// SetScreenMsg запоминает сообщение-экран абонента.
 	SetScreenMsg(userID, msgID int64) error
 

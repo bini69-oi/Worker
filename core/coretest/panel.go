@@ -67,6 +67,13 @@ func (p *Panel) AddDevice(ref, hwid string) {
 	p.devices[ref] = append(p.devices[ref], core.PanelDevice{HWID: hwid})
 }
 
+// AddFullDevice привязывает устройство с платформой и моделью.
+func (p *Panel) AddFullDevice(ref string, d core.PanelDevice) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.devices[ref] = append(p.devices[ref], d)
+}
+
 func (p *Panel) result(ref string) core.PanelResult {
 	u := p.users[ref]
 	return core.PanelResult{Ref: ref, ExpireAt: u.ExpireAt, Enabled: u.Enabled,
