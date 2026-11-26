@@ -16,7 +16,7 @@
 
 ## 3. Волна 3
 - [x] 3.1 MulenPay; проверка: `go test ./pay/mulenpay`
-- [ ] 3.2 Antilopay; проверка: `go test ./pay/antilopay`
+- [x] 3.2 Antilopay; проверка: `go test ./pay/antilopay`
 - [ ] 3.3 SeverPay; проверка: `go test ./pay/severpay`
 - [ ] 3.4 RollyPay; проверка: `go test ./pay/rollypay`
 - [ ] 3.5 AuraPay; проверка: `go test ./pay/aurapay`

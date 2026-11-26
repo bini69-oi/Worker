@@ -1,0 +1,1 @@
+{"type":"payment","payment_id":"ap-7f3a91","order_id":"{{ORDER}}","status":"SUCCESS","amount":{{FEE_AMOUNT}},"original_amount":{{AMOUNT}},"fee":9.9,"currency":"RUB","pay_method":"SBP","merchant_extra":"{{ORDER}}"}
