@@ -46,6 +46,18 @@ func TestExpireDue(t *testing.T) {
 	if n, _ := e.c.ExpireDue(ctx); n != 0 {
 		t.Fatalf("повторный запуск отключил ещё %d", n)
 	}
+	expired := 0
+	for _, n := range notifyTasks(t, e) {
+		if n.Key == "notify.expired" {
+			expired++
+			if n.Vars["trial"] != "1" {
+				t.Fatalf("пробный не отмечен в уведомлении: %+v", n)
+			}
+		}
+	}
+	if expired != 1 {
+		t.Fatalf("уведомлений «подписка закончилась» %d, ждали 1", expired)
+	}
 }
 
 func TestRemindOncePerMark(t *testing.T) {

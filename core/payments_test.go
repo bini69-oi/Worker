@@ -3,6 +3,7 @@ package core_test
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -131,6 +132,19 @@ func TestPendingExpires(t *testing.T) {
 	}
 	if got := e.st.Payment(p.ID).Status; got != core.PayExpired {
 		t.Fatalf("через 25 часов ждали «истёк», получили %s", got)
+	}
+	// Абонент узнаёт об истёкшем счёте один раз, повторная сверка не шлёт второе.
+	if _, err := e.c.ReconcilePayments(ctx); err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, task := range notifyTasks(t, e.env) {
+		if task.Key == "notify.pay_expired" && task.Vars["payment_id"] == strconv.FormatInt(p.ID, 10) {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("уведомлений «счёт истёк» %d, ждали 1", n)
 	}
 }
 

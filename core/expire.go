@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-// ExpireDue отключает подписки, срок которых вышел, и ставит задачу отключить абонента в панели.
+// ExpireDue отключает подписки, срок которых вышел, ставит задачу отключить абонента в панели
+// и говорит абоненту, что подписка закончилась.
 // Возвращает, сколько подписок отключено. Повторный запуск ничего не делает.
 func (c *Core) ExpireDue(ctx context.Context) (int, error) {
 	n := 0
@@ -26,6 +27,14 @@ func (c *Core) ExpireDue(ctx context.Context) (int, error) {
 				return err
 			}
 			if err := enqueueSync(tx, s.ID, now); err != nil {
+				return err
+			}
+			// Статус «истекла» ставится один раз за срок, поэтому и сообщение уходит один раз.
+			vars := map[string]string{"trial": "0"}
+			if s.Trial {
+				vars["trial"] = "1"
+			}
+			if err := enqueueNotify(tx, NotifyTask{UserID: s.UserID, Key: "notify.expired", Vars: vars}, now); err != nil {
 				return err
 			}
 			n++

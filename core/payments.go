@@ -286,12 +286,22 @@ func (c *Core) ReconcilePayments(ctx context.Context) (int, error) {
 			}
 		}
 		if ttl > 0 && now.Sub(p.CreatedAt) > ttl {
-			if err := c.tx(ctx, func(tx Tx) error { _, err := tx.SetPaymentStatus(p.ID, PayPending, PayExpired); return err }); err != nil {
+			if err := c.tx(ctx, func(tx Tx) error { return c.expirePayment(tx, p, now) }); err != nil {
 				return credited, err
 			}
 		}
 	}
 	return credited, nil
+}
+
+// expirePayment помечает платёж «истёк» и говорит об этом абоненту, чтобы он не ждал зачисления молча.
+func (c *Core) expirePayment(tx Tx, p Payment, now time.Time) error {
+	changed, err := tx.SetPaymentStatus(p.ID, PayPending, PayExpired)
+	if err != nil || !changed {
+		return err
+	}
+	vars := map[string]string{"amount": strconv.FormatInt(p.Amount, 10), "gateway": p.Gateway, "payment_id": strconv.FormatInt(p.ID, 10)}
+	return enqueueNotify(tx, NotifyTask{UserID: p.UserID, Key: "notify.pay_expired", Vars: vars}, now)
 }
 
 // CheckPayment проверяет платёж перед оплатой, когда касса спрашивает «можно?» (pre_checkout_query у Stars):
