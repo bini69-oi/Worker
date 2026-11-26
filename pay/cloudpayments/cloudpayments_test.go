@@ -1,7 +1,9 @@
 package cloudpayments
 
 import (
+	"bytes"
 	"encoding/json"
+	"github.com/bini69-oi/worker/pay"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -34,7 +36,7 @@ func sample(t *testing.T, name string, id, amount int64) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return strings.NewReplacer("{{ID}}", strconv.FormatInt(id, 10), "{{AMOUNT}}", rubles(amount)).Replace(string(b))
+	return strings.NewReplacer("{{ID}}", strconv.FormatInt(id, 10), "{{AMOUNT}}", pay.Rubles(amount)).Replace(string(b))
 }
 
 // fakeAPI изображает API CloudPayments: проверяет Basic-вход и отдаёт записанные ответы.
@@ -166,16 +168,36 @@ func TestSecretNotInError(t *testing.T) {
 
 func TestKopecks(t *testing.T) {
 	for in, want := range map[string]int64{"300": 30000, "300.5": 30050, "300.00": 30000, "0.01": 1, "12.3400": 1234} {
-		if got, err := kopecks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%s: %d %v", in, got, err)
 		}
 	}
 	for _, bad := range []string{"", "1.005", "-1", "abc", "1e3"} {
-		if _, err := kopecks(bad); err == nil {
+		if _, err := pay.Kopecks(bad); err == nil {
 			t.Errorf("%q принято", bad)
 		}
 	}
-	if rubles(30000) != "300.00" || rubles(12305) != "123.05" {
+	if pay.Rubles(30000) != "300.00" || pay.Rubles(12305) != "123.05" {
 		t.Error("rubles")
+	}
+}
+
+// Сайт в тестовом режиме: уведомление по тестовой карте не зачисляется, пока тест не включён в настройках.
+func TestTestModeNotCredited(t *testing.T) {
+	body := []byte("TransactionId=1&Amount=300.00&Currency=RUB&InvoiceId=7&Status=Completed&OperationType=Payment&TestMode=1")
+	req := func() *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "/pay/cloudpayments", bytes.NewReader(body))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		r.Header.Set("Content-HMAC", sign(body, testSecret))
+		return r
+	}
+	ev, err := New(good(), "", nil).Verify(req())
+	if err != nil || ev.Status == core.PayPaid {
+		t.Fatalf("тестовый платёж зачислен: %+v %v", ev, err)
+	}
+	test := good()
+	test[keyTest] = "true"
+	if ev, err = New(test, "", nil).Verify(req()); err != nil || ev.Status != core.PayPaid {
+		t.Fatalf("на тестовом стенде не зачислен: %+v %v", ev, err)
 	}
 }

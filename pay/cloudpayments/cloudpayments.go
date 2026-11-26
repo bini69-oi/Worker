@@ -28,6 +28,7 @@ import (
 const DefaultBaseURL = "https://api.cloudpayments.ru"
 
 const (
+	keyTest     = "cloudpayments.test"
 	keyPublicID = "cloudpayments.public_id"
 	keySecret   = "cloudpayments.api_secret"
 	keyReturn   = "cloudpayments.return_url"
@@ -42,6 +43,8 @@ func init() {
 			Desc: "Пароль для API из кабинета CloudPayments. В кабинете укажите адрес https://ваш-сайт/pay/cloudpayments для уведомлений Pay, Fail и Refund"},
 		settings.Def{Key: keyReturn, Kind: settings.KindString, Group: "pay.cloudpayments",
 			Desc: "Куда вернуть абонента после оплаты, {payment} заменится номером платежа. Пусто: обратно в бота"},
+		settings.Def{Key: keyTest, Kind: settings.KindBool, Default: "false", Group: "pay.cloudpayments",
+			Desc: "Зачислять тестовые платежи (TestMode). Только для тестового стенда: тестовая карта платит бесплатно"},
 	)
 }
 
@@ -98,7 +101,7 @@ type reply struct {
 func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, error) {
 	id := strconv.FormatInt(p.ID, 10)
 	req := map[string]any{
-		"Amount":      json.Number(rubles(p.Amount)),
+		"Amount":      json.Number(pay.Rubles(p.Amount)),
 		"Currency":    "RUB",
 		"Description": fmt.Sprintf("Пополнение %d", p.ID),
 		"InvoiceId":   id,
@@ -163,7 +166,7 @@ func rubAmount(n json.Number, cur string) (int64, error) {
 	if cur != "" && !strings.EqualFold(cur, "RUB") {
 		return 0, fmt.Errorf("платёж CloudPayments не в рублях: %s", cur)
 	}
-	return kopecks(string(n))
+	return pay.Kopecks(string(n))
 }
 
 // Verify проверяет подпись по сырому телу и разбирает форму уведомления.
@@ -188,6 +191,10 @@ func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 		return core.GatewayEvent{}, errors.New("в уведомлении CloudPayments нет нашего номера платежа")
 	}
 	ev := core.GatewayEvent{PaymentID: n, ExternalID: strconv.FormatInt(n, 10), Status: core.PayPending}
+	// Сайт в тестовом режиме шлёт настоящие подписанные уведомления по тестовым картам: денег за ними нет.
+	if f.Get("TestMode") == "1" && g.cfg.String(keyTest) != "true" {
+		return ev, nil
+	}
 	switch {
 	case strings.EqualFold(f.Get("OperationType"), "Refund") || f.Get("PaymentTransactionId") != "":
 		ev.Status = core.PayRefunded
