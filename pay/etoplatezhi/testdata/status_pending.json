@@ -1,0 +1,1 @@
+{"project_id":4242,"payment":{"id":"worker_1","type":"purchase","status":"processing","sum":{"amount":{{AMOUNT}},"currency":"RUB"}}}

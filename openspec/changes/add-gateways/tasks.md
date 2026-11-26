@@ -29,7 +29,7 @@
 - [x] 4.5 Overpay; проверка: `go test ./pay/overpay`
 
 ## 5. Волна 5
-- [ ] 5.1 Etoplatezhi; проверка: `go test ./pay/etoplatezhi`
+- [x] 5.1 Etoplatezhi; проверка: `go test ./pay/etoplatezhi`
 - [ ] 5.2 Jupiter; проверка: `go test ./pay/jupiter`
 - [ ] 5.3 TabPay; проверка: `go test ./pay/tabpay`
 - [ ] 5.4 ParityPay; проверка: `go test ./pay/paritypay`

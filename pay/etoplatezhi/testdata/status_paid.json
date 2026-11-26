@@ -1,0 +1,1 @@
+{"project_id":4242,"payment":{"id":"worker_1","type":"purchase","status":"success","method":"card","sum":{"amount":{{AMOUNT}},"currency":"RUB"}},"operations":[{"id":9001,"type":"sale","status":"success"}]}
