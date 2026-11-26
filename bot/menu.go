@@ -32,6 +32,7 @@ func (b *Bot) register() {
 	b.acts["lang"] = func(ctx context.Context, r *req, _ Data) error { return b.showLangs(ctx, r) }
 	b.acts["ln"] = b.onLang
 	b.acts["pchk"] = b.onCheckPay
+	b.acts["con"] = func(ctx context.Context, r *req, _ Data) error { return b.showConnect(ctx, r) }
 	b.inputs[waitPromo] = b.onPromoInput
 }
 

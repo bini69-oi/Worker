@@ -26,6 +26,7 @@ type Options struct {
 	Name    string // имя бота без @, для ссылок t.me
 	URL     string // публичный адрес Worker, для переходов /dl и Mini App
 	Owner   int64  // Telegram ID владельца
+	DLKey   []byte // ключ подписи переходов /dl
 }
 
 // Bot разбирает обновления Telegram.
@@ -40,6 +41,7 @@ type Bot struct {
 	name    string
 	url     string
 	owner   int64
+	dlKey   []byte
 
 	flood  *flood
 	waits  *waits
@@ -77,7 +79,7 @@ func New(o Options) *Bot {
 		o.Log = slog.Default()
 	}
 	b := &Bot{core: o.Core, tx: o.Texts, api: o.API, cfg: o.Config, log: o.Log, now: o.Now,
-		workers: o.Workers, name: o.Name, url: o.URL, owner: o.Owner,
+		workers: o.Workers, name: o.Name, url: o.URL, owner: o.Owner, dlKey: o.DLKey,
 		flood: newFlood(5, 5), waits: newWaits(), acts: map[string]action{}, inputs: map[waitKind]inputFn{},
 		dedup: tg.NewDedup(tg.DedupSize), noticed: map[int64]time.Time{}, pressed: map[string]time.Time{}}
 	b.register()

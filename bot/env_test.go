@@ -223,7 +223,7 @@ func newEnv(t *testing.T) *env {
 	e.c = core.New(core.Deps{Store: store.NewCoreStore(db), Clock: e.clock, Config: e.cfg, Panel: e.panel,
 		Notifier: &coretest.Notifier{}, OwnerID: owner, Channels: Channels{API: e.api}})
 	e.b = New(Options{Core: e.c, Texts: e.tx, API: e.api, Config: e.cfg, Now: e.clock.Now,
-		Name: "workerbot", URL: "https://vpn.example", Owner: owner})
+		Name: "workerbot", URL: "https://vpn.example", Owner: owner, DLKey: []byte(strings.Repeat("d", 32))})
 	return e
 }
 

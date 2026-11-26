@@ -156,8 +156,10 @@ func (b *Bot) onTrial(ctx context.Context, r *req, _ Data) error {
 		return err
 	}
 	r.user.TrialUsed = true
-	return b.show(ctx, r, Screen{Text: b.t(r, "trial.done", map[string]string{"days": strconv.Itoa(sub.PeriodDays)}),
-		Rows: [][]Button{{b.btn(r, "btn.connect", "con")}, b.back(r, "m")}})
+	if err := b.say(ctx, r.chatID, b.t(r, "trial.done", map[string]string{"days": strconv.Itoa(sub.PeriodDays)})); err != nil {
+		return err
+	}
+	return b.showConnect(ctx, r)
 }
 
 // channelURL делает ссылку на канал: ссылка из настройки, если она есть (нужна для закрытого канала
