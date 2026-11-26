@@ -2,6 +2,7 @@ package platega
 
 import (
 	"encoding/json"
+	"github.com/bini69-oi/worker/pay"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -61,7 +62,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func hook(p core.Payment, amount int64, secret string) *http.Request {
-	body, _ := json.Marshal(map[string]any{"id": p.ExternalID, "amount": json.Number(rubles(amount)),
+	body, _ := json.Marshal(map[string]any{"id": p.ExternalID, "amount": json.Number(pay.Rubles(amount)),
 		"currency": "RUB", "status": "CONFIRMED", "payload": "worker:" + string(rune('0'+p.ID))})
 	r := httptest.NewRequest(http.MethodPost, "/pay/platega", strings.NewReader(string(body)))
 	r.Header.Set("X-MerchantId", "shop")
@@ -111,14 +112,14 @@ func TestSecretNotInError(t *testing.T) {
 
 func TestKopecks(t *testing.T) {
 	for in, want := range map[string]int64{"300": 30000, "300.5": 30050, "300.50": 30050, "0.01": 1, "12.3400": 1234} {
-		if got, err := kopecks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%s: %d %v", in, got, err)
 		}
 	}
-	if _, err := kopecks("1.005"); err == nil {
+	if _, err := pay.Kopecks("1.005"); err == nil {
 		t.Error("доли копейки приняты")
 	}
-	if rubles(12305) != "123.05" {
+	if pay.Rubles(12305) != "123.05" {
 		t.Error("rubles")
 	}
 }

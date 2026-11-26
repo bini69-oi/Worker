@@ -99,12 +99,12 @@ func (o order) rubAmount() (int64, error) {
 	if o.Amount == "" {
 		return 0, errors.New("в ответе RioPay нет суммы")
 	}
-	return kopecks(string(o.Amount))
+	return pay.Kopecks(string(o.Amount))
 }
 
 func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, error) {
 	req := createReq{
-		Amount:     rubles(p.Amount),
+		Amount:     pay.Rubles(p.Amount),
 		ExternalID: strconv.FormatInt(p.ID, 10),
 		Purpose:    fmt.Sprintf("Пополнение %d", p.ID),
 		SuccessURL: pay.ReturnURL(g.cfg.String(keyReturn), g.Return, p.ID),
@@ -174,7 +174,7 @@ func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 	if ev.ExtAmount, err = remote.rubAmount(); err != nil {
 		return ev, err
 	}
-	if hookAmount, err := kopecks(string(hook.Amount)); err != nil || hookAmount != ev.ExtAmount {
+	if hookAmount, err := pay.Kopecks(string(hook.Amount)); err != nil || hookAmount != ev.ExtAmount {
 		ev.ExtAmount = hookAmount // сумма вебхука не сошлась с API: ядро отклонит зачисление
 	}
 	return ev, nil

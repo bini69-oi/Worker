@@ -2,6 +2,7 @@ package overpay
 
 import (
 	"encoding/json"
+	"github.com/bini69-oi/worker/pay"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -43,7 +44,7 @@ type api struct {
 
 func (a *api) set(amount int64) {
 	a.mu.Lock()
-	a.reported = rubles(amount)
+	a.reported = pay.Rubles(amount)
 	a.mu.Unlock()
 }
 
@@ -185,14 +186,14 @@ func TestBadCert(t *testing.T) {
 
 func TestMoney(t *testing.T) {
 	for in, want := range map[string]int64{"300": 30000, "300.5": 30050, "0.01": 1, "12.3400": 1234} {
-		if got, err := kopecks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%s: %d %v", in, got, err)
 		}
 	}
-	if _, err := kopecks("1.005"); err == nil {
+	if _, err := pay.Kopecks("1.005"); err == nil {
 		t.Error("доли копейки приняты")
 	}
-	if rubles(12305) != "123.05" {
+	if pay.Rubles(12305) != "123.05" {
 		t.Error("rubles")
 	}
 }

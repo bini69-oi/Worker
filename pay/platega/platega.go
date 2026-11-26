@@ -120,7 +120,7 @@ func (t apiTx) amount() (int64, bool, error) {
 	if n == "" {
 		return 0, false, nil
 	}
-	k, err := kopecks(string(n))
+	k, err := pay.Kopecks(string(n))
 	return k, err == nil, err
 }
 
@@ -147,7 +147,7 @@ func (t apiTx) rubAmount() (int64, error) {
 func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, error) {
 	req := createReq{
 		PaymentMethod:  g.cfg.Int("platega.method"),
-		PaymentDetails: details{Amount: json.Number(rubles(p.Amount)), Currency: "RUB"},
+		PaymentDetails: details{Amount: json.Number(pay.Rubles(p.Amount)), Currency: "RUB"},
 		Description:    fmt.Sprintf("Пополнение %d", p.ID),
 		Return:         pay.ReturnURL(g.cfg.String("platega.return_url"), g.Return, p.ID),
 		Payload:        payloadPrefix + strconv.FormatInt(p.ID, 10),

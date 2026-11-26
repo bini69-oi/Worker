@@ -2,6 +2,7 @@ package cryptobot
 
 import (
 	"encoding/json"
+	"github.com/bini69-oi/worker/pay"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -107,12 +108,12 @@ func TestStatusAndErrors(t *testing.T) {
 func TestParseKopeks(t *testing.T) {
 	ok := map[string]int64{"300.00": 30000, "123.4": 12340, "5": 500, "0.07": 7, "10.500": 1050}
 	for in, want := range ok {
-		if got, err := parseKopeks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%q: %d %v, ждали %d", in, got, err, want)
 		}
 	}
 	for _, in := range []string{"", "abc", "-5", "1.2.3", "1e3", "10.501", ".", "1,5"} {
-		if _, err := parseKopeks(in); err == nil {
+		if _, err := pay.Kopecks(in); err == nil {
 			t.Errorf("%q: ждали ошибку", in)
 		}
 	}

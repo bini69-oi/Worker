@@ -147,7 +147,7 @@ func (a answer) kopecks() (int64, error) {
 	if a.Amount.Value == "" {
 		return 0, errors.New("в ответе Donut нет суммы")
 	}
-	return kopecks(string(a.Amount.Value))
+	return pay.Kopecks(string(a.Amount.Value))
 }
 
 func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, error) {
@@ -164,7 +164,7 @@ func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, err
 	req := map[string]any{
 		"token":       token,
 		"order_id":    order,
-		"amount":      map[string]string{"value": rubles(p.Amount), "currency": "RUB"},
+		"amount":      map[string]string{"value": pay.Rubles(p.Amount), "currency": "RUB"},
 		"customer":    customer,
 		"redirect":    "true",
 		"description": method,
@@ -183,7 +183,7 @@ func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, err
 		req["callback_url"] = hook
 	}
 	req["signature"] = g.sign(
-		"token", token, "order_id", order, "amount.value", rubles(p.Amount), "amount.currency", "RUB",
+		"token", token, "order_id", order, "amount.value", pay.Rubles(p.Amount), "amount.currency", "RUB",
 		"customer.id", customer["id"], "redirect", "true")
 	res, err := g.do(ctx, "/p2p_payin", req)
 	if err != nil {

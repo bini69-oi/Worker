@@ -174,7 +174,7 @@ func event(d payin, id string, paymentID int64) (core.GatewayEvent, error) {
 		return ev, errors.New("в данных SeverPay нет суммы")
 	}
 	var err error
-	ev.ExtAmount, err = kopecks(string(d.Amount))
+	ev.ExtAmount, err = pay.Kopecks(string(d.Amount))
 	return ev, err
 }
 

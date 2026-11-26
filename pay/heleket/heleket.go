@@ -138,7 +138,7 @@ func toEvent(p payment) (core.GatewayEvent, error) {
 	if !strings.EqualFold(p.Currency, "RUB") {
 		return core.GatewayEvent{}, fmt.Errorf("счёт Heleket выставлен не в рублях (%q)", p.Currency)
 	}
-	k, err := kopecks(string(p.Amount))
+	k, err := pay.Kopecks(string(p.Amount))
 	if err != nil {
 		return core.GatewayEvent{}, err
 	}
@@ -149,7 +149,7 @@ func toEvent(p payment) (core.GatewayEvent, error) {
 // Create выставляет счёт в рублях. Монету, сеть и срок берём из настроек.
 func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, error) {
 	req := map[string]any{
-		"amount":   rubles(p.Amount),
+		"amount":   pay.Rubles(p.Amount),
 		"currency": "RUB",
 		"order_id": payloadPrefix + strconv.FormatInt(p.ID, 10),
 		"lifetime": lifetime(g.cfg.Int(keyLifetime)),

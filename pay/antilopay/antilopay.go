@@ -106,7 +106,7 @@ type reply struct {
 func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, error) {
 	in := map[string]any{
 		"project_identificator": g.cfg.Secret(keyProject),
-		"amount":                json.Number(rubles(p.Amount)),
+		"amount":                json.Number(pay.Rubles(p.Amount)),
 		"order_id":              strconv.FormatInt(p.ID, 10),
 		"currency":              "RUB",
 		"product_name":          "Пополнение баланса",
@@ -221,7 +221,7 @@ func paidAmount(original, total amount) (int64, error) {
 	if s == "" {
 		return 0, errors.New("в ответе Antilopay нет суммы")
 	}
-	return kopecks(string(s))
+	return pay.Kopecks(string(s))
 }
 
 // call шлёт подписанный запрос. Ключи идут только в заголовки и в ошибки не попадают.

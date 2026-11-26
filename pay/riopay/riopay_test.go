@@ -3,6 +3,7 @@ package riopay
 import (
 	"encoding/hex"
 	"encoding/json"
+	"github.com/bini69-oi/worker/pay"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -67,7 +68,7 @@ func signed(body, secret string) *http.Request {
 }
 
 func hook(p core.Payment, amount int64, secret string) *http.Request {
-	body := strings.NewReplacer("{{ORDER}}", strconv.FormatInt(p.ID, 10), "{{AMOUNT}}", rubles(amount)).
+	body := strings.NewReplacer("{{ORDER}}", strconv.FormatInt(p.ID, 10), "{{AMOUNT}}", pay.Rubles(amount)).
 		Replace(mustRead("webhook.tmpl"))
 	return signed(body, secret)
 }
@@ -149,14 +150,14 @@ func TestSecretNotInError(t *testing.T) {
 
 func TestMoney(t *testing.T) {
 	for in, want := range map[string]int64{"300": 30000, "300.5": 30050, "0.01": 1, "12.3400": 1234} {
-		if got, err := kopecks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%s: %d %v", in, got, err)
 		}
 	}
-	if _, err := kopecks("1.005"); err == nil {
+	if _, err := pay.Kopecks("1.005"); err == nil {
 		t.Error("доли копейки приняты")
 	}
-	if rubles(12305) != "123.05" {
+	if pay.Rubles(12305) != "123.05" {
 		t.Error("rubles")
 	}
 }

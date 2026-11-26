@@ -162,7 +162,7 @@ func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 	if !hmac.Equal([]byte(strings.ToLower(got)), []byte(strings.ToLower(want))) {
 		return core.GatewayEvent{}, pay.ErrBadSignature
 	}
-	cents, err := parseMoney(sum)
+	cents, err := pay.Kopecks(sum)
 	id, err2 := strconv.ParseInt(order, 10, 64)
 	if err != nil || err2 != nil || id <= 0 {
 		return core.GatewayEvent{}, pay.ErrBadSignature
@@ -239,7 +239,7 @@ func eventFromXML(raw []byte, id int64) (core.GatewayEvent, error) {
 	ev := core.GatewayEvent{PaymentID: id, ExternalID: strconv.FormatInt(id, 10), Status: core.PayPending}
 	switch st.State.Code {
 	case 100:
-		cents, err := parseMoney(st.Info.OutSum)
+		cents, err := pay.Kopecks(st.Info.OutSum)
 		if err != nil {
 			return core.GatewayEvent{}, errors.New("сумма счёта Robokassa не разобрана")
 		}
@@ -258,22 +258,4 @@ func formatMoney(cents int64) string {
 		return strconv.FormatInt(cents/100, 10)
 	}
 	return fmt.Sprintf("%d.%02d", cents/100, cents%100)
-}
-
-// parseMoney разбирает рубли ("300", "300.5", "300.00", "300.000000") в копейки без float.
-func parseMoney(s string) (int64, error) {
-	whole, frac, _ := strings.Cut(strings.TrimSpace(s), ".")
-	if len(frac) > 2 {
-		if strings.Trim(frac[2:], "0") != "" {
-			return 0, errors.New("сумма с долями копейки")
-		}
-		frac = frac[:2]
-	}
-	frac += strings.Repeat("0", 2-len(frac))
-	w, err1 := strconv.ParseInt(whole, 10, 64)
-	f, err2 := strconv.ParseInt(frac, 10, 64)
-	if err1 != nil || err2 != nil || w < 0 || f < 0 {
-		return 0, errors.New("сумма не разобрана")
-	}
-	return w*100 + f, nil
 }

@@ -105,7 +105,7 @@ type invoice struct {
 func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, error) {
 	req := map[string]any{
 		"order_id": orderPrefix + strconv.FormatInt(p.ID, 10),
-		"amount":   json.Number(rubles(p.Amount)), // число с двумя знаками, без float
+		"amount":   json.Number(pay.Rubles(p.Amount)), // число с двумя знаками, без float
 		"comment":  fmt.Sprintf("Пополнение %d", p.ID),
 	}
 	if m := strings.ToLower(strings.TrimSpace(g.cfg.String(keyMethod))); m == "sbp" || m == "card" {
@@ -138,7 +138,7 @@ func (g *Gateway) Status(ctx context.Context, p core.Payment) (core.GatewayEvent
 	}
 	ev := core.GatewayEvent{ExternalID: p.ExternalID, Status: mapStatus(remote.Status)}
 	if ev.Status == core.PayPaid {
-		ev.ExtAmount, err = kopecks(string(remote.Amount))
+		ev.ExtAmount, err = pay.Kopecks(string(remote.Amount))
 	}
 	return ev, err
 }
@@ -189,10 +189,10 @@ func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 	if ev.Status == core.PayRefunded {
 		return ev, nil
 	}
-	if ev.ExtAmount, err = kopecks(string(remote.Amount)); err != nil {
+	if ev.ExtAmount, err = pay.Kopecks(string(remote.Amount)); err != nil {
 		return ev, err
 	}
-	if n, err := kopecks(string(hook.Amount)); err != nil || n != ev.ExtAmount {
+	if n, err := pay.Kopecks(string(hook.Amount)); err != nil || n != ev.ExtAmount {
 		ev.ExtAmount = n // сумма вебхука не сошлась с API: ядро отклонит зачисление
 	}
 	return ev, nil

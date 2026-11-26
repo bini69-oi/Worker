@@ -2,6 +2,7 @@ package paypear
 
 import (
 	"encoding/json"
+	"github.com/bini69-oi/worker/pay"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -60,7 +61,7 @@ func fakeAPI(t *testing.T, statusFile string) *httptest.Server {
 }
 
 func hook(t *testing.T, id string, amount int64) *http.Request {
-	body := strings.NewReplacer("{{ID}}", id, "{{ORDER}}", "worker_1", "{{AMOUNT}}", rubles(amount)).
+	body := strings.NewReplacer("{{ID}}", id, "{{ORDER}}", "worker_1", "{{AMOUNT}}", pay.Rubles(amount)).
 		Replace(read(t, "webhook.tmpl"))
 	return httptest.NewRequest(http.MethodPost, "/pay/paypear", strings.NewReader(body))
 }
@@ -128,14 +129,14 @@ func TestSecretNotInError(t *testing.T) {
 
 func TestMoney(t *testing.T) {
 	for in, want := range map[string]int64{"300": 30000, "300.5": 30050, "0.01": 1, "12.3400": 1234} {
-		if got, err := kopecks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%s: %d %v", in, got, err)
 		}
 	}
-	if _, err := kopecks("1.005"); err == nil {
+	if _, err := pay.Kopecks("1.005"); err == nil {
 		t.Error("доли копейки приняты")
 	}
-	if rubles(12305) != "123.05" {
+	if pay.Rubles(12305) != "123.05" {
 		t.Error("rubles")
 	}
 	var m money

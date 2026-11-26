@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"github.com/bini69-oi/worker/pay"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -51,8 +52,8 @@ func sample(t *testing.T, name string, order, amount int64) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return strings.NewReplacer("{{ORDER}}", strconv.FormatInt(order, 10), "{{AMOUNT}}", rubles(amount),
-		"{{FEE_AMOUNT}}", rubles(amount/2)).Replace(string(b))
+	return strings.NewReplacer("{{ORDER}}", strconv.FormatInt(order, 10), "{{AMOUNT}}", pay.Rubles(amount),
+		"{{FEE_AMOUNT}}", pay.Rubles(amount/2)).Replace(string(b))
 }
 
 func hookReq(body, sig string) *http.Request {
@@ -90,7 +91,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/payment/create":
 		f.last.Store(string(body))
-		k, _ := kopecks(string(in.Amount))
+		k, _ := pay.Kopecks(string(in.Amount))
 		f.amount.Store(k)
 		_, _ = io.WriteString(w, sample(f.t, "create_ok.json", n, 0))
 	case "/payment/check":
@@ -233,16 +234,16 @@ func TestErrorsHideKeys(t *testing.T) {
 
 func TestKopecks(t *testing.T) {
 	for in, want := range map[string]int64{"300": 30000, "300.5": 30050, "300.50": 30050, "0.01": 1, "123.450": 12345} {
-		if got, err := kopecks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%q: %d %v", in, got, err)
 		}
 	}
 	for _, in := range []string{"", "1e5", "-1", "1.005", "abc"} {
-		if _, err := kopecks(in); err == nil {
+		if _, err := pay.Kopecks(in); err == nil {
 			t.Errorf("%q принято", in)
 		}
 	}
-	if !bytes.Equal([]byte(rubles(5)), []byte("0.05")) {
+	if !bytes.Equal([]byte(pay.Rubles(5)), []byte("0.05")) {
 		t.Error("rubles")
 	}
 }

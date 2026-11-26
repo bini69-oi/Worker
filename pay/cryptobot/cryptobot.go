@@ -222,7 +222,7 @@ func toEvent(inv invoice) (core.GatewayEvent, error) {
 	if inv.Amount == "" {
 		return core.GatewayEvent{}, errors.New("cryptobot: в счёте нет суммы")
 	}
-	k, err := parseKopeks(string(inv.Amount))
+	k, err := pay.Kopecks(string(inv.Amount))
 	if err != nil {
 		return core.GatewayEvent{}, err
 	}
@@ -277,32 +277,4 @@ func cleanAssets(s string) string {
 // formatKopeks пишет копейки рублями: 30000 в "300.00".
 func formatKopeks(k int64) string {
 	return fmt.Sprintf("%d.%02d", k/100, k%100)
-}
-
-// parseKopeks переводит "300.00" в 30000 без дробных чисел. Больше двух знаков допустимо только нулями.
-func parseKopeks(s string) (int64, error) {
-	bad := fmt.Errorf("cryptobot: сумма %q не разобрана", s)
-	whole, frac, _ := strings.Cut(strings.TrimSpace(s), ".")
-	if whole == "" || len(whole) > 12 || !digits(whole) || !digits(frac) {
-		return 0, bad
-	}
-	if len(frac) > 2 {
-		if strings.Trim(frac[2:], "0") != "" {
-			return 0, bad
-		}
-		frac = frac[:2]
-	}
-	frac += strings.Repeat("0", 2-len(frac))
-	w, _ := strconv.ParseInt(whole, 10, 64)
-	f, _ := strconv.ParseInt(frac, 10, 64)
-	return w*100 + f, nil
-}
-
-func digits(s string) bool {
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return true
 }

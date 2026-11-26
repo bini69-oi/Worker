@@ -112,7 +112,7 @@ func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, err
 		service = "sbp"
 	}
 	req := map[string]any{
-		"amount":   json.Number(rubles(p.Amount)),
+		"amount":   json.Number(pay.Rubles(p.Amount)),
 		"order_id": orderID(p.ID),
 		"comment":  fmt.Sprintf("Пополнение %d", p.ID),
 		"service":  service,
@@ -232,7 +232,7 @@ func amountOf(n json.Number) (int64, error) {
 	if n == "" {
 		return 0, errors.New("в ответе AuraPay нет суммы")
 	}
-	return kopecks(string(n))
+	return pay.Kopecks(string(n))
 }
 
 func mapStatus(s string) core.PayStatus {

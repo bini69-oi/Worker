@@ -131,12 +131,12 @@ func (o order) rubAmount() (int64, error) {
 	if o.Amount == "" {
 		return 0, errors.New("в ответе Overpay нет суммы")
 	}
-	return kopecks(string(o.Amount))
+	return pay.Kopecks(string(o.Amount))
 }
 
 func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, error) {
 	req := createReq{
-		Amount:     rubles(p.Amount),
+		Amount:     pay.Rubles(p.Amount),
 		Currency:   "RUB",
 		Lifetime:   g.cfg.Int(keyLife),
 		ProjectID:  g.cfg.String(keyProject),

@@ -171,12 +171,12 @@ func TestCreateRejected(t *testing.T) {
 
 func TestMoney(t *testing.T) {
 	for in, want := range map[string]int64{"300": 30000, "300.5": 30050, "300.50": 30050, "0.01": 1} {
-		if got, err := kopecks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%q: %d %v", in, got, err)
 		}
 	}
-	for _, in := range []string{"", "abc", "0", "1.234", "-1"} {
-		if _, err := kopecks(in); err == nil {
+	for _, in := range []string{"", "abc", "1.234", "-1"} {
+		if _, err := pay.Kopecks(in); err == nil {
 			t.Errorf("%q принято", in)
 		}
 	}

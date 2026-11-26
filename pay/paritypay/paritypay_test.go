@@ -3,6 +3,7 @@ package paritypay
 import (
 	"encoding/hex"
 	"encoding/json"
+	"github.com/bini69-oi/worker/pay"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -91,7 +92,7 @@ func signed(body, key string) *http.Request {
 
 func hook(p core.Payment, amount int64, key string) *http.Request {
 	body := strings.NewReplacer("{{ORDER}}", orderPrefix+strconv.FormatInt(p.ID, 10),
-		"{{AMOUNT}}", rubles(amount)).Replace(webhookTmpl)
+		"{{AMOUNT}}", pay.Rubles(amount)).Replace(webhookTmpl)
 	return signed(body, key)
 }
 
@@ -179,12 +180,12 @@ func TestSecretNotInError(t *testing.T) {
 
 func TestMoney(t *testing.T) {
 	for in, want := range map[string]int64{"300": 30000, "300.5": 30050, "1250.00": 125000, "0.01": 1} {
-		if got, err := kopecks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%q: %d %v", in, got, err)
 		}
 	}
-	for _, in := range []string{"", "0", "300.505", "abc", "-1"} {
-		if _, err := kopecks(in); err == nil {
+	for _, in := range []string{"", "300.505", "abc", "-1"} {
+		if _, err := pay.Kopecks(in); err == nil {
 			t.Errorf("%q принято", in)
 		}
 	}

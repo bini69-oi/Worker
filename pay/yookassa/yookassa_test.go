@@ -128,11 +128,11 @@ func TestMoneyFormat(t *testing.T) {
 		if got := formatMoney(cents); got != want {
 			t.Errorf("formatMoney(%d) = %q, ждали %q", cents, got, want)
 		}
-		if back, err := parseMoney(want); err != nil || back != cents {
-			t.Errorf("parseMoney(%q) = %d %v", want, back, err)
+		if back, err := pay.Kopecks(want); err != nil || back != cents {
+			t.Errorf("pay.Kopecks(%q) = %d %v", want, back, err)
 		}
 	}
-	if _, err := parseMoney("1.234"); err == nil {
+	if _, err := pay.Kopecks("1.234"); err == nil {
 		t.Error("три знака после точки должны давать ошибку")
 	}
 }

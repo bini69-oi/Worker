@@ -1,5 +1,5 @@
 // Package jupiter это касса Jupiter (FPGate P2P v2.1): СБП по ссылке или QR, суммы в копейках,
-// вебхук с подписью HMAC-SHA256 по списку полей. Оплату всё равно подтверждает API кассы.
+// вебхук с подписью HMAC-SHA256 по списку полей. Оплата по подписи, API нужен для сверки потерянных вебхуков.
 package jupiter
 
 import (
@@ -148,31 +148,6 @@ func sign(msg, key string) string {
 	return hex.EncodeToString(m.Sum(nil))
 }
 
-// kopecks разбирает рубли вида "300", "300.5" или "300.50" в копейки без float.
-func kopecks(s string) (int64, error) {
-	errBad := errors.New("сумма в ответе Jupiter не разобрана")
-	whole, frac, _ := strings.Cut(strings.TrimSpace(s), ".")
-	if len(frac) > 2 {
-		if strings.Trim(frac[2:], "0") != "" {
-			return 0, errors.New("сумма в ответе Jupiter с долями копейки")
-		}
-		frac = frac[:2]
-	}
-	frac += strings.Repeat("0", 2-len(frac))
-	w, err := strconv.ParseInt(whole, 10, 64)
-	if err != nil || w < 0 {
-		return 0, errBad
-	}
-	f, err := strconv.ParseInt(frac, 10, 64)
-	if err != nil {
-		return 0, errBad
-	}
-	if w == 0 && f == 0 {
-		return 0, errBad
-	}
-	return w*100 + f, nil
-}
-
 // rubles превращает копейки в строку рублей без float: 12345 это "123.45".
 func rubles(kop int64) string { return fmt.Sprintf("%d.%02d", kop/100, kop%100) }
 
@@ -252,7 +227,7 @@ func event(id string, remote reply) (core.GatewayEvent, error) {
 		return ev, nil
 	}
 	var err error
-	ev.ExtAmount, err = kopecks(scalar(remote.Amount.Value))
+	ev.ExtAmount, err = pay.Kopecks(scalar(remote.Amount.Value))
 	return ev, err
 }
 
@@ -298,7 +273,7 @@ func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 	// Вебхук подписан ключом магазина, поэтому сумма берётся из него. Переспрос API здесь не нужен:
 	// вид ответа статуса не сверен с живой кассой, и при расхождении ни одна оплата не зачислилась бы.
 	// Status с API остаётся запасной сверкой для потерянных вебхуков.
-	n, err := kopecks(scalar(hook.Amount.Value))
+	n, err := pay.Kopecks(scalar(hook.Amount.Value))
 	if err != nil || n <= 0 || !strings.EqualFold(hook.Amount.Currency, "RUB") {
 		return core.GatewayEvent{}, errors.New("в вебхуке кассы Jupiter нет суммы в рублях")
 	}

@@ -56,7 +56,7 @@ func fakeAPI(t *testing.T) *httptest.Server {
 				!strings.HasPrefix(fmt.Sprint(req["order_id"]), orderPrefix) {
 				t.Errorf("счёт создан не так: %v", req)
 			}
-			if _, err := parseKopeks(fmt.Sprint(req["amount"])); err != nil {
+			if _, err := pay.Kopecks(fmt.Sprint(req["amount"])); err != nil {
 				t.Errorf("сумма счёта: %v", err)
 			}
 			_, _ = w.Write(fixture(t, "create_ok.json"))
@@ -244,12 +244,12 @@ func FuzzVerify(f *testing.F) {
 
 func TestParseKopeks(t *testing.T) {
 	for in, want := range map[string]int64{"300.00": 30000, "123.4": 12340, "5": 500, "0.07": 7, "10.500": 1050} {
-		if got, err := parseKopeks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%q: %d %v, ждали %d", in, got, err, want)
 		}
 	}
 	for _, in := range []string{"", "abc", "-5", "1.2.3", "1e3", "10.501", ".", "1,5"} {
-		if _, err := parseKopeks(in); err == nil {
+		if _, err := pay.Kopecks(in); err == nil {
 			t.Errorf("%q: ждали ошибку", in)
 		}
 	}

@@ -218,7 +218,7 @@ func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 	if !hmac.Equal([]byte(got), []byte(want)) {
 		return core.GatewayEvent{}, pay.ErrBadSignature
 	}
-	cents, err := parseMoney(amount)
+	cents, err := pay.Kopecks(amount)
 	id, err2 := strconv.ParseInt(order, 10, 64)
 	if err != nil || err2 != nil || id <= 0 {
 		return core.GatewayEvent{}, pay.ErrBadSignature
@@ -266,7 +266,7 @@ func (g *Gateway) Status(ctx context.Context, p core.Payment) (core.GatewayEvent
 		if o.OrderID != p.ExternalID {
 			continue
 		}
-		cents, err := parseMoney(o.Amount.String())
+		cents, err := pay.Kopecks(o.Amount.String())
 		if err != nil || o.Currency != "RUB" {
 			return core.GatewayEvent{}, errors.New("сумма или валюта заказа Kassa AI не разобраны")
 		}
@@ -289,22 +289,4 @@ func (g *Gateway) Status(ctx context.Context, p core.Payment) (core.GatewayEvent
 func formatMoney(cents int64) string {
 	s := fmt.Sprintf("%d.%02d", cents/100, cents%100)
 	return strings.TrimSuffix(strings.TrimRight(s, "0"), ".")
-}
-
-// parseMoney разбирает рубли ("300", "300.5", "300.50") в копейки без float.
-func parseMoney(s string) (int64, error) {
-	whole, frac, _ := strings.Cut(strings.TrimSpace(s), ".")
-	if len(frac) > 2 {
-		if strings.Trim(frac[2:], "0") != "" {
-			return 0, errors.New("сумма с долями копейки")
-		}
-		frac = frac[:2]
-	}
-	frac += strings.Repeat("0", 2-len(frac))
-	w, err1 := strconv.ParseInt(whole, 10, 64)
-	f, err2 := strconv.ParseInt(frac, 10, 64)
-	if err1 != nil || err2 != nil || w < 0 || f < 0 {
-		return 0, errors.New("сумма не разобрана")
-	}
-	return w*100 + f, nil
 }

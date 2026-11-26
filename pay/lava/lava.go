@@ -110,7 +110,7 @@ func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, err
 	req := map[string]any{
 		"shopId":  g.cfg.Secret(keyShop),
 		"orderId": orderPrefix + strconv.FormatInt(p.ID, 10),
-		"sum":     json.Number(rubles(p.Amount)),
+		"sum":     json.Number(pay.Rubles(p.Amount)),
 		"comment": fmt.Sprintf("Пополнение %d", p.ID),
 	}
 	hook := strings.TrimSpace(g.cfg.String(keyURL))
@@ -195,7 +195,7 @@ func amountOf(n json.Number) (int64, error) {
 	if n == "" {
 		return 0, errors.New("в ответе Lava нет суммы")
 	}
-	return kopecks(string(n))
+	return pay.Kopecks(string(n))
 }
 
 func mapStatus(s string) core.PayStatus {

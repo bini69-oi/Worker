@@ -159,7 +159,7 @@ func TestMoney(t *testing.T) {
 			t.Errorf("rubles(%d) = %s, ждали %s", kop, got, want)
 		}
 	}
-	if _, err := kopecks("1.005"); err == nil {
+	if _, err := pay.Kopecks("1.005"); err == nil {
 		t.Error("доли копейки должны давать ошибку")
 	}
 }

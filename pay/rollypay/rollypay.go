@@ -112,13 +112,13 @@ func (a apiPay) rubAmount() (int64, error) {
 	if a.Amount == "" {
 		return 0, errors.New("в ответе RollyPay нет суммы")
 	}
-	return kopecks(string(a.Amount))
+	return pay.Kopecks(string(a.Amount))
 }
 
 func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, error) {
 	back := pay.ReturnURL(g.cfg.String(keyReturn), g.Return, p.ID)
 	req := createReq{
-		Amount:          rubles(p.Amount),
+		Amount:          pay.Rubles(p.Amount),
 		Currency:        "RUB",
 		OrderID:         orderPrefix + strconv.FormatInt(p.ID, 10),
 		Method:          g.cfg.String(keyMethod),
@@ -178,7 +178,7 @@ func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 	if ev.ExternalID == "" {
 		return ev, errors.New("в вебхуке кассы RollyPay нет номера платежа")
 	}
-	hookAmount, _ := kopecks(string(hook.Amount))
+	hookAmount, _ := pay.Kopecks(string(hook.Amount))
 	if ev.Status != core.PayPaid && ev.Status != core.PayRefunded {
 		return ev, nil
 	}

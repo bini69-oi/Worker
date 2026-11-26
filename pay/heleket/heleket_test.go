@@ -2,6 +2,7 @@ package heleket
 
 import (
 	"encoding/json"
+	"github.com/bini69-oi/worker/pay"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -85,7 +86,7 @@ func fakeAPI(t *testing.T) *httptest.Server {
 
 // hook собирает подписанный вебхук из шаблона в testdata.
 func hook(p core.Payment, amount int64, key, status string) *http.Request {
-	body := strings.NewReplacer("{{UUID}}", p.ExternalID, "{{ORDER}}", payloadPrefix+strconv.FormatInt(p.ID, 10), "{{AMOUNT}}", rubles(amount),
+	body := strings.NewReplacer("{{UUID}}", p.ExternalID, "{{ORDER}}", payloadPrefix+strconv.FormatInt(p.ID, 10), "{{AMOUNT}}", pay.Rubles(amount),
 		"{{STATUS}}", status).Replace(string(mustRead("testdata/webhook.tmpl")))
 	signed := body + `,"sign":"` + sign([]byte(body+"}"), key) + `"}`
 	return httptest.NewRequest(http.MethodPost, "/pay/heleket", strings.NewReader(signed))
@@ -215,16 +216,16 @@ func TestKeyNotInError(t *testing.T) {
 
 func TestMoney(t *testing.T) {
 	for in, want := range map[string]int64{"300": 30000, "300.5": 30050, "300.00": 30000, "0.01": 1, "12.3400": 1234} {
-		if got, err := kopecks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%s: %d %v", in, got, err)
 		}
 	}
 	for _, in := range []string{"", "abc", "-5", "1.005", "1e3", ".", "1,5", "1.2.3"} {
-		if _, err := kopecks(in); err == nil {
+		if _, err := pay.Kopecks(in); err == nil {
 			t.Errorf("%q: ждали ошибку", in)
 		}
 	}
-	if rubles(12305) != "123.05" || rubles(30000) != "300.00" {
+	if pay.Rubles(12305) != "123.05" || pay.Rubles(30000) != "300.00" {
 		t.Error("rubles")
 	}
 }

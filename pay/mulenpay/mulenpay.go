@@ -136,7 +136,7 @@ func (r reply) pay() (apiPay, bool) {
 var digits = regexp.MustCompile(`^\d+$`)
 
 func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, error) {
-	amount, shop := rubles(p.Amount), strings.TrimSpace(g.cfg.Secret(keyShop))
+	amount, shop := pay.Rubles(p.Amount), strings.TrimSpace(g.cfg.Secret(keyShop))
 	var shopID any = shop
 	if digits.MatchString(shop) {
 		shopID = json.Number(shop)
@@ -200,7 +200,7 @@ func (g *Gateway) confirmed(ctx context.Context, id string) (core.GatewayEvent, 
 		return ev, errors.New("в ответе MulenPay нет суммы")
 	}
 	var err error
-	ev.ExtAmount, err = kopecks(string(got.Amount))
+	ev.ExtAmount, err = pay.Kopecks(string(got.Amount))
 	return ev, err
 }
 
@@ -226,7 +226,7 @@ func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 	if err != nil || ev.Status != core.PayPaid || hook.Amount == "" {
 		return ev, err
 	}
-	if k, perr := kopecks(string(hook.Amount)); perr != nil || k != ev.ExtAmount {
+	if k, perr := pay.Kopecks(string(hook.Amount)); perr != nil || k != ev.ExtAmount {
 		ev.ExtAmount = k // вебхук не сошёлся с API: подставляем его сумму, ядро отклонит зачисление
 	}
 	return ev, nil

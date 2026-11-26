@@ -177,7 +177,7 @@ func (g *Gateway) fetch(ctx context.Context, id string) (core.GatewayEvent, erro
 	if r.ID != id {
 		return core.GatewayEvent{}, errors.New("ЮKassa вернула другой платёж")
 	}
-	cents, err := parseMoney(r.Amount.Value)
+	cents, err := pay.Kopecks(r.Amount.Value)
 	if err != nil {
 		return core.GatewayEvent{}, err
 	}
@@ -190,7 +190,7 @@ func (g *Gateway) fetch(ctx context.Context, id string) (core.GatewayEvent, erro
 		ev.Status = core.PayPaid
 		// Платёж возвращён целиком: зачисление отменяется. Частичный возврат магазин делает сам
 		// и сам решает, что делать с балансом, поэтому оплата остаётся оплатой.
-		if back, err := parseMoney(r.RefundedAmount.Value); err == nil && back >= cents {
+		if back, err := pay.Kopecks(r.RefundedAmount.Value); err == nil && back >= cents {
 			ev.Status = core.PayRefunded
 		}
 	case "canceled":
@@ -259,21 +259,6 @@ func (g *Gateway) allowed(remote string) bool {
 // formatMoney переводит копейки в строку ЮKassa: 12345 станет "123.45".
 func formatMoney(cents int64) string {
 	return fmt.Sprintf("%d.%02d", cents/100, cents%100)
-}
-
-// parseMoney переводит "123.45" в копейки, не трогая дробные числа.
-func parseMoney(s string) (int64, error) {
-	whole, frac, _ := strings.Cut(s, ".")
-	if len(frac) > 2 {
-		return 0, errors.New("сумма в ответе ЮKassa не разобрана")
-	}
-	frac += strings.Repeat("0", 2-len(frac))
-	w, err1 := strconv.ParseInt(whole, 10, 64)
-	f, err2 := strconv.ParseInt(frac, 10, 64)
-	if err1 != nil || err2 != nil || w < 0 || f < 0 {
-		return 0, errors.New("сумма в ответе ЮKassa не разобрана")
-	}
-	return w*100 + f, nil
 }
 
 // returnURL это адрес возврата. ЮKassa без него не создаёт платёж, поэтому есть последний запасной адрес.

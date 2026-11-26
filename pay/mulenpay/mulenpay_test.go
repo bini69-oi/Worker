@@ -2,6 +2,7 @@ package mulenpay
 
 import (
 	"encoding/json"
+	"github.com/bini69-oi/worker/pay"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -63,7 +64,7 @@ func fakeAPI(t *testing.T, statusFile string) *httptest.Server {
 // secret пустой: вебхук без подписи.
 func hook(t *testing.T, p core.Payment, amount int64, secret string) *http.Request {
 	t.Helper()
-	body := strings.NewReplacer("{{UUID}}", uuidPrefix+strconv.FormatInt(p.ID, 10), "{{AMOUNT}}", rubles(amount)).
+	body := strings.NewReplacer("{{UUID}}", uuidPrefix+strconv.FormatInt(p.ID, 10), "{{AMOUNT}}", pay.Rubles(amount)).
 		Replace(read(t, "webhook.tmpl"))
 	if secret != "" {
 		raw, _, _, err := hookFields([]byte(body))
@@ -142,16 +143,16 @@ func TestStatusMapAndAmounts(t *testing.T) {
 		}
 	}
 	for in, want := range map[string]int64{"300": 30000, "300.5": 30050, "0.01": 1, "12.3400": 1234} {
-		if got, err := kopecks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%s: %d %v", in, got, err)
 		}
 	}
 	for _, in := range []string{"", "abc", "1.005", "-1"} {
-		if _, err := kopecks(in); err == nil {
+		if _, err := pay.Kopecks(in); err == nil {
 			t.Errorf("%q: ждали ошибку", in)
 		}
 	}
-	if rubles(30050) != "300.50" || rubles(5) != "0.05" {
+	if pay.Rubles(30050) != "300.50" || pay.Rubles(5) != "0.05" {
 		t.Fatal("rubles")
 	}
 }

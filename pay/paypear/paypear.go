@@ -117,7 +117,7 @@ func (m money) kopecks() (int64, error) {
 	if m.Value == "" {
 		return 0, errors.New("в ответе PayPear нет суммы")
 	}
-	return kopecks(string(m.Value))
+	return pay.Kopecks(string(m.Value))
 }
 
 // object это платёж в ответе API и в вебхуке.
@@ -144,7 +144,7 @@ func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, err
 		method = "sbp"
 	}
 	req := map[string]any{
-		"amount":              map[string]string{"value": rubles(p.Amount), "currency": "RUB"},
+		"amount":              map[string]string{"value": pay.Rubles(p.Amount), "currency": "RUB"},
 		"order_id":            orderPrefix + strconv.FormatInt(p.ID, 10),
 		"description":         fmt.Sprintf("Пополнение %d", p.ID),
 		"payment_method_data": map[string]string{"type": method},

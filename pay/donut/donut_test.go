@@ -2,6 +2,7 @@ package donut
 
 import (
 	"encoding/json"
+	"github.com/bini69-oi/worker/pay"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -85,8 +86,8 @@ func hook(p core.Payment, amount int64, key string) *http.Request {
 	signer := New(cfg{keySecret: key}, "", nil)
 	order := orderPrefix + strconv.FormatInt(p.ID, 10)
 	sig := signer.sign("token", "tok-test", "transaction_id", extID, "order_id", order,
-		"amount.value", rubles(amount), "amount.currency", "RUB", "recalculated", "false", "status.type", "success")
-	body := strings.NewReplacer("{{ORDER}}", order, "{{AMOUNT}}", rubles(amount), "{{SIG}}", sig).
+		"amount.value", pay.Rubles(amount), "amount.currency", "RUB", "recalculated", "false", "status.type", "success")
+	body := strings.NewReplacer("{{ORDER}}", order, "{{AMOUNT}}", pay.Rubles(amount), "{{SIG}}", sig).
 		Replace(readFile("testdata/webhook.tmpl"))
 	return httptest.NewRequest(http.MethodPost, "/pay/donut", strings.NewReader(body))
 }
@@ -162,12 +163,12 @@ func TestSecretNotInError(t *testing.T) {
 func TestKopecks(t *testing.T) {
 	ok := map[string]int64{"300": 30000, "300.5": 30050, "300.50": 30050, "0.01": 1}
 	for in, want := range ok {
-		if got, err := kopecks(in); err != nil || got != want {
+		if got, err := pay.Kopecks(in); err != nil || got != want {
 			t.Errorf("%q: %d %v", in, got, err)
 		}
 	}
 	for _, in := range []string{"", "abc", "-1", "1.005"} {
-		if _, err := kopecks(in); err == nil {
+		if _, err := pay.Kopecks(in); err == nil {
 			t.Errorf("%q принято", in)
 		}
 	}
