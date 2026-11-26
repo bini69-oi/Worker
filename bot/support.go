@@ -20,6 +20,7 @@ type supportState struct {
 	mu    sync.Mutex
 	card  map[int64]time.Time
 	count map[int64]*hourCount
+	sweep time.Time
 }
 
 type hourCount struct {
@@ -36,6 +37,19 @@ func newSupportState() *supportState {
 func (s *supportState) take(id int64, now time.Time) (ok, warn bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if now.Sub(s.sweep) > time.Hour { // старые счётчики и отметки больше не нужны: память не растёт
+		for k, c := range s.count {
+			if now.Sub(c.start) >= time.Hour {
+				delete(s.count, k)
+			}
+		}
+		for k, at := range s.card {
+			if now.Sub(at) >= cardEvery {
+				delete(s.card, k)
+			}
+		}
+		s.sweep = now
+	}
 	c := s.count[id]
 	if c == nil || now.Sub(c.start) >= time.Hour {
 		c = &hourCount{start: now}
@@ -52,15 +66,19 @@ func (s *supportState) take(id int64, now time.Time) (ok, warn bool) {
 	return false, true
 }
 
-// needCard говорит, слать ли карточку перед сообщением, и запоминает время.
+// needCard говорит, слать ли карточку перед сообщением. Отметку ставит cardSent после отправки:
+// если карточка не ушла, следующее сообщение придёт с ней.
 func (s *supportState) needCard(id int64, now time.Time) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if last, ok := s.card[id]; ok && now.Sub(last) < cardEvery {
-		return false
-	}
+	last, ok := s.card[id]
+	return !ok || now.Sub(last) >= cardEvery
+}
+
+func (s *supportState) cardSent(id int64, now time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.card[id] = now
-	return true
 }
 
 // toSupport копирует сообщение абонента в тему «Поддержка» с карточкой раз в час.
@@ -80,26 +98,22 @@ func (b *Bot) toSupport(ctx context.Context, r *req, m *tg.Message) error {
 		}
 		return nil
 	}
-	thread, err := b.topic(ctx, ch, core.TopicSupport, false)
-	if err != nil {
-		return err
-	}
-	if b.support.needCard(r.from.ID, b.now()) {
-		if err := b.supportCard(ctx, ch.ChatID, thread, r.user.ID); err != nil {
+	card := b.support.needCard(r.from.ID, b.now())
+	err = b.inTopic(ctx, ch, core.TopicSupport, func(thread int) error {
+		if card {
+			if err := b.supportCard(ctx, ch.ChatID, thread, r.user.ID); err != nil {
+				return err
+			}
+			b.support.cardSent(r.from.ID, b.now())
+			card = false
+		}
+		id, err := b.api.CopyMessage(ctx, ch.ChatID, thread, m.Chat.ID, m.MessageID, 0)
+		if err != nil {
 			return err
 		}
-	}
-	id, err := b.api.CopyMessage(ctx, ch.ChatID, thread, m.Chat.ID, m.MessageID, 0)
-	var te *tg.Error
-	if errors.As(err, &te) && te.IsNotFound() {
-		if thread, err = b.topic(ctx, ch, core.TopicSupport, true); err == nil {
-			id, err = b.api.CopyMessage(ctx, ch.ChatID, thread, m.Chat.ID, m.MessageID, 0)
-		}
-	}
+		return b.core.LinkSupport(ctx, ch.ChatID, int64(id), r.user.ID)
+	})
 	if err != nil {
-		return err
-	}
-	if err := b.core.LinkSupport(ctx, int64(id), r.user.ID); err != nil {
 		return err
 	}
 	return b.say(ctx, r.chatID, b.t(r, "support.sent", nil))
@@ -111,7 +125,7 @@ func (b *Bot) supportCard(ctx context.Context, chat int64, thread int, userID in
 	if err != nil {
 		return err
 	}
-	r := &req{lang: b.lang("")}
+	r := b.sysReq()
 	tariff, until := b.t(r, "status.none", nil), "-"
 	if !card.ExpiresAt.IsZero() {
 		tariff, until = card.Tariff, date(card.ExpiresAt)
@@ -125,7 +139,7 @@ func (b *Bot) supportCard(ctx context.Context, chat int64, thread int, userID in
 	if err != nil {
 		return err
 	}
-	return b.core.LinkSupport(ctx, int64(m.MessageID), userID)
+	return b.core.LinkSupport(ctx, chat, int64(m.MessageID), userID)
 }
 
 // fromSupportChat разбирает сообщения в привязанной группе: реплай админа с правом support
@@ -140,15 +154,10 @@ func (b *Bot) fromSupportChat(ctx context.Context, m *tg.Message) error {
 	if err != nil || ch.ChatID != m.Chat.ID || !b.core.IsAdmin(ctx, m.From.ID, core.PermSupport) {
 		return nil
 	}
-	r := &req{lang: b.lang("")}
-	reply := func(key string) error {
-		_, err := b.api.SendMessage(ctx, tg.SendParams{ChatID: m.Chat.ID, ThreadID: m.ThreadID, Text: b.t(r, key, nil), ReplyTo: m.MessageID})
-		return err
-	}
-	uid, err := b.core.SupportUser(ctx, int64(m.ReplyToMessage.MessageID))
+	uid, err := b.core.SupportUser(ctx, m.Chat.ID, int64(m.ReplyToMessage.MessageID))
 	if errors.Is(err, core.ErrNotFound) {
 		if m.ThreadID != 0 && int64(m.ThreadID) == ch.Topics[core.TopicSupport] {
-			return reply("support.too_old")
+			return b.replyIn(ctx, m, "support.too_old")
 		}
 		return nil // реплай на событие или чужое сообщение: не поддержка
 	}
@@ -165,7 +174,7 @@ func (b *Bot) fromSupportChat(ctx context.Context, m *tg.Message) error {
 		if err := b.core.MarkUnreachable(ctx, u.ID); err != nil {
 			return err
 		}
-		return reply("support.blocked")
+		return b.replyIn(ctx, m, "support.blocked")
 	}
 	return err
 }

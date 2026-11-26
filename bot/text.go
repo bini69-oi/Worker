@@ -73,3 +73,6 @@ func parseInt(s string) (int64, bool) {
 	n, err := strconv.ParseInt(s, 10, 64)
 	return n, err == nil
 }
+
+// sysReq это запрос от имени системы: тексты на языке по умолчанию. Им пишутся сообщения админам.
+func (b *Bot) sysReq() *req { return &req{lang: b.lang("")} }

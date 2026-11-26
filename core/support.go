@@ -49,17 +49,17 @@ func (c *Core) SupportCard(ctx context.Context, userID int64) (SupportCard, erro
 // supportKeep это сколько живёт связь «сообщение в группе, абонент»: реплай на старое не уходит.
 const supportKeep = 30 * 24 * time.Hour
 
-// LinkSupport запоминает, что сообщение в группе поддержки от абонента userID.
-func (c *Core) LinkSupport(ctx context.Context, chatMsgID, userID int64) error {
-	return c.tx(ctx, func(tx Tx) error { return tx.AddSupportMsg(chatMsgID, userID, c.clock.Now()) })
+// LinkSupport запоминает, что сообщение chatMsgID в группе chatID относится к абоненту userID.
+func (c *Core) LinkSupport(ctx context.Context, chatID, chatMsgID, userID int64) error {
+	return c.tx(ctx, func(tx Tx) error { return tx.AddSupportMsg(chatID, chatMsgID, userID, c.clock.Now()) })
 }
 
 // SupportUser отдаёт абонента, которому уходит реплай на сообщение в группе.
 // Связи нет или она старше 30 дней: ErrNotFound.
-func (c *Core) SupportUser(ctx context.Context, chatMsgID int64) (int64, error) {
+func (c *Core) SupportUser(ctx context.Context, chatID, chatMsgID int64) (int64, error) {
 	var uid int64
 	err := c.store.Tx(ctx, func(tx Tx) error {
-		id, at, err := tx.SupportMsg(chatMsgID)
+		id, at, err := tx.SupportMsg(chatID, chatMsgID)
 		if err == nil && c.clock.Now().Sub(at) > supportKeep {
 			err = ErrNotFound
 		}

@@ -66,9 +66,9 @@ type Tx interface {
 	// SetBanned ставит бан. Нулевое время снимает его.
 	SetBanned(userID int64, at time.Time) error
 	// AddSupportMsg запоминает, что сообщение в группе поддержки относится к абоненту.
-	AddSupportMsg(chatMsgID, userID int64, at time.Time) error
+	AddSupportMsg(chatID, chatMsgID, userID int64, at time.Time) error
 	// SupportMsg отдаёт абонента и время связи по сообщению в группе. Нет связи: ErrNotFound.
-	SupportMsg(chatMsgID int64) (userID int64, at time.Time, err error)
+	SupportMsg(chatID, chatMsgID int64) (userID int64, at time.Time, err error)
 	// SetLang меняет язык абонента.
 	SetLang(userID int64, lang string) error
 	// SetScreenMsg запоминает сообщение-экран абонента.

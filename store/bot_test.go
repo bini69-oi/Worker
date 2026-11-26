@@ -62,15 +62,15 @@ func TestSetBanned(t *testing.T) {
 func TestSupportMsgs(t *testing.T) {
 	s, id := newCoreStore(t)
 	ctx := context.Background()
-	if err := s.Tx(ctx, func(tx core.Tx) error { return tx.AddSupportMsg(77, id, tNow) }); err != nil {
+	if err := s.Tx(ctx, func(tx core.Tx) error { return tx.AddSupportMsg(-5, 77, id, tNow) }); err != nil {
 		t.Fatal(err)
 	}
 	err := s.Tx(ctx, func(tx core.Tx) error {
-		uid, at, err := tx.SupportMsg(77)
+		uid, at, err := tx.SupportMsg(-5, 77)
 		if err != nil || uid != id || !at.Equal(tNow) {
 			t.Fatalf("связь: %d %v %v", uid, at, err)
 		}
-		_, _, err = tx.SupportMsg(78)
+		_, _, err = tx.SupportMsg(-6, 77)
 		if !errors.Is(err, core.ErrNotFound) {
 			t.Fatalf("нет связи: %v", err)
 		}

@@ -37,16 +37,17 @@ func (t *coreTx) SetLang(userID int64, lang string) error {
 	return t.execOne("UPDATE users SET lang = ? WHERE id = ?", lang, userID)
 }
 
-func (t *coreTx) AddSupportMsg(chatMsgID, userID int64, at time.Time) error {
+func (t *coreTx) AddSupportMsg(chatID, chatMsgID, userID int64, at time.Time) error {
 	_, err := t.q.ExecContext(t.ctx,
-		"INSERT INTO support_msgs (chat_msg_id, user_id, created_at) VALUES (?, ?, ?) ON CONFLICT (chat_msg_id) DO NOTHING",
-		chatMsgID, userID, at.Unix())
+		"INSERT INTO support_msgs (chat_id, chat_msg_id, user_id, created_at) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+		chatID, chatMsgID, userID, at.Unix())
 	return mapErr(err)
 }
 
-func (t *coreTx) SupportMsg(chatMsgID int64) (int64, time.Time, error) {
+func (t *coreTx) SupportMsg(chatID, chatMsgID int64) (int64, time.Time, error) {
 	var userID, at int64
-	err := t.q.QueryRowContext(t.ctx, "SELECT user_id, created_at FROM support_msgs WHERE chat_msg_id = ?", chatMsgID).Scan(&userID, &at)
+	err := t.q.QueryRowContext(t.ctx, "SELECT user_id, created_at FROM support_msgs WHERE chat_id = ? AND chat_msg_id = ?",
+		chatID, chatMsgID).Scan(&userID, &at)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, time.Time{}, core.ErrNotFound
 	}

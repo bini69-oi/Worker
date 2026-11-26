@@ -46,15 +46,19 @@ func (b *Bot) Admin(ctx context.Context, n core.AdminTask) error {
 	return b.toTopic(ctx, ch, n.Topic, s)
 }
 
-// toTopic шлёт сообщение в тему. Тему удалили в группе: создаёт заново и шлёт ещё раз.
+// toTopic шлёт сообщение в тему.
 func (b *Bot) toTopic(ctx context.Context, ch core.AdminChat, topic string, s Screen) error {
-	thread, err := b.topic(ctx, ch, topic, false)
-	if err != nil {
-		return err
-	}
-	send := func(thread int) error {
+	return b.inTopic(ctx, ch, topic, func(thread int) error {
 		_, err := b.api.SendMessage(ctx, tg.SendParams{ChatID: ch.ChatID, ThreadID: thread, Text: s.Text, ParseMode: "HTML",
 			Markup: s.markup(), DisablePreview: true})
+		return err
+	})
+}
+
+// inTopic выполняет send в теме. Тему удалили в группе: создаёт её заново и повторяет один раз.
+func (b *Bot) inTopic(ctx context.Context, ch core.AdminChat, topic string, send func(thread int) error) error {
+	thread, err := b.topic(ctx, ch, topic, false)
+	if err != nil {
 		return err
 	}
 	err = send(thread)
@@ -72,21 +76,20 @@ func (b *Bot) toTopic(ctx context.Context, ch core.AdminChat, topic string, s Sc
 func (b *Bot) topic(ctx context.Context, ch core.AdminChat, topic string, fresh bool) (int, error) {
 	topicMu.Lock()
 	defer topicMu.Unlock()
-	if !fresh {
-		if cur, err := b.core.AdminChat(ctx); err == nil {
-			ch = cur
-		}
-		if id, ok := ch.Topics[topic]; ok {
-			return int(id), nil
-		}
+	// Чат перечитываем под замком: другой обработчик мог только что создать соседнюю тему.
+	if cur, err := b.core.AdminChat(ctx); err == nil {
+		ch = cur
 	}
-	id, err := b.api.CreateForumTopic(ctx, ch.ChatID, b.t(&req{lang: b.lang("")}, "topic."+topic, nil))
+	if id, ok := ch.Topics[topic]; ok && !fresh {
+		return int(id), nil
+	}
+	id, err := b.api.CreateForumTopic(ctx, ch.ChatID, b.t(b.sysReq(), "topic."+topic, nil))
 	if err != nil {
 		return 0, err
 	}
-	topics := map[string]int64{}
-	for k, v := range ch.Topics {
-		topics[k] = v
+	topics := maps.Clone(ch.Topics)
+	if topics == nil {
+		topics = map[string]int64{}
 	}
 	topics[topic] = int64(id)
 	return id, b.core.SetChatTopics(ctx, topics)

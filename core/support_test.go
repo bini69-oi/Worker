@@ -33,17 +33,17 @@ func TestSupportCard(t *testing.T) {
 func TestSupportLinks(t *testing.T) {
 	ctx := context.Background()
 	e := newEnv(t)
-	if err := e.c.LinkSupport(ctx, 77, e.user.ID); err != nil {
+	if err := e.c.LinkSupport(ctx, -5, 77, e.user.ID); err != nil {
 		t.Fatal(err)
 	}
-	if uid, err := e.c.SupportUser(ctx, 77); err != nil || uid != e.user.ID {
+	if uid, err := e.c.SupportUser(ctx, -5, 77); err != nil || uid != e.user.ID {
 		t.Fatalf("связь: %d %v", uid, err)
 	}
-	if _, err := e.c.SupportUser(ctx, 78); !errors.Is(err, core.ErrNotFound) {
+	if _, err := e.c.SupportUser(ctx, -5, 78); !errors.Is(err, core.ErrNotFound) {
 		t.Fatalf("нет связи: %v", err)
 	}
 	e.clock.Add(31 * 24 * time.Hour)
-	if _, err := e.c.SupportUser(ctx, 77); !errors.Is(err, core.ErrNotFound) {
+	if _, err := e.c.SupportUser(ctx, -5, 77); !errors.Is(err, core.ErrNotFound) {
 		t.Fatalf("связь старше 30 дней работает: %v", err)
 	}
 	if n, err := e.c.CleanSupport(ctx); err != nil || n != 1 {

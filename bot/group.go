@@ -26,11 +26,7 @@ func (b *Bot) onGroup(ctx context.Context, m *tg.Message) error {
 // bindChat привязывает группу кодом из админки и создаёт темы. Темы нужны, поэтому сначала проверяем форум:
 // код одноразовый и не должен сгореть на группе без тем.
 func (b *Bot) bindChat(ctx context.Context, m *tg.Message, code string) error {
-	r := &req{lang: b.lang("")}
-	reply := func(key string) error {
-		_, err := b.api.SendMessage(ctx, tg.SendParams{ChatID: m.Chat.ID, ThreadID: m.ThreadID, Text: b.t(r, key, nil), ReplyTo: m.MessageID})
-		return err
-	}
+	reply := func(key string) error { return b.replyIn(ctx, m, key) }
 	if !m.Chat.IsForum {
 		return reply("chat.need_forum")
 	}
@@ -193,4 +189,10 @@ func (b *Bot) onUserAction(ctx context.Context, r *req, q *tg.CallbackQuery, d D
 		return err
 	}
 	return b.answer(ctx, r, b.t(r, "adm.done", nil))
+}
+
+// replyIn отвечает в группе реплаем на сообщение, в той же теме.
+func (b *Bot) replyIn(ctx context.Context, m *tg.Message, key string) error {
+	_, err := b.api.SendMessage(ctx, tg.SendParams{ChatID: m.Chat.ID, ThreadID: m.ThreadID, Text: b.t(b.sysReq(), key, nil), ReplyTo: m.MessageID})
+	return err
 }

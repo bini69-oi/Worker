@@ -69,7 +69,7 @@ type state struct {
 	confirms  map[int64]core.Confirm
 	sessions  map[string]sessionRow
 	chat      *core.AdminChat
-	support   map[int64]supportRow
+	support   map[[2]int64]supportRow
 }
 
 func (s *state) clone() *state {
@@ -253,18 +253,19 @@ type supportRow struct {
 	at   time.Time
 }
 
-func (t *tx) AddSupportMsg(chatMsgID, userID int64, at time.Time) error {
+func (t *tx) AddSupportMsg(chatID, chatMsgID, userID int64, at time.Time) error {
 	if t.st.support == nil {
-		t.st.support = map[int64]supportRow{}
+		t.st.support = map[[2]int64]supportRow{}
 	}
-	if _, ok := t.st.support[chatMsgID]; !ok {
-		t.st.support[chatMsgID] = supportRow{user: userID, at: at}
+	k := [2]int64{chatID, chatMsgID}
+	if _, ok := t.st.support[k]; !ok {
+		t.st.support[k] = supportRow{user: userID, at: at}
 	}
 	return nil
 }
 
-func (t *tx) SupportMsg(chatMsgID int64) (int64, time.Time, error) {
-	r, ok := t.st.support[chatMsgID]
+func (t *tx) SupportMsg(chatID, chatMsgID int64) (int64, time.Time, error) {
+	r, ok := t.st.support[[2]int64{chatID, chatMsgID}]
 	if !ok {
 		return 0, time.Time{}, core.ErrNotFound
 	}

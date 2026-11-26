@@ -70,7 +70,7 @@ func (e *env) lastSupportLink(t *testing.T) int {
 	t.Helper()
 	u, _ := e.c.UserByTg(context.Background(), userTg)
 	for id := e.api.nextMsg + 100; id > 100; id-- {
-		if uid, err := e.c.SupportUser(context.Background(), int64(id)); err == nil && uid == u.ID {
+		if uid, err := e.c.SupportUser(context.Background(), chat, int64(id)); err == nil && uid == u.ID {
 			return id
 		}
 	}
@@ -140,5 +140,15 @@ func TestSupportCleanup(t *testing.T) {
 	e.groupIn(t, chat, owner, thread, link, "поздний ответ")
 	if got := render(e.api.take()); !strings.Contains(got, "слишком старое") {
 		t.Fatalf("реплай после очистки: %s", got)
+	}
+}
+
+func TestSupportTopicDeleted(t *testing.T) {
+	e, _ := supportEnv(t)
+	e.b.api = &goneTopicAPI{fakeAPI: e.api}
+	e.text(t, userTg, "первое сообщение")
+	got := render(e.api.take())
+	if !strings.Contains(got, "== topic") || !strings.Contains(got, "Тариф:") || !strings.Contains(got, "== copy chat=-100500") {
+		t.Fatalf("после удаления темы сообщение не дошло с карточкой: %s", got)
 	}
 }
