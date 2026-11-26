@@ -57,6 +57,7 @@ var (
 	ErrBanned       = newErr("E3006", "err.banned", "абонент заблокирован")
 	ErrPanelPending = newErr("E3007", "err.panel_pending", "подписка ещё оформляется")
 	ErrPanelDown    = newErr("E3008", "err.panel_down", "сервис временно недоступен")
+	ErrNoSub        = newErr("E3010", "err.no_sub", "у абонента нет подписки")
 )
 
 // Кассы
