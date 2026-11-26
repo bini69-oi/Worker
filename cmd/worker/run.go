@@ -18,10 +18,15 @@ import (
 	"github.com/bini69-oi/worker/panel"
 	"github.com/bini69-oi/worker/pay"
 	"github.com/bini69-oi/worker/pay/cryptobot"
+	"github.com/bini69-oi/worker/pay/cryptomus"
+	"github.com/bini69-oi/worker/pay/freekassa"
+	"github.com/bini69-oi/worker/pay/heleket"
 	"github.com/bini69-oi/worker/pay/manual"
 	"github.com/bini69-oi/worker/pay/platega"
 	"github.com/bini69-oi/worker/pay/stars"
+	"github.com/bini69-oi/worker/pay/wata"
 	"github.com/bini69-oi/worker/pay/yookassa"
+	"github.com/bini69-oi/worker/pay/yoomoney"
 	"github.com/bini69-oi/worker/redact"
 	"github.com/bini69-oi/worker/settings"
 	"github.com/bini69-oi/worker/store"
@@ -43,7 +48,7 @@ type app struct {
 
 // gateways это все кассы. Новая касса добавляется сюда одной строкой. t даёт кассам адрес возврата в бота
 // и возврат звёзд через Telegram.
-func gateways(cfg *settings.Settings, t *telegram) []pay.Gateway {
+func gateways(cfg *settings.Settings, t *telegram, publicURL string) []pay.Gateway {
 	kassa := yookassa.New(cfg, "", nil)
 	kassa.RestrictIPs(yookassa.OfficialNets()) // уведомления ЮKassa только с её адресов
 	kassa.Return = t.paidURL
@@ -51,12 +56,27 @@ func gateways(cfg *settings.Settings, t *telegram) []pay.Gateway {
 	pl.Return = t.paidURL
 	st := stars.New(cfg)
 	st.Refunder = t.client.RefundStarPayment
+	hel := heleket.New(cfg, "", nil)
+	hel.Return, hel.Hook = t.paidURL, publicURL+"/pay/heleket"
+	cm := cryptomus.New(cfg, "", nil)
+	cm.Return, cm.Hook = t.paidURL, publicURL+"/pay/cryptomus"
+	ym := yoomoney.New(cfg, "", nil)
+	ym.Return = t.paidURL
+	fk := freekassa.New(cfg, "", nil)
+	fk.RestrictIPs(freekassa.OfficialNets()) // уведомления FreeKassa только с её адресов
+	wt := wata.New(cfg, "", nil)
+	wt.Return = t.paidURL
 	return []pay.Gateway{
 		manual.New(cfg),
 		st,
 		kassa,
 		cryptobot.New(cfg, "", nil),
 		pl,
+		hel,
+		cm,
+		ym,
+		fk,
+		wt,
 	}
 }
 
@@ -104,7 +124,7 @@ func build(env Env, base slog.Handler) (*app, error) {
 
 	t := newTelegram(env.BotToken, env.TelegramURL, env.PublicURL, func() bool { return cfg.Bool("bot.polling") }, log)
 	secrets.Add(t.secret)
-	gws := gateways(cfg, t)
+	gws := gateways(cfg, t, env.PublicURL)
 	notes := &notifier{}
 	c := core.New(core.Deps{
 		Store:    store.NewCoreStore(db),

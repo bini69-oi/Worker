@@ -100,6 +100,9 @@ func TestServeAndStop(t *testing.T) {
 	check("GET", "/dl/happ/garbage", 404)
 	check("POST", "/pay/unknown", 404)
 	check("POST", "/pay/stars", 401)
+	for _, name := range []string{"heleket", "cryptomus", "yoomoney", "freekassa", "wata"} {
+		check("POST", "/pay/"+name, 401) // касса подключена: поддельный вебхук отклонён, а не 404
+	}
 	check("POST", "/panel/webhook", 401)
 	// Чужой адрес через наш прокси: уведомление ЮKassa отклоняется ещё до запроса к её API.
 	req, _ := http.NewRequest("POST", base+"/pay/yookassa", strings.NewReader(`{"event":"payment.succeeded","object":{"id":"x"}}`))
