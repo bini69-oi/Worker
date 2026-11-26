@@ -11,7 +11,7 @@ import (
 func inputEnv(t *testing.T) (*env, *[]string) {
 	e := newEnv(t)
 	var got []string
-	e.b.acts["askpromo"] = func(_ context.Context, r *req, _ Data) error { e.b.expect(r, waitPromo, ""); return nil }
+	e.b.acts["askpromo"] = func(_ context.Context, r *req, _ Data) error { e.b.expect(r, waitPromo); return nil }
 	e.b.inputs[waitPromo] = func(_ context.Context, _ *req, _ wait, text string) error { got = append(got, text); return nil }
 	return e, &got
 }

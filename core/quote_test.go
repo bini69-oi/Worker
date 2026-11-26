@@ -24,7 +24,7 @@ func TestQuote(t *testing.T) {
 	}
 
 	e.topup(t, 20000)
-	if q, _ = e.c.Quote(ctx, e.user.ID, month.ID, 30); q.Missing != 0 || q.Renew {
+	if q, _ = e.c.Quote(ctx, e.user.ID, month.ID, 30); q.Missing != 0 {
 		t.Fatalf("хватает: %+v", q)
 	}
 	if b := e.balance(t); b != 30000 {
@@ -33,9 +33,6 @@ func TestQuote(t *testing.T) {
 
 	if _, err := e.c.Buy(ctx, e.user.ID, month.ID, 30); err != nil {
 		t.Fatal(err)
-	}
-	if q, _ = e.c.Quote(ctx, e.user.ID, month.ID, 30); !q.Renew {
-		t.Fatalf("тот же тариф не продление: %+v", q)
 	}
 	if _, err := e.c.Quote(ctx, e.user.ID, other.ID, 30); !errors.Is(err, core.ErrOtherTariff) {
 		t.Fatalf("другой тариф: ждали ErrOtherTariff, получили %v", err)

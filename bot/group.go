@@ -174,8 +174,17 @@ func (b *Bot) afterConfirm(ctx context.Context, r *req, q *tg.CallbackQuery, id 
 	return b.answer(ctx, r, b.t(r, result, nil))
 }
 
-// topicOf это буква темы в данных кнопки: по ней кнопки под событием собираются заново.
+// topicOf это буква темы в данных кнопки и обратно: по ней кнопки под событием собираются заново.
 var topicOf = map[string]string{"p": core.TopicPayments, "t": core.TopicTrials, "n": core.TopicNew}
+
+func topicLetter(topic string) string {
+	for l, t := range topicOf {
+		if t == topic {
+			return l
+		}
+	}
+	return ""
+}
 
 // onUserAction это «Бан», «Разбанить» и «+7 дней» под событием в группе.
 func (b *Bot) onUserAction(ctx context.Context, r *req, q *tg.CallbackQuery, d Data) error {

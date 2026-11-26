@@ -7,7 +7,6 @@ type Quote struct {
 	Price   int64 // копейки
 	Balance int64 // копейки
 	Missing int64 // копейки, 0 если денег хватает
-	Renew   bool  // продление той же подписки, а не новая
 }
 
 // Quote считает цену покупки по тем же правилам, что Buy, но ничего не списывает.
@@ -20,7 +19,6 @@ func (c *Core) Quote(ctx context.Context, userID, tariffID int64, days int) (Quo
 		}
 		q.Price, q.Balance = b.period.Price, b.buyer.Balance
 		q.Missing = max(q.Price-q.Balance, 0)
-		q.Renew = b.exists && !b.sub.Trial && b.sub.TariffID == tariffID
 		return nil
 	})
 	return q, err

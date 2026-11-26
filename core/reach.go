@@ -7,23 +7,26 @@ import (
 
 // MarkUnreachable отмечает, что абонент заблокировал бота: новые уведомления ему не ставятся.
 func (c *Core) MarkUnreachable(ctx context.Context, userID int64) error {
-	return c.tx(ctx, func(tx Tx) error {
-		u, err := tx.User(userID)
-		if err != nil || !u.UnreachableAt.IsZero() {
-			return err
-		}
-		return tx.SetUnreachable(userID, c.clock.Now())
-	})
+	return c.setReach(ctx, userID, false)
 }
 
 // MarkReachable снимает отметку, когда абонент снова написал боту.
 func (c *Core) MarkReachable(ctx context.Context, userID int64) error {
+	return c.setReach(ctx, userID, true)
+}
+
+// setReach меняет отметку, только если она другая: первое время блокировки не сдвигается.
+func (c *Core) setReach(ctx context.Context, userID int64, reachable bool) error {
 	return c.tx(ctx, func(tx Tx) error {
 		u, err := tx.User(userID)
-		if err != nil || u.UnreachableAt.IsZero() {
+		if err != nil || u.UnreachableAt.IsZero() == reachable {
 			return err
 		}
-		return tx.SetUnreachable(userID, time.Time{})
+		at := time.Time{}
+		if !reachable {
+			at = c.clock.Now()
+		}
+		return tx.SetUnreachable(userID, at)
 	})
 }
 

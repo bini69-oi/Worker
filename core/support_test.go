@@ -16,7 +16,7 @@ func TestSupportCard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if card.User.TgID != 1001 || card.Tariff != "" || card.Active {
+	if card.User.TgID != 1001 || card.Tariff != "" || !card.ExpiresAt.IsZero() {
 		t.Fatalf("без подписки: %+v", card)
 	}
 
@@ -25,7 +25,7 @@ func TestSupportCard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if card.Tariff != "Месяц" || !card.Active || !card.ExpiresAt.Equal(sub.ExpiresAt) || card.User.Balance != e.balance(t) {
+	if card.Tariff != "Месяц" || !card.ExpiresAt.Equal(sub.ExpiresAt) || card.User.Balance != e.balance(t) {
 		t.Fatalf("с подпиской: %+v", card)
 	}
 }

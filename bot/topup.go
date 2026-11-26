@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -19,26 +20,21 @@ func (b *Bot) onTopup(ctx context.Context, r *req, d Data) error {
 		return b.showGateways(ctx, r, amount)
 	}
 	s := Screen{Text: b.t(r, "topup.amount", nil)}
-	var row []Button
+	var presets []Button
 	for _, p := range strings.Split(b.cfg.String("pay.presets"), ",") {
 		rub, err := strconv.ParseInt(strings.TrimSpace(p), 10, 64)
 		if err != nil || rub <= 0 || rub > maxTopupRub {
 			continue
 		}
-		row = append(row, Button{Text: money(rub * 100), Data: data("tp", rub*100)})
-		if len(row) == 2 {
-			s.Rows, row = append(s.Rows, row), nil
-		}
+		presets = append(presets, Button{Text: money(rub * 100), Data: data("tp", rub*100)})
 	}
-	if len(row) > 0 {
-		s.Rows = append(s.Rows, row)
-	}
+	s.Rows = slices.AppendSeq(s.Rows, slices.Chunk(presets, 2))
 	s.Rows = append(s.Rows, []Button{b.btn(r, "btn.own_amount", "tpown")}, b.back(r, "bal"))
 	return b.show(ctx, r, s)
 }
 
 func (b *Bot) onOwnAmount(ctx context.Context, r *req, _ Data) error {
-	b.expect(r, waitAmount, "")
+	b.expect(r, waitAmount)
 	return b.show(ctx, r, Screen{Text: b.t(r, "topup.own", map[string]string{"max": money(maxTopupRub * 100)}),
 		Rows: [][]Button{b.back(r, "tp")}})
 }
@@ -47,7 +43,7 @@ func (b *Bot) onOwnAmount(ctx context.Context, r *req, _ Data) error {
 func (b *Bot) onAmountInput(ctx context.Context, r *req, _ wait, text string) error {
 	rub, err := strconv.ParseInt(text, 10, 64)
 	if err != nil || rub < 1 || rub > maxTopupRub || text != strconv.FormatInt(rub, 10) {
-		b.expect(r, waitAmount, "")
+		b.expect(r, waitAmount)
 		return b.say(ctx, r.chatID, b.t(r, "topup.bad_amount", map[string]string{"max": money(maxTopupRub * 100)}))
 	}
 	r.msgID = 0 // ответ на текст идёт новым сообщением

@@ -109,9 +109,11 @@ func (b *Bot) enter(ctx context.Context, from tg.User, chatID int64, cbID, ref s
 	if !u.BannedAt.IsZero() {
 		return r, false, b.banNotice(ctx, r)
 	}
-	if b.core.Maintenance() && !b.core.IsStaff(ctx, from.ID) {
+	if err := b.core.Serving(ctx, u.ID); errors.Is(err, core.ErrMaintenance) {
 		_ = b.answer(ctx, r, "")
 		return r, false, b.say(ctx, chatID, b.t(r, "bot.maintenance", nil))
+	} else if err != nil {
+		return r, false, err
 	}
 	return r, true, nil
 }

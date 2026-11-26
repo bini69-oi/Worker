@@ -71,6 +71,13 @@ func word(s string, min, max int, dash bool) bool {
 	return true
 }
 
+// pair отдаёт два первых аргумента числами, например тариф и срок.
+func (d Data) pair() (int64, int64, bool) {
+	a, ok1 := d.Int(0)
+	b, ok2 := d.Int(1)
+	return a, b, ok1 && ok2
+}
+
 // Int отдаёт аргумент i как положительное число. Нет аргумента или не число: false.
 func (d Data) Int(i int) (int64, bool) {
 	if i >= len(d.Args) {

@@ -14,6 +14,6 @@ func (b *Bot) onInput(ctx context.Context, r *req, w wait, text string) error {
 }
 
 // expect ставит ожидание текста от абонента.
-func (b *Bot) expect(r *req, kind waitKind, arg string) {
-	b.waits.set(r.from.ID, kind, arg, b.now())
+func (b *Bot) expect(r *req, kind waitKind) {
+	b.waits.set(r.from.ID, kind, b.now())
 }

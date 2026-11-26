@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -91,18 +92,13 @@ func (b *Bot) showDevices(ctx context.Context, r *req) error {
 	}
 	s := Screen{}
 	var lines []string
-	var row []Button
+	var dels []Button
 	for i, dv := range list {
 		n := strconv.Itoa(i + 1)
 		lines = append(lines, b.t(r, "devices.item", map[string]string{"n": n, "name": strings.TrimSpace(dv.Platform + " " + dv.Model)}))
-		row = append(row, Button{Text: b.t(r, "btn.dev_del", map[string]string{"n": n}), Data: data("devdel", i+1, len(list))})
-		if len(row) == 4 {
-			s.Rows, row = append(s.Rows, row), nil
-		}
+		dels = append(dels, Button{Text: b.t(r, "btn.dev_del", map[string]string{"n": n}), Data: data("devdel", i+1, len(list))})
 	}
-	if len(row) > 0 {
-		s.Rows = append(s.Rows, row)
-	}
+	s.Rows = slices.AppendSeq(s.Rows, slices.Chunk(dels, 4))
 	text := b.t(r, "devices.empty", nil)
 	if len(lines) > 0 {
 		text = strings.Join(lines, "\n")
@@ -116,9 +112,8 @@ func (b *Bot) showDevices(ctx context.Context, r *req) error {
 // onDeviceDelete отвязывает устройство по номеру. Список перечитывается: если он изменился с показа,
 // бот не угадывает, а показывает свежий список.
 func (b *Bot) onDeviceDelete(ctx context.Context, r *req, d Data) error {
-	n, ok1 := d.Int(0)
-	total, ok2 := d.Int(1)
-	if !ok1 || !ok2 {
+	n, total, ok := d.pair()
+	if !ok {
 		return core.ErrInvalid
 	}
 	list, err := b.core.Devices(ctx, r.user.ID)

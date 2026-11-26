@@ -47,7 +47,7 @@ func (b *Bot) showRef(ctx context.Context, r *req) error {
 }
 
 func (b *Bot) onPromoAsk(ctx context.Context, r *req, _ Data) error {
-	b.expect(r, waitPromo, "")
+	b.expect(r, waitPromo)
 	return b.show(ctx, r, Screen{Text: b.t(r, "promo.ask", nil), Rows: [][]Button{b.back(r, "m")}})
 }
 

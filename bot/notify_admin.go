@@ -106,7 +106,7 @@ func (b *Bot) adminRows(r *req, topic string, uid int64, banned bool) [][]Button
 	if uid == 0 || (topic != core.TopicPayments && topic != core.TopicTrials && topic != core.TopicNew) {
 		return nil
 	}
-	letter := topic[:1] // p, t, n: тема в данных кнопки, чтобы собрать кнопки заново после нажатия
+	letter := topicLetter(topic)
 	ban := b.btn(r, "btn.ban", data("adm", "ban", uid, letter))
 	if banned {
 		ban = b.btn(r, "btn.unban", data("adm", "unban", uid, letter))

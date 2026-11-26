@@ -87,9 +87,8 @@ func (b *Bot) onTariff(ctx context.Context, r *req, d Data) error {
 // onPeriod показывает подтверждение с ценой. Денег не хватает: недостача цифрами и пополнение на разницу,
 // а выбор запоминается в корзине ядра и купится сам после оплаты.
 func (b *Bot) onPeriod(ctx context.Context, r *req, d Data) error {
-	id, ok1 := d.Int(0)
-	days, ok2 := d.Int(1)
-	if !ok1 || !ok2 {
+	id, days, ok := d.pair()
+	if !ok {
 		return core.ErrInvalid
 	}
 	t, err := b.core.Tariff(ctx, id)
@@ -128,9 +127,8 @@ func (b *Bot) otherTariff(ctx context.Context, r *req) error {
 
 // onBuy покупает с баланса. Повторный клик по той же кнопке получает «уже обрабатываем».
 func (b *Bot) onBuy(ctx context.Context, r *req, d Data) error {
-	id, ok1 := d.Int(0)
-	days, ok2 := d.Int(1)
-	if !ok1 || !ok2 {
+	id, days, ok := d.pair()
+	if !ok {
 		return core.ErrInvalid
 	}
 	if !b.once(r, d) {

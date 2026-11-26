@@ -78,13 +78,12 @@ type waits struct {
 
 type wait struct {
 	kind  waitKind
-	arg   string // например касса для своей суммы
 	until time.Time
 }
 
 func newWaits() *waits { return &waits{m: map[int64]wait{}} }
 
-func (w *waits) set(id int64, kind waitKind, arg string, now time.Time) {
+func (w *waits) set(id int64, kind waitKind, now time.Time) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	for k, v := range w.m {
@@ -92,7 +91,7 @@ func (w *waits) set(id int64, kind waitKind, arg string, now time.Time) {
 			delete(w.m, k)
 		}
 	}
-	w.m[id] = wait{kind: kind, arg: arg, until: now.Add(waitTTL)}
+	w.m[id] = wait{kind: kind, until: now.Add(waitTTL)}
 }
 
 // take отдаёт и снимает ожидание. Истёкшее считается снятым.
