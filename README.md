@@ -26,6 +26,8 @@
 
 - [Решения](docs/decisions.md): почему Go, SQLite и один бинарник
 - [План](docs/roadmap.md): пять частей по порядку
+- [Карта функций](docs/features.md): что в первой версии, что позже, чего не делаем
+- [Как мы разрабатываем](docs/development.md): шаги, тест первым, ревью тремя взглядами; правила для ИИ-агентов в [AGENTS.md](AGENTS.md)
 - [Как добавить кассу](docs/add-gateway.md)
 - [Спеки](openspec/): что именно должна делать каждая часть ([OpenSpec](https://github.com/Fission-AI/OpenSpec))
 
