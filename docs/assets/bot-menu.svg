@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="560" viewBox="0 0 760 560">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#062a18"/>
+      <stop offset="1" stop-color="#03130b"/>
+    </linearGradient>
+  </defs>
+  <rect width="760" height="560" rx="28" fill="url(#bg)"/>
+
+  <g font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+    <!-- шапка чата -->
+    <circle cx="66" cy="54" r="24" fill="#16a34a"/>
+    <text x="66" y="62" text-anchor="middle" font-size="20" font-weight="800" fill="#f0fdf4">M</text>
+    <text x="104" y="50" font-size="20" font-weight="700" fill="#f0fdf4">M32</text>
+    <text x="104" y="74" font-size="15" fill="#86efac">бот</text>
+    <line x1="32" y1="100" x2="728" y2="100" stroke="#14532d"/>
+
+    <!-- сообщение-экран -->
+    <rect x="40" y="124" width="680" height="150" rx="18" fill="#0d3a22" stroke="#166534"/>
+    <text x="68" y="166" font-size="22" font-weight="700" fill="#f0fdf4">Главное меню</text>
+    <text x="68" y="204" font-size="18" fill="#d1fae5">Подписка до 31.01, осталось 30 дн.</text>
+    <text x="68" y="238" font-size="18" fill="#d1fae5">Баланс: <tspan font-weight="700" fill="#a3e635">250 ₽</tspan></text>
+
+    <!-- кнопки -->
+    <g font-size="17" font-weight="600" fill="#ecfccb" text-anchor="middle">
+      <rect x="40" y="290" width="336" height="48" rx="12" fill="#15803d"/>
+      <text x="208" y="320">Моя подписка</text>
+      <rect x="384" y="290" width="336" height="48" rx="12" fill="#16a34a"/>
+      <text x="552" y="320">Подключить</text>
+
+      <rect x="40" y="346" width="336" height="48" rx="12" fill="#14532d"/>
+      <text x="208" y="376">Купить или продлить</text>
+      <rect x="384" y="346" width="336" height="48" rx="12" fill="#14532d"/>
+      <text x="552" y="376">Баланс</text>
+
+      <rect x="40" y="402" width="336" height="48" rx="12" fill="#14532d"/>
+      <text x="208" y="432">Пригласить друга</text>
+      <rect x="384" y="402" width="336" height="48" rx="12" fill="#14532d"/>
+      <text x="552" y="432">Промокод</text>
+
+      <rect x="40" y="458" width="680" height="48" rx="12" fill="#14532d"/>
+      <text x="380" y="488">Поддержка</text>
+    </g>
+    <text x="380" y="538" text-anchor="middle" font-size="14" fill="#4ade80" fill-opacity="0.7">одно сообщение, которое правится при каждом переходе</text>
+  </g>
+</svg>
