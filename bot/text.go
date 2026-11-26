@@ -8,7 +8,7 @@ import (
 )
 
 // rawVars это подстановки, которые уже собраны из текстов по ключу и экранированы: их не трогаем.
-var rawVars = map[string]bool{"status": true, "history": true, "list": true}
+var rawVars = map[string]bool{"status": true, "history": true, "list": true, "user": true}
 
 // t отдаёт текст по ключу на языке абонента. Тексты размечены HTML, поэтому каждая подстановка
 // экранируется: название тарифа или модель устройства с `<` не сломает сообщение.
@@ -65,4 +65,11 @@ func (b *Bot) count(r *req, n int) string {
 		return b.t(r, "sub.unlimited", nil)
 	}
 	return strconv.Itoa(n)
+}
+
+func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+func parseInt(s string) (int64, bool) {
+	n, err := strconv.ParseInt(s, 10, 64)
+	return n, err == nil
 }
