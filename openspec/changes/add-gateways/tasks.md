@@ -33,7 +33,7 @@
 - [x] 5.2 Jupiter; проверка: `go test ./pay/jupiter`
 - [x] 5.3 TabPay; проверка: `go test ./pay/tabpay`
 - [x] 5.4 ParityPay; проверка: `go test ./pay/paritypay`
-- [ ] 5.5 Donut; проверка: `go test ./pay/donut`
+- [x] 5.5 Donut; проверка: `go test ./pay/donut`
 
 ## 6. Волна 6: по документации
 - [ ] 6.1 T-Bank; проверка: `go test ./pay/tbank`
