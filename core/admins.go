@@ -18,10 +18,11 @@ const (
 	PermBroadcast Perm = "broadcast" // рассылки
 	PermStats     Perm = "stats"     // статистика
 	PermSupport   Perm = "support"   // отвечать в поддержке
+	PermBan       Perm = "ban"       // банить и разбанивать абонентов
 )
 
 // HelperPerms это все права, которые владелец может дать помощнику.
-var HelperPerms = []Perm{PermUsers, PermGrant, PermPromo, PermTariffs, PermBroadcast, PermStats, PermSupport}
+var HelperPerms = []Perm{PermUsers, PermGrant, PermBan, PermPromo, PermTariffs, PermBroadcast, PermStats, PermSupport}
 
 // Admin это владелец или помощник. Владелец определяется только по OWNER_TG_ID из окружения.
 type Admin struct {

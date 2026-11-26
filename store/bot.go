@@ -25,3 +25,7 @@ func (t *coreTx) SetUnreachable(userID int64, at time.Time) error {
 func (t *coreTx) SetScreenMsg(userID, msgID int64) error {
 	return t.execOne("UPDATE users SET screen_msg_id = ? WHERE id = ?", msgID, userID)
 }
+
+func (t *coreTx) SetBanned(userID int64, at time.Time) error {
+	return t.execOne("UPDATE users SET banned_at = ? WHERE id = ?", nullTime(at), userID)
+}

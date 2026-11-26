@@ -225,3 +225,13 @@ func (t *tx) SetScreenMsg(userID, msgID int64) error {
 	t.st.users[userID] = u
 	return nil
 }
+
+func (t *tx) SetBanned(userID int64, at time.Time) error {
+	u, ok := t.st.users[userID]
+	if !ok {
+		return core.ErrNotFound
+	}
+	u.BannedAt = at
+	t.st.users[userID] = u
+	return nil
+}

@@ -60,6 +60,8 @@ type Tx interface {
 	SetTrialUsed(userID int64) error
 	// SetUnreachable отмечает, что абонент заблокировал бота. Нулевое время снимает отметку.
 	SetUnreachable(userID int64, at time.Time) error
+	// SetBanned ставит бан. Нулевое время снимает его.
+	SetBanned(userID int64, at time.Time) error
 	// SetScreenMsg запоминает сообщение-экран абонента.
 	SetScreenMsg(userID, msgID int64) error
 
