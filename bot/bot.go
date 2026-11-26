@@ -52,6 +52,7 @@ type Bot struct {
 	mu      sync.Mutex
 	noticed map[int64]time.Time  // кому и когда показан текст о бане
 	pressed map[string]time.Time // нажатые кнопки оплаты, чтобы второй клик не платил
+	joined  map[int64]time.Time  // группы, куда добавили бота, и когда: не привязали за 10 минут, выходим
 }
 
 // action это обработчик нажатия кнопки абонента.
@@ -81,7 +82,7 @@ func New(o Options) *Bot {
 	b := &Bot{core: o.Core, tx: o.Texts, api: o.API, cfg: o.Config, log: o.Log, now: o.Now,
 		workers: o.Workers, name: o.Name, url: o.URL, owner: o.Owner, dlKey: o.DLKey,
 		flood: newFlood(5, 5), waits: newWaits(), acts: map[string]action{}, inputs: map[waitKind]inputFn{},
-		dedup: tg.NewDedup(tg.DedupSize), noticed: map[int64]time.Time{}, pressed: map[string]time.Time{}}
+		dedup: tg.NewDedup(tg.DedupSize), noticed: map[int64]time.Time{}, pressed: map[string]time.Time{}, joined: map[int64]time.Time{}}
 	b.register()
 	return b
 }
@@ -107,10 +108,14 @@ func (b *Bot) Run(ctx context.Context, in <-chan tg.Update) {
 		}
 		wg.Wait()
 	}()
+	sweep := time.NewTicker(time.Minute)
+	defer sweep.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-sweep.C:
+			b.sweepGroups(ctx)
 		case u := <-in:
 			if b.dedup.Seen(u.UpdateID) {
 				continue

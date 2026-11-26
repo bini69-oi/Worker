@@ -69,6 +69,11 @@ func (f *fakeAPI) EditMessageText(_ context.Context, p tg.EditParams) error {
 	return f.editErr
 }
 
+func (f *fakeAPI) EditMessageReplyMarkup(_ context.Context, chat int64, msg int, m *tg.InlineKeyboardMarkup) error {
+	f.add(call{method: "edit_markup", chat: chat, msg: msg, markup: m})
+	return nil
+}
+
 func (f *fakeAPI) AnswerCallbackQuery(_ context.Context, id, text string, alert bool) error {
 	f.add(call{method: "answer", text: text, alert: alert})
 	return nil
@@ -195,17 +200,18 @@ func golden(t *testing.T, name string, calls []call) {
 
 // env это бот на настоящем ядре и SQLite во временном файле, с фейковыми Telegram и панелью.
 type env struct {
-	b     *Bot
-	api   *fakeAPI
-	c     *core.Core
-	cfg   *settings.Settings
-	tx    *texts.Texts
-	clock *coretest.Clock
-	panel *coretest.Panel
-	db    *store.DB
-	fake  *gatewaytest.Fake
-	upd   int64
-	step  time.Duration // часы сдвигаются перед каждым действием, чтобы тесты не упирались во флуд
+	b      *Bot
+	api    *fakeAPI
+	c      *core.Core
+	cfg    *settings.Settings
+	tx     *texts.Texts
+	clock  *coretest.Clock
+	panel  *coretest.Panel
+	db     *store.DB
+	fake   *gatewaytest.Fake
+	notify *lazyNotifier
+	upd    int64
+	step   time.Duration // часы сдвигаются перед каждым действием, чтобы тесты не упирались во флуд
 }
 
 func newEnv(t *testing.T) *env {
@@ -224,11 +230,13 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	e.fake = &gatewaytest.Fake{Secret: "s"}
+	e.notify = &lazyNotifier{}
 	e.c = core.New(core.Deps{Store: store.NewCoreStore(db), Clock: e.clock, Config: e.cfg, Panel: e.panel,
-		Notifier: &coretest.Notifier{}, OwnerID: owner, Channels: Channels{API: e.api},
+		Notifier: e.notify, OwnerID: owner, Channels: Channels{API: e.api},
 		Gateways: []core.Gateway{stars.New(e.cfg), e.fake}})
 	e.b = New(Options{Core: e.c, Texts: e.tx, API: e.api, Config: e.cfg, Now: e.clock.Now,
 		Name: "workerbot", URL: "https://vpn.example", Owner: owner, DLKey: []byte(strings.Repeat("d", 32))})
+	e.notify.b = e.b
 	return e
 }
 
@@ -331,4 +339,47 @@ func (e *env) balance(t *testing.T) int64 {
 		t.Fatal(err)
 	}
 	return u.Balance
+}
+
+// lazyNotifier отдаёт уведомления ядра боту, который собирается после ядра.
+type lazyNotifier struct{ b *Bot }
+
+func (l *lazyNotifier) User(ctx context.Context, n core.NotifyTask) error { return l.b.User(ctx, n) }
+func (l *lazyNotifier) Admin(ctx context.Context, n core.AdminTask) error { return l.b.Admin(ctx, n) }
+func (l *lazyNotifier) Confirm(ctx context.Context, n core.ConfirmTask) error {
+	return l.b.Confirm(ctx, n)
+}
+
+// group шлёт сообщение в группу от человека from.
+func (e *env) group(t *testing.T, chat, from int64, forum bool, text string, reply *tg.Message) {
+	t.Helper()
+	m := &tg.Message{MessageID: int(e.next()), From: &tg.User{ID: from, FirstName: "Админ"}, Chat: tg.Chat{ID: chat, Type: "supergroup", IsForum: forum},
+		Text: text, ReplyToMessage: reply}
+	if err := e.b.handle(context.Background(), tg.Update{UpdateID: e.upd, Message: m}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// pressIn нажимает кнопку в чате chat (группа или личка админа).
+func (e *env) pressIn(t *testing.T, chat, from int64, msg int, data string) {
+	t.Helper()
+	typ := "supergroup"
+	if chat > 0 {
+		typ = "private"
+	}
+	q := &tg.CallbackQuery{ID: fmt.Sprint(e.next()), From: tg.User{ID: from}, Message: &tg.Message{MessageID: msg, Chat: tg.Chat{ID: chat, Type: typ}}, Data: data}
+	if err := e.b.handle(context.Background(), tg.Update{UpdateID: e.upd, CallbackQuery: q}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// bind привязывает группу chat с темами.
+func (e *env) bind(t *testing.T, chat int64) {
+	t.Helper()
+	code, err := e.c.NewChatCode(context.Background(), owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.group(t, chat, owner, true, "/bind "+code, nil)
+	e.api.take()
 }
