@@ -4,7 +4,7 @@
 - [x] 1.1 Heleket; проверка: `go test ./pay/heleket`
 - [x] 1.2 YooMoney; проверка: `go test ./pay/yoomoney`
 - [x] 1.3 FreeKassa; проверка: `go test ./pay/freekassa`
-- [ ] 1.4 WATA; проверка: `go test ./pay/wata`
+- [x] 1.4 WATA; проверка: `go test ./pay/wata`
 - [ ] 1.5 Cryptomus; проверка: `go test ./pay/cryptomus`
 
 ## 2. Волна 2

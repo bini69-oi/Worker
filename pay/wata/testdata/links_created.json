@@ -1,0 +1,1 @@
+{"id":"link-{{ORDER}}","amount":300.00,"currency":"RUB","status":"Opened","url":"https://acquiring.wata.pro/link/{{ORDER}}","orderId":"{{ORDER}}"}

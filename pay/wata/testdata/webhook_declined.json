@@ -1,0 +1,1 @@
+{"transactionId":"3a1f2b4c-0000-4d6e-9a11-cccccccccccc","transactionType":"CardCrypto","transactionStatus":"Declined","errorCode":"1001","errorDescription":"Insufficient funds","amount":300.00,"currency":"RUB","orderId":"{{ORDER}}","paymentTime":"2026-11-20T10:16:30.123Z"}
