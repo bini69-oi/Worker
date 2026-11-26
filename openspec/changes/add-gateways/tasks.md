@@ -1,0 +1,46 @@
+# Tasks
+
+## 1. Волна 1: самые частые
+- [ ] 1.1 Heleket; проверка: `go test ./pay/heleket`
+- [ ] 1.2 YooMoney; проверка: `go test ./pay/yoomoney`
+- [ ] 1.3 FreeKassa; проверка: `go test ./pay/freekassa`
+- [ ] 1.4 WATA; проверка: `go test ./pay/wata`
+- [ ] 1.5 Cryptomus; проверка: `go test ./pay/cryptomus`
+
+## 2. Волна 2
+- [ ] 2.1 Tribute; проверка: `go test ./pay/tribute`
+- [ ] 2.2 Robokassa; проверка: `go test ./pay/robokassa`
+- [ ] 2.3 Lava; проверка: `go test ./pay/lava`
+- [ ] 2.4 CloudPayments; проверка: `go test ./pay/cloudpayments`
+- [ ] 2.5 PayPalych; проверка: `go test ./pay/paypalych`
+
+## 3. Волна 3
+- [ ] 3.1 MulenPay; проверка: `go test ./pay/mulenpay`
+- [ ] 3.2 Antilopay; проверка: `go test ./pay/antilopay`
+- [ ] 3.3 SeverPay; проверка: `go test ./pay/severpay`
+- [ ] 3.4 RollyPay; проверка: `go test ./pay/rollypay`
+- [ ] 3.5 AuraPay; проверка: `go test ./pay/aurapay`
+
+## 4. Волна 4
+- [ ] 4.1 CisPay; проверка: `go test ./pay/cispay`
+- [ ] 4.2 Kassa AI; проверка: `go test ./pay/kassaai`
+- [ ] 4.3 RioPay; проверка: `go test ./pay/riopay`
+- [ ] 4.4 PayPear; проверка: `go test ./pay/paypear`
+- [ ] 4.5 Overpay; проверка: `go test ./pay/overpay`
+
+## 5. Волна 5
+- [ ] 5.1 Etoplatezhi; проверка: `go test ./pay/etoplatezhi`
+- [ ] 5.2 Jupiter; проверка: `go test ./pay/jupiter`
+- [ ] 5.3 TabPay; проверка: `go test ./pay/tabpay`
+- [ ] 5.4 ParityPay; проверка: `go test ./pay/paritypay`
+- [ ] 5.5 Donut; проверка: `go test ./pay/donut`
+
+## 6. Волна 6: по документации
+- [ ] 6.1 T-Bank; проверка: `go test ./pay/tbank`
+- [ ] 6.2 Stripe; проверка: `go test ./pay/stripe`
+
+## 7. Подключение и ревью
+- [ ] 7.1 Все кассы в `cmd/worker`; проверка: тест запуска видит их адреса вебхуков
+- [ ] 7.2 `docs/gateways.md`: касса, ключи, адрес вебхука, проверена ли вживую; проверка: ссылка из README
+- [ ] 7.3 Ревью безопасности всех касс одним проверяющим; проверка: находки закрыты
+- [ ] 7.4 Живая проверка на тестовом сервере с ключами владельца; проверка: отметки в `docs/gateways.md`
