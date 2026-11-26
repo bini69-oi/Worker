@@ -1,7 +1,7 @@
 # Tasks
 
 ## 1. Волна 1: самые частые
-- [ ] 1.1 Heleket; проверка: `go test ./pay/heleket`
+- [x] 1.1 Heleket; проверка: `go test ./pay/heleket`
 - [ ] 1.2 YooMoney; проверка: `go test ./pay/yoomoney`
 - [ ] 1.3 FreeKassa; проверка: `go test ./pay/freekassa`
 - [ ] 1.4 WATA; проверка: `go test ./pay/wata`
