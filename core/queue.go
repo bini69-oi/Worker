@@ -60,7 +60,16 @@ func enqueueAdmin(tx Tx, n AdminTask, now time.Time) error {
 	return err
 }
 
+// enqueueNotify ставит уведомление абоненту. Абоненту, который заблокировал бота, не ставит:
+// Telegram всё равно откажет, а очередь будет повторять задачу впустую.
 func enqueueNotify(tx Tx, n NotifyTask, now time.Time) error {
+	u, err := tx.User(n.UserID)
+	if err != nil {
+		return err
+	}
+	if !u.UnreachableAt.IsZero() {
+		return nil
+	}
 	body, err := json.Marshal(n)
 	if err != nil {
 		return err

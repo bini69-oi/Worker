@@ -205,3 +205,23 @@ func (t *tx) AddLedger(e core.LedgerEntry) (int64, error) {
 	t.st.ledger = append(t.st.ledger, e)
 	return e.ID, nil
 }
+
+func (t *tx) SetUnreachable(userID int64, at time.Time) error {
+	u, ok := t.st.users[userID]
+	if !ok {
+		return core.ErrNotFound
+	}
+	u.UnreachableAt = at
+	t.st.users[userID] = u
+	return nil
+}
+
+func (t *tx) SetScreenMsg(userID, msgID int64) error {
+	u, ok := t.st.users[userID]
+	if !ok {
+		return core.ErrNotFound
+	}
+	u.ScreenMsgID = msgID
+	t.st.users[userID] = u
+	return nil
+}

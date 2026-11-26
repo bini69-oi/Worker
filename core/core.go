@@ -58,6 +58,10 @@ type Tx interface {
 	// уход в минус даёт ErrNotEnoughMoney.
 	AddLedger(e LedgerEntry) (int64, error)
 	SetTrialUsed(userID int64) error
+	// SetUnreachable отмечает, что абонент заблокировал бота. Нулевое время снимает отметку.
+	SetUnreachable(userID int64, at time.Time) error
+	// SetScreenMsg запоминает сообщение-экран абонента.
+	SetScreenMsg(userID, msgID int64) error
 
 	Tariff(id int64) (Tariff, error)
 	// SaveTariff создаёт тариф (ID == 0) или заменяет его вместе с периодами.

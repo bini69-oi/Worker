@@ -14,6 +14,9 @@ type User struct {
 	TrialUsed  bool
 	BannedAt   time.Time // нулевое время, если бана нет
 	CreatedAt  time.Time
+	// UnreachableAt это когда абонент заблокировал бота. Нулевое время: бот может ему писать.
+	UnreachableAt time.Time
+	ScreenMsgID   int64 // сообщение-экран, которое бот правит; 0, если его ещё нет
 }
 
 // Tariff это тариф: лимиты и группы серверов в панели.

@@ -78,7 +78,7 @@ type coreTx struct {
 	q   querier
 }
 
-const userCols = `id, tg_id, username, lang, referrer_id, ref_code, balance, trial_used, banned_at, created_at`
+const userCols = `id, tg_id, username, lang, referrer_id, ref_code, balance, trial_used, banned_at, created_at, unreachable_at, screen_msg_id`
 
 func (t *coreTx) User(id int64) (core.User, error) {
 	return scanUser(t.q.QueryRowContext(t.ctx, "SELECT "+userCols+" FROM users WHERE id = ?", id))
@@ -94,9 +94,10 @@ func (t *coreTx) UserByRef(code string) (core.User, error) {
 
 func scanUser(row *sql.Row) (core.User, error) {
 	var u core.User
-	var referrer, banned sql.NullInt64
+	var referrer, banned, unreachable sql.NullInt64
 	var created int64
-	err := row.Scan(&u.ID, &u.TgID, &u.Username, &u.Lang, &referrer, &u.RefCode, &u.Balance, &u.TrialUsed, &banned, &created)
+	err := row.Scan(&u.ID, &u.TgID, &u.Username, &u.Lang, &referrer, &u.RefCode, &u.Balance, &u.TrialUsed, &banned, &created,
+		&unreachable, &u.ScreenMsgID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return u, core.ErrNotFound
 	}
@@ -106,6 +107,9 @@ func scanUser(row *sql.Row) (core.User, error) {
 	u.ReferrerID = referrer.Int64
 	if banned.Valid {
 		u.BannedAt = time.Unix(banned.Int64, 0).UTC()
+	}
+	if unreachable.Valid {
+		u.UnreachableAt = time.Unix(unreachable.Int64, 0).UTC()
 	}
 	u.CreatedAt = time.Unix(created, 0).UTC()
 	return u, nil
