@@ -13,6 +13,8 @@ import (
 
 	"github.com/bini69-oi/worker/core"
 	"github.com/bini69-oi/worker/core/coretest"
+	"github.com/bini69-oi/worker/pay/gatewaytest"
+	"github.com/bini69-oi/worker/pay/stars"
 	"github.com/bini69-oi/worker/settings"
 	"github.com/bini69-oi/worker/store"
 	"github.com/bini69-oi/worker/texts"
@@ -201,6 +203,7 @@ type env struct {
 	clock *coretest.Clock
 	panel *coretest.Panel
 	db    *store.DB
+	fake  *gatewaytest.Fake
 	upd   int64
 	step  time.Duration // часы сдвигаются перед каждым действием, чтобы тесты не упирались во флуд
 }
@@ -220,8 +223,10 @@ func newEnv(t *testing.T) *env {
 	if e.tx, err = texts.New(store.NewTextsStore(db), func() string { return "ru" }, e.clock.Now); err != nil {
 		t.Fatal(err)
 	}
+	e.fake = &gatewaytest.Fake{Secret: "s"}
 	e.c = core.New(core.Deps{Store: store.NewCoreStore(db), Clock: e.clock, Config: e.cfg, Panel: e.panel,
-		Notifier: &coretest.Notifier{}, OwnerID: owner, Channels: Channels{API: e.api}})
+		Notifier: &coretest.Notifier{}, OwnerID: owner, Channels: Channels{API: e.api},
+		Gateways: []core.Gateway{stars.New(e.cfg), e.fake}})
 	e.b = New(Options{Core: e.c, Texts: e.tx, API: e.api, Config: e.cfg, Now: e.clock.Now,
 		Name: "workerbot", URL: "https://vpn.example", Owner: owner, DLKey: []byte(strings.Repeat("d", 32))})
 	return e
@@ -297,4 +302,33 @@ func (e *env) sync(t *testing.T) {
 	if _, err := e.c.ProcessDue(context.Background()); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// paid шлёт боту сообщение об оплате Stars от абонента.
+func (e *env) paid(t *testing.T, from int64, sp *tg.SuccessfulPayment, rp *tg.RefundedPayment) {
+	t.Helper()
+	m := &tg.Message{MessageID: int(e.next()), From: &tg.User{ID: from}, Chat: tg.Chat{ID: from, Type: "private"},
+		SuccessfulPayment: sp, RefundedPayment: rp}
+	if err := e.b.handle(context.Background(), tg.Update{UpdateID: e.upd, Message: m}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (e *env) precheckout(t *testing.T, from int64, currency, payload string, amount int64) string {
+	t.Helper()
+	q := &tg.PreCheckoutQuery{ID: "pc", From: tg.User{ID: from}, Currency: currency, TotalAmount: amount, InvoicePayload: payload}
+	if err := e.b.handle(context.Background(), tg.Update{UpdateID: e.next(), PreCheckoutQuery: q}); err != nil {
+		t.Fatal(err)
+	}
+	calls := e.api.take()
+	return calls[len(calls)-1].text
+}
+
+func (e *env) balance(t *testing.T) int64 {
+	t.Helper()
+	u, err := e.c.UserByTg(context.Background(), userTg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u.Balance
 }

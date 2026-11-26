@@ -131,3 +131,10 @@ type noNotifier struct{}
 func (noNotifier) User(context.Context, NotifyTask) error     { return errNoNotifier }
 func (noNotifier) Admin(context.Context, AdminTask) error     { return errNoNotifier }
 func (noNotifier) Confirm(context.Context, ConfirmTask) error { return errNoNotifier }
+
+// ReportError кладёт событие в тему «Ошибки». Бот так сообщает о том, чего быть не должно.
+func (c *Core) ReportError(ctx context.Context, key string, vars map[string]string) error {
+	return c.tx(ctx, func(tx Tx) error {
+		return enqueueAdmin(tx, AdminTask{Topic: TopicErrors, Key: key, Vars: vars}, c.clock.Now())
+	})
+}
