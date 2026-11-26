@@ -311,6 +311,21 @@ func TestAmountMismatchAlertsOnce(t *testing.T) {
 	if n != 1 {
 		t.Fatalf("тревог о сумме %d, ждали 1", n)
 	}
+	if got := countNotify(t, e.env, "notify.pay_review"); got != 1 {
+		t.Fatalf("абоненту «платёж на проверке» %d раз, ждали 1", got)
+	}
+}
+
+// countNotify считает уведомления абоненту с ключом key в очереди.
+func countNotify(t *testing.T, e *env, key string) int {
+	t.Helper()
+	n := 0
+	for _, task := range notifyTasks(t, e) {
+		if task.Key == key {
+			n++
+		}
+	}
+	return n
 }
 
 func TestRefundReversesCredit(t *testing.T) {
@@ -332,6 +347,9 @@ func TestRefundReversesCredit(t *testing.T) {
 	}
 	if b := e.balance(t); b != 0 {
 		t.Fatalf("после возврата баланс %d, ждали 0", b)
+	}
+	if got := countNotify(t, e.env, "notify.refunded"); got != 1 {
+		t.Fatalf("абоненту «платёж возвращён» %d раз, ждали 1", got)
 	}
 	if err := e.c.Credit(ctx, "fake", paid); err != nil {
 		t.Fatal(err)

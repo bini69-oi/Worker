@@ -206,9 +206,15 @@ func (c *Core) amountAlert(ctx context.Context, p Payment, got int64) {
 		if err != nil || !first {
 			return err
 		}
-		return enqueueAdmin(tx, AdminTask{Topic: TopicPayments, Key: "admin.amount_mismatch", Vars: map[string]string{
+		err = enqueueAdmin(tx, AdminTask{Topic: TopicPayments, Key: "admin.amount_mismatch", Vars: map[string]string{
 			"payment": itoa(p.ID), "user_id": itoa(p.UserID), "gateway": p.Gateway,
 			"want": itoa(p.ExtAmount), "got": itoa(got)}}, now)
+		if err != nil {
+			return err
+		}
+		// Абонент тоже узнаёт, что платёж не потерялся, а ждёт проверки админом.
+		return enqueueNotify(tx, NotifyTask{UserID: p.UserID, Key: "notify.pay_review",
+			Vars: map[string]string{"payment_id": itoa(p.ID), "gateway": p.Gateway}}, now)
 	})
 }
 
