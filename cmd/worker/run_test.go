@@ -101,7 +101,8 @@ func TestServeAndStop(t *testing.T) {
 	check("POST", "/pay/unknown", 404)
 	check("POST", "/pay/stars", 401)
 	for _, name := range []string{"heleket", "cryptomus", "yoomoney", "freekassa", "wata", "robokassa", "lava", "cloudpayments", "paypalych", "tribute",
-		"mulenpay", "antilopay", "severpay", "rollypay", "aurapay", "cispay", "kassaai", "riopay", "paypear", "overpay"} {
+		"mulenpay", "antilopay", "severpay", "rollypay", "aurapay", "cispay", "kassaai", "riopay", "paypear", "overpay",
+		"etoplatezhi", "jupiter", "tabpay", "paritypay", "donut"} {
 		check("POST", "/pay/"+name, 401) // касса подключена: поддельный вебхук отклонён, а не 404
 	}
 	check("POST", "/panel/webhook", 401)

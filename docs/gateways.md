@@ -33,3 +33,8 @@
 | RioPay | карты, СБП | `riopay.api_token`, `riopay.webhook_secret` | подпись HMAC-SHA512, оплата подтверждается API | нет |
 | PayPear | СБП, карты, SberPay, T-Pay | `paypear.shop_id`, `paypear.secret_key` | подписи нет, статус и сумма только из API | нет |
 | Overpay | карты, СБП | `overpay.username`, `overpay.password`, `overpay.project_id`, сертификат по желанию | подписи нет, статус и сумма только из API, при недоступном API отказ | нет |
+| Это платежи | карты, СБП | `etoplatezhi.project_id`, `etoplatezhi.secret_key` | подпись HMAC-SHA512 в теле | нет |
+| Jupiter | СБП, перевод в банк | `jupiter.token`, `jupiter.secret` | подпись HMAC-SHA256 по полям, ответ `{"status":"ok"}` | нет |
+| TabPay | карты, СБП | `tabpay.api_key`, `tabpay.webhook_secret` | подпись HMAC-SHA256 с меткой времени, оплата подтверждается API | нет |
+| ParityPay | СБП, карты | `paritypay.shop_id`, `paritypay.secret_key`, `paritypay.callback_secret` | подпись HMAC-SHA256 по полям, оплата подтверждается API | нет |
+| Donut | карты, СБП | `donut.token`, `donut.secret`, `donut.phone` | подпись HMAC-SHA256 по полям; касса требует телефон, берётся один из настроек | нет |
