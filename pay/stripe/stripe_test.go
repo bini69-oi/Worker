@@ -292,3 +292,11 @@ func FuzzVerify(f *testing.F) {
 		}
 	})
 }
+
+func TestCurrencyNeedsCents(t *testing.T) {
+	for code, ok := range map[string]bool{"usd": true, "EUR": true, "jpy": false, "krw": false, "kwd": false, "us": false} {
+		if _, got := currencyCode(code); got != ok {
+			t.Fatalf("%s: %v, ждали %v", code, got, ok)
+		}
+	}
+}

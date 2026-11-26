@@ -29,5 +29,18 @@ func currencyCode(s string) (string, bool) {
 			return "", false
 		}
 	}
+	if !twoDecimals(s) {
+		return "", false
+	}
 	return s, true
 }
+
+// notTwoDecimals это валюты Stripe без центов или с тремя знаками после запятой. Пересчёт в «центы»
+// для них ошибся бы в 10-100 раз, поэтому такие валюты касса не принимает.
+var notTwoDecimals = map[string]bool{
+	"bif": true, "clp": true, "djf": true, "gnf": true, "jpy": true, "kmf": true, "krw": true, "mga": true,
+	"pyg": true, "rwf": true, "ugx": true, "vnd": true, "vuv": true, "xaf": true, "xof": true, "xpf": true,
+	"bhd": true, "jod": true, "kwd": true, "omr": true, "tnd": true,
+}
+
+func twoDecimals(code string) bool { return !notTwoDecimals[code] }
