@@ -12,7 +12,7 @@
 - [x] 2.2 Robokassa; проверка: `go test ./pay/robokassa`
 - [x] 2.3 Lava; проверка: `go test ./pay/lava`
 - [x] 2.4 CloudPayments; проверка: `go test ./pay/cloudpayments`
-- [ ] 2.5 PayPalych; проверка: `go test ./pay/paypalych`
+- [x] 2.5 PayPalych; проверка: `go test ./pay/paypalych`
 
 ## 3. Волна 3
 - [ ] 3.1 MulenPay; проверка: `go test ./pay/mulenpay`
