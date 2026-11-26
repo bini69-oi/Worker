@@ -19,16 +19,21 @@ import (
 	"github.com/bini69-oi/worker/pay"
 	"github.com/bini69-oi/worker/pay/antilopay"
 	"github.com/bini69-oi/worker/pay/aurapay"
+	"github.com/bini69-oi/worker/pay/cispay"
 	"github.com/bini69-oi/worker/pay/cloudpayments"
 	"github.com/bini69-oi/worker/pay/cryptobot"
 	"github.com/bini69-oi/worker/pay/cryptomus"
 	"github.com/bini69-oi/worker/pay/freekassa"
 	"github.com/bini69-oi/worker/pay/heleket"
+	"github.com/bini69-oi/worker/pay/kassaai"
 	"github.com/bini69-oi/worker/pay/lava"
 	"github.com/bini69-oi/worker/pay/manual"
 	"github.com/bini69-oi/worker/pay/mulenpay"
+	"github.com/bini69-oi/worker/pay/overpay"
 	"github.com/bini69-oi/worker/pay/paypalych"
+	"github.com/bini69-oi/worker/pay/paypear"
 	"github.com/bini69-oi/worker/pay/platega"
+	"github.com/bini69-oi/worker/pay/riopay"
 	"github.com/bini69-oi/worker/pay/robokassa"
 	"github.com/bini69-oi/worker/pay/rollypay"
 	"github.com/bini69-oi/worker/pay/severpay"
@@ -92,6 +97,16 @@ func gateways(cfg *settings.Settings, t *telegram, publicURL string) []pay.Gatew
 	rp.Return = t.paidURL
 	ar := aurapay.New(cfg, "", nil)
 	ar.Return, ar.Hook = t.paidURL, publicURL+"/pay/aurapay"
+	cs := cispay.New(cfg, "", nil)
+	cs.Return = t.paidURL
+	ka := kassaai.New(cfg, "", nil)
+	ka.Return, ka.Hook = t.paidURL, publicURL+"/pay/kassaai"
+	ri := riopay.New(cfg, "", nil)
+	ri.Return = t.paidURL
+	pr := paypear.New(cfg, "", nil)
+	pr.Return, pr.Hook = t.paidURL, publicURL+"/pay/paypear"
+	ov := overpay.New(cfg, "", nil)
+	ov.Return = t.paidURL
 	return []pay.Gateway{
 		manual.New(cfg),
 		st,
@@ -113,6 +128,11 @@ func gateways(cfg *settings.Settings, t *telegram, publicURL string) []pay.Gatew
 		sv,
 		rp,
 		ar,
+		cs,
+		ka,
+		ri,
+		pr,
+		ov,
 	}
 }
 

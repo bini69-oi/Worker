@@ -28,3 +28,8 @@
 | SeverPay | карты, СБП | `severpay.mid`, `severpay.token` | подпись HMAC-SHA256, ответ `{"status":true}` | нет |
 | RollyPay | СБП, карты | `rollypay.api_key`, `rollypay.signing_secret` | подпись HMAC-SHA256, оплата подтверждается API | нет |
 | AuraPay | СБП, карты | `aurapay.api_key`, `aurapay.shop_id`, `aurapay.secret_key` | подпись HMAC-SHA256 по полям | нет |
+| CisPay | карты, СБП | `cispay.shop_id`, `cispay.api_key` | подпись HMAC-SHA256, оплата подтверждается API | нет |
+| Kassa AI | СБП, карты, SberPay | `kassaai.shop_id`, `kassaai.api_key`, `kassaai.secret2`, `kassaai.server_ip` | подпись md5, ответ `YES` | нет |
+| RioPay | карты, СБП | `riopay.api_token`, `riopay.webhook_secret` | подпись HMAC-SHA512, оплата подтверждается API | нет |
+| PayPear | СБП, карты, SberPay, T-Pay | `paypear.shop_id`, `paypear.secret_key` | подписи нет, статус и сумма только из API | нет |
+| Overpay | карты, СБП | `overpay.username`, `overpay.password`, `overpay.project_id`, сертификат по желанию | подписи нет, статус и сумма только из API, при недоступном API отказ | нет |
