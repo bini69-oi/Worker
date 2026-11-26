@@ -33,7 +33,12 @@ func (b *Bot) register() {
 	b.acts["ln"] = b.onLang
 	b.acts["pchk"] = b.onCheckPay
 	b.acts["con"] = func(ctx context.Context, r *req, _ Data) error { return b.showConnect(ctx, r) }
+	b.acts["tp"] = b.onTopup
+	b.acts["tpown"] = b.onOwnAmount
+	b.acts["tpg"] = b.onGateway
+	b.acts["ss"] = b.onStarsSub
 	b.inputs[waitPromo] = b.onPromoInput
+	b.inputs[waitAmount] = b.onAmountInput
 }
 
 // showMenu показывает главное меню.
