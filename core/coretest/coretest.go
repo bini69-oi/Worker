@@ -69,6 +69,7 @@ type state struct {
 	confirms  map[int64]core.Confirm
 	sessions  map[string]sessionRow
 	chat      *core.AdminChat
+	support   map[int64]supportRow
 }
 
 func (s *state) clone() *state {
@@ -91,6 +92,7 @@ func (s *state) clone() *state {
 		confirms:  maps.Clone(s.confirms),
 		sessions:  maps.Clone(s.sessions),
 		chat:      cloneChat(s.chat),
+		support:   maps.Clone(s.support),
 		nextID:    s.nextID,
 	}
 }
@@ -244,4 +246,41 @@ func (t *tx) SetLang(userID int64, lang string) error {
 	u.Lang = lang
 	t.st.users[userID] = u
 	return nil
+}
+
+type supportRow struct {
+	user int64
+	at   time.Time
+}
+
+func (t *tx) AddSupportMsg(chatMsgID, userID int64, at time.Time) error {
+	if t.st.support == nil {
+		t.st.support = map[int64]supportRow{}
+	}
+	if _, ok := t.st.support[chatMsgID]; !ok {
+		t.st.support[chatMsgID] = supportRow{user: userID, at: at}
+	}
+	return nil
+}
+
+func (t *tx) SupportMsg(chatMsgID int64) (int64, time.Time, error) {
+	r, ok := t.st.support[chatMsgID]
+	if !ok {
+		return 0, time.Time{}, core.ErrNotFound
+	}
+	return r.user, r.at, nil
+}
+
+// DeleteSupportBefore удаляет связи поддержки старше before.
+func (s *Store) DeleteSupportBefore(_ context.Context, before time.Time) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for id, r := range s.st.support {
+		if r.at.Before(before) {
+			delete(s.st.support, id)
+			n++
+		}
+	}
+	return n, nil
 }

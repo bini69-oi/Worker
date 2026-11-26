@@ -43,6 +43,9 @@ type Store interface {
 	// Уведомления админу сюда не попадают, иначе тревога о тревоге шла бы по кругу.
 	StuckTasks(ctx context.Context, before time.Time) ([]Task, error)
 
+	// DeleteSupportBefore удаляет связи поддержки старше before.
+	DeleteSupportBefore(ctx context.Context, before time.Time) (int, error)
+
 	// PendingPayments отдаёт платежи «ожидает», созданные раньше before.
 	PendingPayments(ctx context.Context, before time.Time) ([]Payment, error)
 }
@@ -62,6 +65,10 @@ type Tx interface {
 	SetUnreachable(userID int64, at time.Time) error
 	// SetBanned ставит бан. Нулевое время снимает его.
 	SetBanned(userID int64, at time.Time) error
+	// AddSupportMsg запоминает, что сообщение в группе поддержки относится к абоненту.
+	AddSupportMsg(chatMsgID, userID int64, at time.Time) error
+	// SupportMsg отдаёт абонента и время связи по сообщению в группе. Нет связи: ErrNotFound.
+	SupportMsg(chatMsgID int64) (userID int64, at time.Time, err error)
 	// SetLang меняет язык абонента.
 	SetLang(userID int64, lang string) error
 	// SetScreenMsg запоминает сообщение-экран абонента.

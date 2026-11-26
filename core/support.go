@@ -45,3 +45,31 @@ func (c *Core) SupportCard(ctx context.Context, userID int64) (SupportCard, erro
 	}
 	return card, nil
 }
+
+// supportKeep это сколько живёт связь «сообщение в группе, абонент»: реплай на старое не уходит.
+const supportKeep = 30 * 24 * time.Hour
+
+// LinkSupport запоминает, что сообщение в группе поддержки от абонента userID.
+func (c *Core) LinkSupport(ctx context.Context, chatMsgID, userID int64) error {
+	return c.tx(ctx, func(tx Tx) error { return tx.AddSupportMsg(chatMsgID, userID, c.clock.Now()) })
+}
+
+// SupportUser отдаёт абонента, которому уходит реплай на сообщение в группе.
+// Связи нет или она старше 30 дней: ErrNotFound.
+func (c *Core) SupportUser(ctx context.Context, chatMsgID int64) (int64, error) {
+	var uid int64
+	err := c.store.Tx(ctx, func(tx Tx) error {
+		id, at, err := tx.SupportMsg(chatMsgID)
+		if err == nil && c.clock.Now().Sub(at) > supportKeep {
+			err = ErrNotFound
+		}
+		uid = id
+		return err
+	})
+	return uid, err
+}
+
+// CleanSupport удаляет связи поддержки старше 30 дней. Фоновая задача раз в сутки.
+func (c *Core) CleanSupport(ctx context.Context) (int, error) {
+	return c.store.DeleteSupportBefore(ctx, c.clock.Now().Add(-supportKeep))
+}
