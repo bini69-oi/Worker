@@ -83,3 +83,19 @@ func TestSupportMsgs(t *testing.T) {
 		t.Fatalf("очистка: %d %v", n, err)
 	}
 }
+
+// TestNoticeWithoutUser проверяет общие отметки (user_id 0): по ним тревоги админам уходят раз в окно.
+func TestNoticeWithoutUser(t *testing.T) {
+	s, _ := newCoreStore(t)
+	for i, want := range []bool{true, false} {
+		var got bool
+		err := s.Tx(context.Background(), func(tx core.Tx) error {
+			var err error
+			got, err = tx.AddNotice(0, "channel_check", "2026-01-01T12", tNow)
+			return err
+		})
+		if err != nil || got != want {
+			t.Fatalf("попытка %d: %v %v, ждали %v", i+1, got, err, want)
+		}
+	}
+}

@@ -149,7 +149,7 @@ CREATE TABLE texts (
 
 -- Отправленные напоминания, чтобы не слать дважды
 CREATE TABLE notices (
-    user_id INTEGER NOT NULL REFERENCES users (id),
+    user_id INTEGER NOT NULL, -- 0 значит общая отметка без абонента, например тревога раз в час
     kind    TEXT    NOT NULL,
     ref     TEXT    NOT NULL,
     sent_at INTEGER NOT NULL,
