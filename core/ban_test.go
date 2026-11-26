@@ -71,3 +71,24 @@ func countAudit(e *env, action string) int {
 	}
 	return n
 }
+
+func TestBanNotStaff(t *testing.T) {
+	ctx := context.Background()
+	e := newSecEnv(t)
+	e.addHelperTg(t, 501, core.PermBan)
+	e.addHelperTg(t, 502, core.PermUsers)
+	boss, _ := e.c.Register(ctx, owner, "boss", "ru")
+	colleague, _ := e.c.Register(ctx, 502, "colleague", "ru")
+	if err := e.c.Ban(ctx, 501, boss.ID, ""); !errors.Is(err, core.ErrForbidden) {
+		t.Fatalf("помощник забанил владельца: %v", err)
+	}
+	if err := e.c.Ban(ctx, owner, boss.ID, ""); !errors.Is(err, core.ErrForbidden) {
+		t.Fatalf("владелец забанил себя: %v", err)
+	}
+	if err := e.c.Ban(ctx, 501, colleague.ID, ""); !errors.Is(err, core.ErrForbidden) {
+		t.Fatalf("помощник забанил админа: %v", err)
+	}
+	if err := e.c.Ban(ctx, owner, colleague.ID, ""); err != nil {
+		t.Fatalf("владелец банит помощника как абонента: %v", err)
+	}
+}

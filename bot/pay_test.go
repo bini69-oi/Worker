@@ -190,3 +190,17 @@ func TestUrgentForeignPaymentReported(t *testing.T) {
 		t.Fatalf("чужой платёж не должен повторяться: %v %v", handled, err)
 	}
 }
+
+func TestGatewayRetryAfterFailure(t *testing.T) {
+	e := payEnv(t)
+	e.set(t, "fake.max", "10000")
+	e.press(t, userTg, 5, "tpg:fake:30000")
+	if got := render(e.api.take()); !strings.Contains(got, "Этой кассой можно оплатить") {
+		t.Fatalf("предел кассы: %s", got)
+	}
+	e.set(t, "fake.max", "0")
+	e.press(t, userTg, 5, "tpg:fake:30000")
+	if got := render(e.api.take()); strings.Contains(got, "Уже обрабатываем") || !strings.Contains(got, "Счёт на") {
+		t.Fatalf("после неудачи повторный клик отбит: %s", got)
+	}
+}

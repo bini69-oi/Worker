@@ -97,6 +97,9 @@ func adminAct(act string) bool { return act == "cf" || act == "lg" || act == "ad
 // onAdminCallback разбирает нажатия админов. Права проверяет ядро по тому, кто нажал.
 func (b *Bot) onAdminCallback(ctx context.Context, q *tg.CallbackQuery, d Data) error {
 	r := &req{lang: b.lang(""), cbID: q.ID}
+	if ok, _ := b.flood.allow(q.From.ID, b.now()); !ok {
+		return nil // лишние нажатия не тратят даже ответ Telegram
+	}
 	id, ok := d.Int(0)
 	if q.Message == nil || len(d.Args) < 2 || (!ok && d.Act != "adm") {
 		return b.answer(ctx, r, "")
@@ -161,6 +164,15 @@ func (b *Bot) onUserAction(ctx context.Context, r *req, q *tg.CallbackQuery, d D
 	if !ok || len(d.Args) < 3 {
 		return b.answer(ctx, r, "")
 	}
+	// Посторонний в группе не доходит до ядра: иначе каждое его нажатие писало бы в журнал и слало тревогу.
+	if !b.core.IsStaff(ctx, q.From.ID) {
+		return b.api.AnswerCallbackQuery(ctx, q.ID, b.t(r, "adm.no_rights", nil), true)
+	}
+	// «+7 дней» под одним событием срабатывает один раз, кто бы и сколько ни нажал.
+	key := pressKey(q.Message.Chat.ID, q.Message.MessageID, d)
+	if d.Args[0] == "days" && !b.onceKey(key) {
+		return b.answer(ctx, r, b.t(r, "bot.busy", nil))
+	}
 	topic := topicOf[d.Args[2]]
 	var err error
 	banned := false
@@ -174,6 +186,9 @@ func (b *Bot) onUserAction(ctx context.Context, r *req, q *tg.CallbackQuery, d D
 		_, err = b.core.GrantDays(ctx, q.From.ID, uid, 7)
 	default:
 		return b.answer(ctx, r, "")
+	}
+	if err != nil && d.Args[0] == "days" {
+		b.forget(key)
 	}
 	if errors.Is(err, core.ErrForbidden) {
 		return b.api.AnswerCallbackQuery(ctx, q.ID, b.t(r, "adm.no_rights", nil), true)

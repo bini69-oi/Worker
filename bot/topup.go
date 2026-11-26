@@ -82,6 +82,9 @@ func (b *Bot) onGateway(ctx context.Context, r *req, d Data) error {
 	}
 	gw := d.Args[0]
 	p, inv, err := b.core.CreatePayment(ctx, r.user.ID, gw, amount)
+	if err != nil {
+		b.forget(pressKey(r.from.ID, r.msgID, d))
+	}
 	var le *core.LimitError
 	if errors.As(err, &le) {
 		return b.say(ctx, r.chatID, b.t(r, "topup.limits", map[string]string{"min": b.limit(r, le.Min), "max": b.limit(r, le.Max)}))

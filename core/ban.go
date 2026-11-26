@@ -33,10 +33,14 @@ func (c *Core) setBan(ctx context.Context, actorTg, userID int64, on bool, comme
 	if len([]rune(comment)) > maxComment {
 		return ErrTooLong
 	}
-	err := c.asAdmin(ctx, actorTg, PermBan, action, func(tx Tx, _ Admin, now time.Time) (string, map[string]string, error) {
+	err := c.asAdmin(ctx, actorTg, PermBan, action, func(tx Tx, a Admin, now time.Time) (string, map[string]string, error) {
 		u, err := tx.User(userID)
 		if err != nil {
 			return "", nil, err
+		}
+		// Владельца не банит никто, админа банит только владелец: помощник не выключит VPN команде.
+		if _, staff := c.admin(tx, u.TgID); c.isOwner(u.TgID) || (staff == nil && !a.Owner) {
+			return "", nil, ErrForbidden
 		}
 		if !u.BannedAt.IsZero() == on {
 			return "", nil, errSame

@@ -91,7 +91,7 @@ func (b *Bot) enter(ctx context.Context, from tg.User, chatID int64, cbID, ref s
 		if warn {
 			return r, false, b.answer(ctx, r, b.t(r, "bot.too_fast", nil))
 		}
-		return r, false, b.answer(ctx, r, "")
+		return r, false, nil // лишние нажатия не тратят общий лимит отправки в Telegram
 	}
 	u, err := b.core.UserByTg(ctx, from.ID)
 	if errors.Is(err, core.ErrNotFound) {

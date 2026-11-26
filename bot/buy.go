@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/bini69-oi/worker/core"
@@ -14,8 +15,14 @@ const onceTTL = 2 * time.Minute
 
 // once пропускает кнопку один раз. Ядро и так не спишет за одну покупку дважды, но второй клик по старой
 // кнопке «Оплатить» продлил бы подписку ещё раз: это отдельная покупка с точки зрения ядра.
-func (b *Bot) once(r *req, d Data) bool {
-	key := strconv.FormatInt(r.from.ID, 10) + ":" + strconv.Itoa(r.msgID) + ":" + data(d.Act, toArgs(d.Args)...)
+// Ключ: кто нажал, в каком сообщении и что. Если действие не удалось, ключ снимает forget.
+func (b *Bot) once(r *req, d Data) bool { return b.onceKey(pressKey(r.from.ID, r.msgID, d)) }
+
+func pressKey(who int64, msg int, d Data) string {
+	return itoa(who) + ":" + strconv.Itoa(msg) + ":" + d.Act + ":" + strings.Join(d.Args, ":")
+}
+
+func (b *Bot) onceKey(key string) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	now := b.now()
@@ -31,12 +38,11 @@ func (b *Bot) once(r *req, d Data) bool {
 	return true
 }
 
-func toArgs(ss []string) []any {
-	out := make([]any, len(ss))
-	for i, s := range ss {
-		out[i] = s
-	}
-	return out
+// forget снимает отметку нажатия: действие не удалось, повторный клик должен сработать.
+func (b *Bot) forget(key string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	delete(b.pressed, key)
 }
 
 // showTariffs показывает тарифы, которые продаются.
@@ -131,6 +137,9 @@ func (b *Bot) onBuy(ctx context.Context, r *req, d Data) error {
 		return b.answer(ctx, r, b.t(r, "bot.busy", nil))
 	}
 	sub, err := b.core.Buy(ctx, r.user.ID, id, int(days))
+	if err != nil {
+		b.forget(pressKey(r.from.ID, r.msgID, d))
+	}
 	var need *core.NeedMoney
 	if errors.As(err, &need) {
 		return b.onPeriod(ctx, r, d) // баланс успел уменьшиться: покажем недостачу

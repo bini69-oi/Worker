@@ -226,3 +226,32 @@ func TestConfirmButtons(t *testing.T) {
 		t.Fatalf("неверный код: %s", got)
 	}
 }
+
+func TestDaysButtonOnce(t *testing.T) {
+	e := newEnv(t)
+	u := e.start(t)
+	tr := e.tariff(t, "Месяц", core.Period{Days: 30, Price: 100})
+	e.topup(t, u.ID, 1000)
+	if _, err := e.c.Buy(context.Background(), u.ID, tr.ID, 30); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := e.c.Sub(context.Background(), u.ID)
+	days := "adm:days:" + itoa(u.ID) + ":p"
+	e.pressIn(t, chat, owner, 9, days)
+	e.pressIn(t, chat, owner, 9, days)
+	after, _ := e.c.Sub(context.Background(), u.ID)
+	if got := after.ExpiresAt.Sub(before.ExpiresAt).Hours() / 24; got != 7 {
+		t.Fatalf("два нажатия «+7 дней» дали %v дней", got)
+	}
+}
+
+func TestStrangerButtonNoAlert(t *testing.T) {
+	e := newEnv(t)
+	u := e.start(t)
+	e.pressIn(t, chat, 555, 9, "adm:ban:"+itoa(u.ID)+":p")
+	e.api.take()
+	e.sync(t)
+	if got := render(e.api.take()); strings.Contains(got, "без прав") {
+		t.Fatalf("нажатие постороннего подняло тревогу: %s", got)
+	}
+}
