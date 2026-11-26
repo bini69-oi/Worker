@@ -1,0 +1,1 @@
+{"update_id":1006,"message":{"message_id":62,"from":{"id":4242,"is_bot":false,"first_name":"Ivan"},"chat":{"id":4242,"type":"private"},"date":1700000004,"refunded_payment":{"currency":"XTR","total_amount":150,"invoice_payload":"order:77","telegram_payment_charge_id":"chg_1"}}}

@@ -2,7 +2,7 @@
 
 ## 1. Клиент Telegram
 
-- [ ] 1.1 Типы Bot API, которые нужны боту (Update, Message, CallbackQuery, PreCheckoutQuery, SuccessfulPayment, RefundedPayment, ChatMember, клавиатуры); проверка: тест разбора записанных примеров обновлений
+- [x] 1.1 Типы Bot API, которые нужны боту (Update, Message, CallbackQuery, PreCheckoutQuery, SuccessfulPayment, RefundedPayment, ChatMember, клавиатуры); проверка: тест разбора записанных примеров обновлений
 - [ ] 1.2 Вызов метода с разбором ответа и ошибок Telegram; проверка: тесты на `httptest` «ок», «ошибка с описанием», «сеть упала»
 - [ ] 1.3 Ответ 429 и ожидание `retry_after`, ограничение частоты отправки; проверка: тест на фейковых часах
 - [ ] 1.4 Методы из `design.md` по списку; проверка: тест на каждый метод с записанным ответом

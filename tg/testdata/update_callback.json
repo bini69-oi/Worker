@@ -1,0 +1,1 @@
+{"update_id":1003,"callback_query":{"id":"cb1","from":{"id":4242,"is_bot":false,"first_name":"Ivan"},"message":{"message_id":60,"chat":{"id":4242,"type":"private"},"date":1700000002,"text":"Меню"},"chat_instance":"x","data":"buy:3:30"}}

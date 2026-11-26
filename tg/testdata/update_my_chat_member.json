@@ -1,0 +1,1 @@
+{"update_id":1007,"my_chat_member":{"chat":{"id":4242,"type":"private"},"from":{"id":4242,"is_bot":false,"first_name":"Ivan"},"date":1700000005,"old_chat_member":{"user":{"id":99,"is_bot":true,"first_name":"Bot"},"status":"member"},"new_chat_member":{"user":{"id":99,"is_bot":true,"first_name":"Bot"},"status":"kicked","until_date":0}}}
