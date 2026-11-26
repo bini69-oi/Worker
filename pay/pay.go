@@ -18,6 +18,12 @@ type Gateway interface {
 	Verify(r *http.Request) (core.GatewayEvent, error)
 }
 
+// Acker это касса, которая ждёт в ответе на успешный вебхук своё слово (FreeKassa «YES», Robokassa «OK<номер>»).
+// Без него касса считает уведомление недоставленным и повторяет его.
+type Acker interface {
+	Ack(ev core.GatewayEvent) string
+}
+
 // ErrNoWebhook отвечает касса, которая не принимает вебхуки (например Stars: оплата приходит через бота).
 var ErrNoWebhook = errors.New("касса не принимает вебхуки")
 
@@ -54,13 +60,22 @@ func Handler(c *core.Core, list []Gateway, log *slog.Logger) http.Handler {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+		accept := func() {
+			if a, is := g.(Acker); is {
+				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(a.Ack(ev)))
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		}
 		switch err := c.Credit(r.Context(), name, ev); {
 		case err == nil:
-			w.WriteHeader(http.StatusOK)
+			accept()
 		case errors.Is(err, core.ErrNotFound):
-			// Платёж не наш или уже удалён: отвечаем 200, чтобы касса не повторяла вечно.
+			// Платёж не наш или уже удалён: отвечаем «принято», чтобы касса не повторяла вечно.
 			log.Warn("вебхук о неизвестном платеже", "gateway", name, "external_id", ev.ExternalID)
-			w.WriteHeader(http.StatusOK)
+			accept()
 		case errors.Is(err, core.ErrAmountMismatch), errors.Is(err, core.ErrInvalid):
 			// Сумма не та или номер кассы чужой: повтор не поможет, админ уже получил сообщение о сумме.
 			log.Warn("оплата отклонена", "gateway", name, "err", err)
