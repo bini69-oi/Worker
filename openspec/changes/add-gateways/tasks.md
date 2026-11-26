@@ -22,7 +22,7 @@
 - [x] 3.5 AuraPay; проверка: `go test ./pay/aurapay`
 
 ## 4. Волна 4
-- [ ] 4.1 CisPay; проверка: `go test ./pay/cispay`
+- [x] 4.1 CisPay; проверка: `go test ./pay/cispay`
 - [ ] 4.2 Kassa AI; проверка: `go test ./pay/kassaai`
 - [ ] 4.3 RioPay; проверка: `go test ./pay/riopay`
 - [ ] 4.4 PayPear; проверка: `go test ./pay/paypear`
