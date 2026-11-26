@@ -101,7 +101,7 @@ func (b bill) failed() bool {
 
 func (g *Gateway) Create(ctx context.Context, p core.Payment) (core.Invoice, error) {
 	req := map[string]string{
-		"amount":      rubles(p.Amount),
+		"amount":      pay.Rubles(p.Amount),
 		"shop_id":     strings.TrimSpace(g.cfg.Secret(keyShop)),
 		"order_id":    orderPrefix + strconv.FormatInt(p.ID, 10),
 		"currency_in": "RUB",
@@ -148,7 +148,7 @@ func (g *Gateway) Status(ctx context.Context, p core.Payment) (core.GatewayEvent
 		return ev, errors.New("в ответе PayPalych нет суммы")
 	}
 	var err error
-	ev.ExtAmount, err = kopecks(string(res.Amount))
+	ev.ExtAmount, err = pay.Kopecks(string(res.Amount))
 	return ev, err
 }
 
@@ -180,8 +180,19 @@ func (g *Gateway) Verify(r *http.Request) (core.GatewayEvent, error) {
 	if ev.ExternalID == "" && ev.PaymentID == 0 {
 		return ev, errors.New("в postback кассы PayPalych нет номера платежа")
 	}
-	if ev.ExtAmount, err = kopecks(f["OutSum"]); err != nil {
+	if ev.ExtAmount, err = pay.Kopecks(f["OutSum"]); err != nil {
 		return ev, err
+	}
+	// Подпись закрывает только сумму и номер заказа, статус в неё не входит. Поэтому «оплачено»
+	// подтверждаем запросом счёта нашим токеном, если касса прислала номер счёта.
+	if ev.Status == core.PayPaid && ev.ExternalID != "" {
+		remote, err := g.Status(r.Context(), core.Payment{ID: ev.PaymentID, ExternalID: ev.ExternalID})
+		if err != nil {
+			return core.GatewayEvent{}, err
+		}
+		if remote.Status != core.PayPaid {
+			return core.GatewayEvent{}, errors.New("PayPalych не подтвердила оплату из postback")
+		}
 	}
 	return ev, nil
 }
