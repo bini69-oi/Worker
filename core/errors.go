@@ -48,16 +48,17 @@ func (e *NeedMoney) Unwrap() error { return ErrNotEnoughMoney }
 
 // Подписки
 var (
-	ErrNoPeriod     = newErr("E3001", "err.no_period", "у тарифа нет такого срока")
-	ErrTariffHidden = newErr("E3002", "err.tariff_hidden", "тариф не продаётся")
-	ErrOtherTariff  = newErr("E3003", "err.other_tariff", "у абонента живая подписка на другой тариф")
-	ErrTrialOff     = newErr("E3004", "err.trial_off", "пробный период выключен")
-	ErrTrialUsed    = newErr("E3005", "err.trial_used", "пробный период уже был")
-	ErrTrialBusy    = newErr("E3009", "err.trial_busy", "пробные периоды на этот час закончились, попробуйте позже")
-	ErrBanned       = newErr("E3006", "err.banned", "абонент заблокирован")
-	ErrPanelPending = newErr("E3007", "err.panel_pending", "подписка ещё оформляется")
-	ErrPanelDown    = newErr("E3008", "err.panel_down", "сервис временно недоступен")
-	ErrNoSub        = newErr("E3010", "err.no_sub", "у абонента нет подписки")
+	ErrNoPeriod      = newErr("E3001", "err.no_period", "у тарифа нет такого срока")
+	ErrTariffHidden  = newErr("E3002", "err.tariff_hidden", "тариф не продаётся")
+	ErrOtherTariff   = newErr("E3003", "err.other_tariff", "у абонента живая подписка на другой тариф")
+	ErrTrialOff      = newErr("E3004", "err.trial_off", "пробный период выключен")
+	ErrTrialUsed     = newErr("E3005", "err.trial_used", "пробный период уже был")
+	ErrTrialBusy     = newErr("E3009", "err.trial_busy", "пробные периоды на этот час закончились, попробуйте позже")
+	ErrBanned        = newErr("E3006", "err.banned", "абонент заблокирован")
+	ErrPanelPending  = newErr("E3007", "err.panel_pending", "подписка ещё оформляется")
+	ErrPanelDown     = newErr("E3008", "err.panel_down", "сервис временно недоступен")
+	ErrNoSub         = newErr("E3010", "err.no_sub", "у абонента нет подписки")
+	ErrNotSubscribed = newErr("E3011", "err.not_subscribed", "сначала подпишитесь на канал")
 )
 
 // Кассы

@@ -144,6 +144,11 @@ type Notifier interface {
 	Confirm(ctx context.Context, n ConfirmTask) error
 }
 
+// Channels говорит, подписан ли человек на канал. Реализует бот через getChatMember.
+type Channels interface {
+	IsMember(ctx context.Context, channel string, tgID int64) (bool, error)
+}
+
 // Config это настройки, которые читает ядро. Реализует их пакет settings.
 type Config interface {
 	Bool(key string) bool
@@ -160,6 +165,8 @@ type Deps struct {
 	Notifier Notifier
 	Gateways []Gateway
 	Telegram TelegramAPI
+	// Channels проверяет подписку на канал перед пробным периодом. Может быть nil: проверки не будет.
+	Channels Channels
 	// OwnerID это Telegram ID владельца из окружения. Изнутри системы он не меняется.
 	OwnerID int64
 	// Secrets это фильтр секретов журнала. Ядро добавляет в него новые ключи после их смены
@@ -183,6 +190,7 @@ type Core struct {
 	notifier Notifier
 	gateways []Gateway
 	telegram TelegramAPI
+	channels Channels
 	owner    int64
 	log      *slog.Logger
 	kick     chan struct{}
@@ -205,7 +213,7 @@ func New(d Deps) *Core {
 	}
 	return &Core{
 		store: d.Store, clock: d.Clock, cfg: d.Config, panel: d.Panel,
-		notifier: d.Notifier, gateways: d.Gateways, telegram: d.Telegram, owner: d.OwnerID, log: d.Log,
+		notifier: d.Notifier, gateways: d.Gateways, telegram: d.Telegram, channels: d.Channels, owner: d.OwnerID, log: d.Log,
 		kick: make(chan struct{}, 1), actions: map[string]action{}, filter: d.Secrets,
 	}
 }

@@ -91,6 +91,8 @@ var base = []Def{
 		Desc: "Сколько устройств можно подключить в пробный период"},
 	{Key: "trial.squads", Kind: KindString, Default: "", Group: "trial",
 		Desc: "Сквады пробного периода через запятую (UUID групп серверов в Remnawave)"},
+	{Key: "trial.channel", Kind: KindString, Default: "", Group: "trial",
+		Desc: "Канал, на который надо подписаться перед пробным периодом: @имя или -100…. Пусто: без проверки. Бот должен быть админом канала"},
 	{Key: "trial.max_per_hour", Kind: KindInt, Default: "30", Group: "trial",
 		Desc: "Сколько пробных периодов выдать за час всем вместе, 0 без предела. Поток новых аккаунтов упрётся в предел"},
 	{Key: "autorenew.days_before", Kind: KindInt, Default: "1", Group: "notify",

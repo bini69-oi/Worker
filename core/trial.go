@@ -17,6 +17,10 @@ func (c *Core) Trial(ctx context.Context, userID int64) (Subscription, error) {
 	if days <= 0 {
 		return Subscription{}, ErrTrialOff
 	}
+	// Канал проверяется до транзакции: это запрос в Telegram, базу он держать не должен.
+	if err := c.checkChannel(ctx, userID); err != nil {
+		return Subscription{}, err
+	}
 	var out Subscription
 	full := false
 	err := c.tx(ctx, func(tx Tx) error {
