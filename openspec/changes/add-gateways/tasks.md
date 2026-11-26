@@ -15,7 +15,7 @@
 - [x] 2.5 PayPalych; проверка: `go test ./pay/paypalych`
 
 ## 3. Волна 3
-- [ ] 3.1 MulenPay; проверка: `go test ./pay/mulenpay`
+- [x] 3.1 MulenPay; проверка: `go test ./pay/mulenpay`
 - [ ] 3.2 Antilopay; проверка: `go test ./pay/antilopay`
 - [ ] 3.3 SeverPay; проверка: `go test ./pay/severpay`
 - [ ] 3.4 RollyPay; проверка: `go test ./pay/rollypay`

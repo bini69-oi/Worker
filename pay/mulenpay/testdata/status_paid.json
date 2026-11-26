@@ -1,0 +1,1 @@
+{"success":true,"payment":{"id":4821,"uuid":"{{UUID}}","currency":"rub","amount":"{{AMOUNT}}","status":3,"paymentUrl":"https://mulenpay.ru/pay/4821"}}
