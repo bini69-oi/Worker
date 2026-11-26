@@ -25,7 +25,7 @@
 - [x] 4.1 CisPay; проверка: `go test ./pay/cispay`
 - [x] 4.2 Kassa AI; проверка: `go test ./pay/kassaai`
 - [x] 4.3 RioPay; проверка: `go test ./pay/riopay`
-- [ ] 4.4 PayPear; проверка: `go test ./pay/paypear`
+- [x] 4.4 PayPear; проверка: `go test ./pay/paypear`
 - [ ] 4.5 Overpay; проверка: `go test ./pay/overpay`
 
 ## 5. Волна 5
