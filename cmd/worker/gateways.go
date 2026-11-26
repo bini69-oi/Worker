@@ -27,7 +27,9 @@ import (
 	"github.com/bini69-oi/worker/pay/rollypay"
 	"github.com/bini69-oi/worker/pay/severpay"
 	"github.com/bini69-oi/worker/pay/stars"
+	"github.com/bini69-oi/worker/pay/stripe"
 	"github.com/bini69-oi/worker/pay/tabpay"
+	"github.com/bini69-oi/worker/pay/tbank"
 	"github.com/bini69-oi/worker/pay/tribute"
 	"github.com/bini69-oi/worker/pay/wata"
 	"github.com/bini69-oi/worker/pay/yookassa"
@@ -91,6 +93,10 @@ func gateways(cfg *settings.Settings, t *telegram, publicURL string) []pay.Gatew
 	py.Return, py.Hook = t.paidURL, publicURL+"/pay/paritypay"
 	dn := donut.New(cfg, "", nil)
 	dn.Return, dn.Hook = t.paidURL, publicURL+"/pay/donut"
+	tk := tbank.New(cfg, "", nil)
+	tk.Return, tk.Hook = t.paidURL, publicURL+"/pay/tbank"
+	sr := stripe.New(cfg, "", nil)
+	sr.Return = t.paidURL
 	return []pay.Gateway{
 		manual.New(cfg),
 		st,
@@ -122,5 +128,7 @@ func gateways(cfg *settings.Settings, t *telegram, publicURL string) []pay.Gatew
 		tb,
 		py,
 		dn,
+		tk,
+		sr,
 	}
 }

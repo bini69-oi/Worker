@@ -38,3 +38,12 @@
 | TabPay | карты, СБП | `tabpay.api_key`, `tabpay.webhook_secret` | подпись HMAC-SHA256 с меткой времени, оплата подтверждается API | нет |
 | ParityPay | СБП, карты | `paritypay.shop_id`, `paritypay.secret_key`, `paritypay.callback_secret` | подпись HMAC-SHA256 по полям, оплата подтверждается API | нет |
 | Donut | карты, СБП | `donut.token`, `donut.secret`, `donut.phone` | подпись HMAC-SHA256 по полям; касса требует телефон, берётся один из настроек | нет |
+| T-Bank | карты, СБП, T-Pay | `tbank.terminal_key`, `tbank.password` | подпись Token SHA-256, ответ `OK` | нет |
+| Stripe | зарубежные карты | `stripe.secret_key`, `stripe.webhook_secret`, `stripe.currency`, `stripe.rate` | подпись Stripe-Signature с меткой времени; курс задаёт владелец, без курса касса не видна | нет |
+
+## Какая касса что делает с вебхуком
+
+- **Подписанный вебхук** проверяется подписью кассы. Часть касс дополнительно сверяет оплату с API (RollyPay, CisPay, RioPay, TabPay, ParityPay).
+- **Вебхук без подписи** (PayPear, Overpay, MulenPay без подписи) только сигнал: статус и сумма берутся из API кассы. Если API недоступен, оплата не зачисляется, касса повторит уведомление.
+- **Касса ждёт своё слово в ответе** (FreeKassa и Kassa AI `YES`, Robokassa `OK<номер>`, T-Bank `OK`, CloudPayments `{"code":0}`, SeverPay `{"status":true}`, Jupiter `{"status":"ok"}`): Worker отвечает этим словом сам.
+- **Частичный возврат** не отменяет зачисление автоматически: ядро умеет только полный возврат, частичный админ разбирает в кабинете кассы.
