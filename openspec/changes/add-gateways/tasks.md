@@ -19,7 +19,7 @@
 - [x] 3.2 Antilopay; проверка: `go test ./pay/antilopay`
 - [x] 3.3 SeverPay; проверка: `go test ./pay/severpay`
 - [x] 3.4 RollyPay; проверка: `go test ./pay/rollypay`
-- [ ] 3.5 AuraPay; проверка: `go test ./pay/aurapay`
+- [x] 3.5 AuraPay; проверка: `go test ./pay/aurapay`
 
 ## 4. Волна 4
 - [ ] 4.1 CisPay; проверка: `go test ./pay/cispay`
