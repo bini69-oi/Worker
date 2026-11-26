@@ -149,6 +149,8 @@ type Tx interface {
 type Notifier interface {
 	User(ctx context.Context, n NotifyTask) error
 	Admin(ctx context.Context, n AdminTask) error
+	// Owner шлёт тревогу безопасности владельцу в личку.
+	Owner(ctx context.Context, n AdminTask) error
 	// Confirm шлёт админу в личку сообщение с кнопками «Да» и «Нет».
 	Confirm(ctx context.Context, n ConfirmTask) error
 }

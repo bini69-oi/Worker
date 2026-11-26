@@ -140,7 +140,11 @@ func (c *Core) audit(ctx context.Context, tx Tx, adminTg int64, action, target s
 // alert шлёт тревогу безопасности: в тему «Безопасность» и владельцу в личку. Выключить её нельзя,
 // поэтому ни одной настройки для неё нет.
 func (c *Core) alert(tx Tx, key string, vars map[string]string, now time.Time) error {
-	return enqueueAdmin(tx, AdminTask{Topic: TopicSecurity, Key: key, Vars: vars}, now)
+	n := AdminTask{Topic: TopicSecurity, Key: key, Vars: vars}
+	if err := enqueueAdmin(tx, n, now); err != nil {
+		return err
+	}
+	return enqueueOwner(tx, n, now)
 }
 
 // Admins отдаёт список помощников. Видит его только владелец.

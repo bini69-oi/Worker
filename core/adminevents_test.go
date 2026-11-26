@@ -58,3 +58,14 @@ func TestTrialSendsEvent(t *testing.T) {
 		t.Fatalf("событие о пробном: %+v", got)
 	}
 }
+
+func TestAlertGoesToOwnerSeparately(t *testing.T) {
+	e := newSecEnv(t)
+	if _, err := e.c.LoginStart(context.Background(), owner, "wrong-password-1", core.LoginInfo{IP: "1.2.3.4"}); err == nil {
+		t.Fatal("вход с неверным паролем")
+	}
+	e.process(t)
+	if len(e.notes.ToOwner) == 0 || len(e.notes.ToAdmins) == 0 || e.notes.ToOwner[0].Key != e.notes.ToAdmins[0].Key {
+		t.Fatalf("тревога: владельцу %+v, в тему %+v", e.notes.ToOwner, e.notes.ToAdmins)
+	}
+}

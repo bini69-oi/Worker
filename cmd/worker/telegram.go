@@ -74,3 +74,4 @@ type notifier struct{ b *bot.Bot }
 func (n *notifier) User(ctx context.Context, x core.NotifyTask) error     { return n.b.User(ctx, x) }
 func (n *notifier) Admin(ctx context.Context, x core.AdminTask) error     { return n.b.Admin(ctx, x) }
 func (n *notifier) Confirm(ctx context.Context, x core.ConfirmTask) error { return n.b.Confirm(ctx, x) }
+func (n *notifier) Owner(ctx context.Context, x core.AdminTask) error     { return n.b.Owner(ctx, x) }

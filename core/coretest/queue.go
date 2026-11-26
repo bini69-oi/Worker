@@ -71,7 +71,7 @@ func (s *Store) StuckTasks(_ context.Context, before time.Time) ([]core.Task, er
 	defer s.mu.Unlock()
 	var out []core.Task
 	for _, r := range s.st.tasks {
-		if !r.done && !r.alerted && r.Kind != core.KindNotifyAdmin && r.CreatedAt.Before(before) {
+		if !r.done && !r.alerted && r.Kind != core.KindNotifyAdmin && r.Kind != core.KindNotifyOwner && r.CreatedAt.Before(before) {
 			out = append(out, r.Task)
 		}
 	}

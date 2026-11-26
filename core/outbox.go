@@ -74,10 +74,13 @@ func (c *Core) runTask(ctx context.Context, t Task) error {
 			return err
 		}
 		return c.notifier.Confirm(ctx, n)
-	case KindNotifyAdmin:
+	case KindNotifyAdmin, KindNotifyOwner:
 		var n AdminTask
 		if err := json.Unmarshal(t.Payload, &n); err != nil {
 			return err
+		}
+		if t.Kind == KindNotifyOwner {
+			return c.notifier.Owner(ctx, n)
 		}
 		return c.notifier.Admin(ctx, n)
 	}
@@ -130,6 +133,7 @@ type noNotifier struct{}
 
 func (noNotifier) User(context.Context, NotifyTask) error     { return errNoNotifier }
 func (noNotifier) Admin(context.Context, AdminTask) error     { return errNoNotifier }
+func (noNotifier) Owner(context.Context, AdminTask) error     { return errNoNotifier }
 func (noNotifier) Confirm(context.Context, ConfirmTask) error { return errNoNotifier }
 
 // ReportError кладёт событие в тему «Ошибки». Бот так сообщает о том, чего быть не должно.

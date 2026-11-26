@@ -346,6 +346,7 @@ type lazyNotifier struct{ b *Bot }
 
 func (l *lazyNotifier) User(ctx context.Context, n core.NotifyTask) error { return l.b.User(ctx, n) }
 func (l *lazyNotifier) Admin(ctx context.Context, n core.AdminTask) error { return l.b.Admin(ctx, n) }
+func (l *lazyNotifier) Owner(ctx context.Context, n core.AdminTask) error { return l.b.Owner(ctx, n) }
 func (l *lazyNotifier) Confirm(ctx context.Context, n core.ConfirmTask) error {
 	return l.b.Confirm(ctx, n)
 }

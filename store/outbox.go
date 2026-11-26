@@ -76,8 +76,8 @@ func (s *CoreStore) TaskFailed(ctx context.Context, id int64, attempts int, next
 func (s *CoreStore) StuckTasks(ctx context.Context, before time.Time) ([]core.Task, error) {
 	rows, err := s.db.R.QueryContext(ctx,
 		"SELECT "+taskCols+` FROM outbox
-		 WHERE done_at IS NULL AND alerted = 0 AND kind <> ? AND created_at < ? ORDER BY id`,
-		core.KindNotifyAdmin, before.Unix())
+		 WHERE done_at IS NULL AND alerted = 0 AND kind NOT IN (?, ?) AND created_at < ? ORDER BY id`,
+		core.KindNotifyAdmin, core.KindNotifyOwner, before.Unix())
 	if err != nil {
 		return nil, err
 	}

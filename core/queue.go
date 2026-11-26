@@ -13,6 +13,9 @@ const (
 	KindNotifyUser = "notify.user"
 	// KindNotifyAdmin шлёт событие в тему админ-чата.
 	KindNotifyAdmin = "notify.admin"
+	// KindNotifyOwner шлёт тревогу безопасности владельцу в личку. Это отдельная задача от темы группы:
+	// если одна сторона недоступна, повтор не дублирует другую.
+	KindNotifyOwner = "notify.owner"
 )
 
 // Темы админ-чата: по видам событий, не по абонентам.
@@ -68,6 +71,15 @@ func enqueueAdmin(tx Tx, n AdminTask, now time.Time) error {
 
 // enqueueNotify ставит уведомление абоненту. Абоненту, который заблокировал бота, не ставит:
 // Telegram всё равно откажет, а очередь будет повторять задачу впустую.
+func enqueueOwner(tx Tx, n AdminTask, now time.Time) error {
+	body, err := json.Marshal(n)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Enqueue(KindNotifyOwner, body, now)
+	return err
+}
+
 func enqueueNotify(tx Tx, n NotifyTask, now time.Time) error {
 	u, err := tx.User(n.UserID)
 	if err != nil {

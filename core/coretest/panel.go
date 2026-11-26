@@ -168,6 +168,7 @@ func (p *Panel) RevokeLink(_ context.Context, ref string) (core.PanelResult, err
 type Notifier struct {
 	mu        sync.Mutex
 	ToUsers   []core.NotifyTask
+	ToOwner   []core.AdminTask
 	ToAdmins  []core.AdminTask
 	ToConfirm []core.ConfirmTask
 }
@@ -183,6 +184,14 @@ func (n *Notifier) Admin(_ context.Context, t core.AdminTask) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.ToAdmins = append(n.ToAdmins, t)
+	return nil
+}
+
+// Owner запоминает тревогу владельцу в личку.
+func (n *Notifier) Owner(_ context.Context, t core.AdminTask) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.ToOwner = append(n.ToOwner, t)
 	return nil
 }
 

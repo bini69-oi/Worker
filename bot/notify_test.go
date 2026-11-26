@@ -155,19 +155,49 @@ func TestTopicRecreated(t *testing.T) {
 func TestSecurityToOwner(t *testing.T) {
 	e := newEnv(t)
 	task := core.AdminTask{Topic: core.TopicSecurity, Key: "admin.login_bruteforce", Vars: map[string]string{"admin": "1", "ip": "1.2.3.4"}}
-	if err := e.b.Admin(context.Background(), task); err != nil {
+	if err := e.b.Owner(context.Background(), task); err != nil {
 		t.Fatal(err)
 	}
 	if c := e.api.take(); len(c) != 1 || c[0].chat != owner {
-		t.Fatalf("без группы тревога не у владельца: %s", render(c))
+		t.Fatalf("тревога не у владельца: %s", render(c))
 	}
-	e.bind(t, chat)
+	// Без группы в тему слать некуда, задача закрывается без ошибки.
 	if err := e.b.Admin(context.Background(), task); err != nil {
 		t.Fatal(err)
 	}
-	c := e.api.take()
-	if len(c) != 2 || c[0].chat != owner || c[1].chat != chat {
-		t.Fatalf("с группой тревога должна быть и в теме, и у владельца: %s", render(c))
+	if c := e.api.take(); len(c) != 0 {
+		t.Fatalf("без группы что-то отправлено: %s", render(c))
+	}
+	e.bind(t, chat)
+	e.set(t, "notify.payments", "false") // выключение другой темы безопасность не трогает
+	if err := e.b.Admin(context.Background(), task); err != nil {
+		t.Fatal(err)
+	}
+	if c := e.api.take(); len(c) != 1 || c[0].chat != chat {
+		t.Fatalf("тревога не в теме группы: %s", render(c))
+	}
+}
+
+// TestSecurityAlertTwoTasks проверяет, что тревога это две задачи: сбой одной стороны не дублирует другую.
+func TestSecurityAlertTwoTasks(t *testing.T) {
+	e := newEnv(t)
+	e.bind(t, chat)
+	ctx := context.Background()
+	if _, err := e.c.LoginStart(ctx, owner, "wrong-password", core.LoginInfo{IP: "1.2.3.4"}); err == nil {
+		t.Fatal("вход с неверным паролем")
+	}
+	e.sync(t)
+	toOwner, toChat := 0, 0
+	for _, c := range e.api.take() {
+		if c.chat == owner {
+			toOwner++
+		}
+		if c.chat == chat {
+			toChat++
+		}
+	}
+	if toOwner == 0 || toChat == 0 {
+		t.Fatalf("тревога: владельцу %d, в группу %d", toOwner, toChat)
 	}
 }
 

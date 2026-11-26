@@ -15,25 +15,10 @@ import (
 // topicMu не даёт двум уведомлениям одновременно создать одну и ту же тему.
 var topicMu sync.Mutex
 
-// Admin шлёт событие в тему группы по его виду. Тема выключена: молчим. Группы нет: тревоги
-// безопасности идут владельцу в личку, остальное пропускается. Безопасность дублируется владельцу всегда.
+// Admin шлёт событие в тему группы по его виду. Тема выключена или группы нет: молчим.
+// Тревоги безопасности владельцу в личку идут отдельной задачей (Owner), тема «Безопасность» не выключается.
 func (b *Bot) Admin(ctx context.Context, n core.AdminTask) error {
-	r := &req{lang: b.lang("")}
-	vars := moneyFmt(n.Vars)
-	var uid int64
-	if id, ok := parseInt(n.Vars["user_id"]); ok && id > 0 {
-		if u, err := b.core.User(ctx, id); err == nil {
-			uid, vars["user"] = id, mention(u)
-		}
-	}
-	s := Screen{Text: b.t(r, n.Key, vars), Rows: b.adminRows(r, n.Topic, uid, false)}
-	security := n.Topic == core.TopicSecurity
-	if security {
-		if _, err := b.api.SendMessage(ctx, tg.SendParams{ChatID: b.owner, Text: s.Text, ParseMode: "HTML", DisablePreview: true}); err != nil {
-			return err
-		}
-	}
-	if !security && !b.cfg.Bool("notify."+n.Topic) {
+	if n.Topic != core.TopicSecurity && !b.cfg.Bool("notify."+n.Topic) {
 		return nil
 	}
 	ch, err := b.core.AdminChat(ctx)
@@ -43,7 +28,28 @@ func (b *Bot) Admin(ctx context.Context, n core.AdminTask) error {
 	if err != nil {
 		return err
 	}
-	return b.toTopic(ctx, ch, n.Topic, s)
+	r := b.sysReq()
+	text, uid := b.eventText(ctx, r, n)
+	return b.toTopic(ctx, ch, n.Topic, Screen{Text: text, Rows: b.adminRows(r, n.Topic, uid, false)})
+}
+
+// Owner шлёт тревогу безопасности владельцу в личку.
+func (b *Bot) Owner(ctx context.Context, n core.AdminTask) error {
+	text, _ := b.eventText(ctx, b.sysReq(), n)
+	_, err := b.api.SendMessage(ctx, tg.SendParams{ChatID: b.owner, Text: text, ParseMode: "HTML", DisablePreview: true})
+	return err
+}
+
+// eventText собирает текст события: копейки рублями, абонент ссылкой. Отдаёт и id абонента для кнопок.
+func (b *Bot) eventText(ctx context.Context, r *req, n core.AdminTask) (string, int64) {
+	vars := moneyFmt(n.Vars)
+	var uid int64
+	if id, ok := parseInt(n.Vars["user_id"]); ok && id > 0 {
+		if u, err := b.core.User(ctx, id); err == nil {
+			uid, vars["user"] = id, mention(u)
+		}
+	}
+	return b.t(r, n.Key, vars), uid
 }
 
 // toTopic шлёт сообщение в тему.
