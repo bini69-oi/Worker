@@ -153,3 +153,40 @@ func TestDoubleClickGateway(t *testing.T) {
 		t.Fatalf("двойной клик выставил %d счетов", n)
 	}
 }
+
+func TestUrgentPaymentRetried(t *testing.T) {
+	e := payEnv(t)
+	e.press(t, userTg, 5, "tpg:stars:30000")
+	payload := strings.Fields(e.api.take()[0].text)[1]
+	u := tg.Update{UpdateID: 50, Message: &tg.Message{MessageID: 1, From: &tg.User{ID: userTg}, Chat: tg.Chat{ID: userTg, Type: "private"},
+		SuccessfulPayment: &tg.SuccessfulPayment{Currency: "XTR", TotalAmount: 200, InvoicePayload: payload, TelegramPaymentChargeID: "ch-u"}}}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // база не отвечает: контекст уже закрыт
+	if handled, err := e.b.Urgent(ctx, u); !handled || err == nil {
+		t.Fatalf("сбой должен вернуть ошибку для повтора: %v %v", handled, err)
+	}
+	if handled, err := e.b.Urgent(context.Background(), u); !handled || err != nil {
+		t.Fatalf("повтор: %v %v", handled, err)
+	}
+	if handled, err := e.b.Urgent(context.Background(), u); !handled || err != nil {
+		t.Fatalf("второй повтор того же обновления: %v %v", handled, err)
+	}
+	if b := e.balance(t); b != 30000 {
+		t.Fatalf("после сбоя и двух повторов баланс %d, ждали 30000", b)
+	}
+	if handled, _ := e.b.Urgent(context.Background(), tg.Update{Message: &tg.Message{From: &tg.User{ID: 1}, Chat: tg.Chat{Type: "private"}, Text: "hi"}}); handled {
+		t.Fatal("обычное сообщение ушло в срочную обработку")
+	}
+}
+
+func TestUrgentForeignPaymentReported(t *testing.T) {
+	e := payEnv(t)
+	e.press(t, userTg, 5, "tpg:stars:30000")
+	payload := strings.Fields(e.api.take()[0].text)[1]
+	e.text(t, 2002, "/start")
+	u := tg.Update{Message: &tg.Message{From: &tg.User{ID: 2002}, Chat: tg.Chat{ID: 2002, Type: "private"},
+		SuccessfulPayment: &tg.SuccessfulPayment{Currency: "XTR", TotalAmount: 200, InvoicePayload: payload, TelegramPaymentChargeID: "ch-x"}}}
+	if handled, err := e.b.Urgent(context.Background(), u); !handled || err != nil {
+		t.Fatalf("чужой платёж не должен повторяться: %v %v", handled, err)
+	}
+}

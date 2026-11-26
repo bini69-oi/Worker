@@ -96,3 +96,21 @@ func (b *Bot) onStarsSub(ctx context.Context, r *req, d Data) error {
 	return b.show(ctx, r, Screen{Text: b.t(r, "stars.sub_ready", vars), Rows: [][]Button{
 		{{Text: b.t(r, "btn.subscribe", nil), URL: link}}, b.back(r, data("bt", t.ID))}})
 }
+
+// Urgent обрабатывает оплату и возврат Stars сразу в вебхуке, до ответа Telegram. Сбой базы или сети:
+// ошибка, вебхук отвечает 500, Telegram пришлёт обновление снова, ядро не зачислит дважды.
+// Отказ ядра по правилам (чужой платёж, испорченные данные) повтором не исправить: он уходит админам.
+func (b *Bot) Urgent(ctx context.Context, u tg.Update) (bool, error) {
+	m := u.Message
+	if m == nil || m.From == nil || m.Chat.Type != "private" || (m.SuccessfulPayment == nil && m.RefundedPayment == nil) {
+		return false, nil
+	}
+	err := b.onPayment(ctx, m)
+	var ce *core.Error
+	if errors.As(err, &ce) {
+		b.log.Warn("оплата Stars не принята ядром", "tg_id", m.From.ID, "err", err)
+		return true, b.core.ReportError(ctx, "admin.payment_failed", map[string]string{
+			"tg_id": strconv.FormatInt(m.From.ID, 10), "code": ce.Code})
+	}
+	return true, err
+}

@@ -28,6 +28,7 @@ var notifyDefs = []Def{
 	{Key: "admin.panel_event", Params: []string{"event"}, Default: "🛰 Событие панели: {event}"},
 	{Key: "admin.tasks_stuck", Params: []string{"count", "kinds"}, Default: "⚠️ Задач, которые не проходят больше часа: {count} ({kinds}). Проверьте панель."},
 	{Key: "admin.channel_check", Params: []string{"channel", "error"}, Default: "⚠️ Не проверить подписку на канал {channel}: {error}. Бот должен быть админом канала."},
+	{Key: "admin.payment_failed", Params: []string{"tg_id", "code"}, Default: "⚠️ Оплата Stars от {tg_id} не зачислена: ошибка {code}. Проверьте в админке."},
 	{Key: "admin.wrong_currency", Params: []string{"tg_id", "currency"}, Default: "⚠️ Оплата не в звёздах ({currency}) от {tg_id}, не зачислена"},
 	{Key: "admin.login", Params: []string{"admin", "ip", "agent"}, Default: "🔐 Вход в админку: {admin}, {ip}, {agent}"},
 	{Key: "admin.login_bruteforce", Params: []string{"admin", "ip"}, Default: "🚨 Подбор пароля: {admin} с {ip}"},
