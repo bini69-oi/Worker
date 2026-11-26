@@ -1,0 +1,1 @@
+{"type":"payin","data":{"id":4815,"uid":"u-1","order_id":"worker_7","status":"success","amount":300.0,"currency":"RUB","comment":"Пополнение 7"},"salt":"abc123","sign":"bba0574444e9a175541674b3c90dc93ebdb0814dd20423fd89bf7b94eb623d46"}
