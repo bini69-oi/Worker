@@ -13,6 +13,10 @@ func Types() []reflect.Type {
 		reflect.TypeFor[AdminUserList](),
 		reflect.TypeFor[AdminUserCard](),
 		reflect.TypeFor[AdminPaymentList](),
+		reflect.TypeFor[AdminTariffList](),
+		reflect.TypeFor[AdminTariff](),
+		reflect.TypeFor[AdminPromoList](),
+		reflect.TypeFor[AdminPromo](),
 		reflect.TypeFor[AdminBalance](),
 		reflect.TypeFor[AdminExpires](),
 	}

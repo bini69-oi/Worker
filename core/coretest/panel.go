@@ -22,6 +22,7 @@ type Panel struct {
 	links   map[string]int // номер выпуска ссылки
 	next    int
 	listed  []core.PanelEntry
+	squads  []core.PanelSquad
 	skipped []core.PanelSkip
 	Calls   int
 }
@@ -203,6 +204,23 @@ func (p *Panel) RevokeLink(_ context.Context, ref string) (core.PanelResult, err
 	}
 	p.links[ref]++
 	return p.result(ref), nil
+}
+
+// AddSquad кладёт в панель сквад: его отдаст Squads.
+func (p *Panel) AddSquad(uuid, name string, members int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.squads = append(p.squads, core.PanelSquad{UUID: uuid, Name: name, Members: members})
+}
+
+// Squads отдаёт сквады из AddSquad. Упавшая панель (SetDown) не отвечает.
+func (p *Panel) Squads(context.Context) ([]core.PanelSquad, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if err := p.enter(); err != nil {
+		return nil, err
+	}
+	return slices.Clone(p.squads), nil
 }
 
 // Notifier запоминает уведомления вместо отправки.

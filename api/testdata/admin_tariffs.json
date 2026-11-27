@@ -1,0 +1,39 @@
+{
+  "tariffs": [
+    {
+      "id": 7,
+      "name": "Месяц",
+      "traffic_bytes": 107374182400,
+      "devices": 3,
+      "reset": "MONTH",
+      "squads": [
+        "sq-1"
+      ],
+      "active": true,
+      "sort": 1,
+      "periods": [
+        {
+          "days": 30,
+          "price": 20000
+        },
+        {
+          "days": 90,
+          "price": 50000
+        }
+      ]
+    }
+  ],
+  "squads": [
+    {
+      "uuid": "sq-1",
+      "name": "Европа",
+      "members": 12
+    },
+    {
+      "uuid": "sq-2",
+      "name": "Азия",
+      "members": 0
+    }
+  ],
+  "squads_ok": true
+}

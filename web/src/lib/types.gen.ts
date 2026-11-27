@@ -63,6 +63,36 @@ export interface AdminPaymentList {
   next: number;
 }
 
+export interface AdminPeriod {
+  days: number;
+  price: number;
+}
+
+export interface AdminPromo {
+  id: number;
+  code: string;
+  kind: string;
+  value: number;
+  tariff_id: number;
+  max_uses: number;
+  uses: number;
+  new_only: boolean;
+  expires_at: string | null;
+  active: boolean;
+  link: string;
+}
+
+export interface AdminPromoList {
+  items: AdminPromo[];
+  next: number;
+}
+
+export interface AdminSquad {
+  uuid: string;
+  name: string;
+  members: number;
+}
+
 export interface AdminSub {
   tariff: string;
   trial: boolean;
@@ -73,6 +103,24 @@ export interface AdminSub {
   auto_renew: boolean;
   traffic_bytes: number;
   device_limit: number;
+}
+
+export interface AdminTariff {
+  id: number;
+  name: string;
+  traffic_bytes: number;
+  devices: number;
+  reset: string;
+  squads: string[];
+  active: boolean;
+  sort: number;
+  periods: AdminPeriod[];
+}
+
+export interface AdminTariffList {
+  tariffs: AdminTariff[];
+  squads: AdminSquad[];
+  squads_ok: boolean;
 }
 
 export interface AdminUserCard {

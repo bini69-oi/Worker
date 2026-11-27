@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "id": 7,
+      "code": "SPRING26",
+      "kind": "days",
+      "value": 7,
+      "tariff_id": 0,
+      "max_uses": 100,
+      "uses": 0,
+      "new_only": false,
+      "expires_at": null,
+      "active": true,
+      "link": "https://t.me/test_bot?start=promo_SPRING26"
+    }
+  ],
+  "next": 0
+}

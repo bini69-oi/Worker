@@ -76,3 +76,13 @@ func (a CoreAdapter) EachUser(ctx context.Context, fn func(core.PanelPage) error
 		return fn(out)
 	})
 }
+
+// Squads отдаёт сквады панели ядру: админка по ним предлагает выбор в тарифе.
+func (a CoreAdapter) Squads(ctx context.Context) ([]core.PanelSquad, error) {
+	list, err := a.Client.Squads(ctx)
+	out := make([]core.PanelSquad, 0, len(list))
+	for _, s := range list {
+		out = append(out, core.PanelSquad{UUID: s.UUID, Name: s.Name, Members: s.Members})
+	}
+	return out, coreErr(err)
+}

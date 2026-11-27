@@ -33,3 +33,30 @@ func (c *Core) SetPromoActive(ctx context.Context, actorTg, id int64, active boo
 	p.Active = active
 	return c.SavePromo(ctx, actorTg, p)
 }
+
+// PanelSquad это сквад панели: группа серверов, которую выдаёт тариф.
+type PanelSquad struct {
+	UUID    string
+	Name    string
+	Members int
+}
+
+// SquadLister это панель, которая умеет отдать список сквадов. Это отдельный интерфейс, а не часть Panel:
+// остальные сценарии ядра сквады не читают.
+type SquadLister interface {
+	Squads(ctx context.Context) ([]PanelSquad, error)
+}
+
+// PanelSquads отдаёт сквады панели для выбора в тарифе. Нужно право tariffs. Панель не ответила: ErrPanelDown,
+// страница тарифов при этом работает и без списка. Панель без этой возможности отдаёт пустой список.
+func (c *Core) PanelSquads(ctx context.Context, actorTg int64) ([]PanelSquad, error) {
+	if _, err := c.Require(ctx, actorTg, PermTariffs, "tariff.squads"); err != nil {
+		return nil, err
+	}
+	l, ok := c.panel.(SquadLister)
+	if !ok {
+		return nil, nil
+	}
+	list, err := l.Squads(ctx)
+	return list, c.panelErr("squads", err)
+}
