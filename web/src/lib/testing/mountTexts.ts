@@ -34,3 +34,17 @@ export function render<P extends Record<string, unknown>>(
 }
 
 export { flushSync }
+
+import { createRouter } from '../router'
+import { APP, type AppCtx } from '../../app/context'
+import type { Endpoints } from '../../app/endpoints'
+import { createLoader } from '../view'
+import type { MeResponse } from '../types.gen'
+
+/** Контекст кабинета для теста экрана: данные главной из эталона, вызовы API подставляет тест. */
+export function fakeApp(me: MeResponse, ep: Partial<Endpoints> = {}, over: Partial<AppCtx> = {}) {
+  const router = createRouter(window)
+  const loader = createLoader(async () => me)
+  const ctx = { ep: ep as Endpoints, router, me: loader, tg: null, win: window, session: {} as never, ...over } as AppCtx
+  return { ctx, router, loader, extra: [[APP, ctx]] as [unknown, unknown][] }
+}

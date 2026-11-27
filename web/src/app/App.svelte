@@ -4,13 +4,13 @@
   import { useApp } from './context'
   import Login from './Login.svelte'
   import Notice from './Notice.svelte'
+  import Routes from './Routes.svelte'
 
   const t = useT()
-  const { session, router, ep } = useApp()
+  const { session, ep } = useApp()
   const state = session.state
   const failure = session.failure
   const revision = session.revision
-  const path = router.path
 </script>
 
 {#if $state === 'booting'}
@@ -25,6 +25,6 @@
   </Notice>
 {:else}
   {#key $revision}
-    <p>{$path}</p>
+    <Routes />
   {/key}
 {/if}

@@ -48,7 +48,15 @@ func TestWebKeysExist(t *testing.T) {
 	}
 	for key, path := range used {
 		if strings.HasSuffix(key, "_") {
-			continue // начало ключа, остальное собирается в коде: проверяется отдельно ниже
+			// Начало ключа, остальное собирается в коде (например состояние подписки): должен быть хоть один текст с этим началом.
+			found := false
+			for k := range have {
+				found = found || strings.HasPrefix(k, key)
+			}
+			if !found {
+				t.Errorf("ни одного текста с началом %s (из %s)", key, path)
+			}
+			continue
 		}
 		d, ok := have[key]
 		if !ok {
