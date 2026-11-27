@@ -11,5 +11,9 @@
       "title": "Перевод по реквизитам"
     }
   ],
+  "addons": {
+    "traffic": [],
+    "device_price": 0
+  },
   "bot_link": "https://t.me/worker_bot"
 }

@@ -31,6 +31,9 @@ func (a *App) me(w http.ResponseWriter, r *http.Request, au Auth) (any, error) {
 		return nil, err
 	}
 	hasSub := err == nil
+	if out.Addons, err = a.addonsView(r, au.User.ID); err != nil {
+		return nil, err
+	}
 	out.TrialAvailable = a.Core.TrialOpen(au.User, hasSub)
 	if hasSub {
 		if out.Sub, err = a.subView(r, sub); err != nil {

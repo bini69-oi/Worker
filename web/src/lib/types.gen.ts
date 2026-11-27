@@ -1,5 +1,10 @@
 // Код создан командой make types из структур Go (пакет api). Руками не править.
 
+export interface AddonsView {
+  traffic: PackView[];
+  device_price: number;
+}
+
 export interface AppView {
   id: string;
   name: string;
@@ -74,6 +79,7 @@ export interface MeResponse {
   trial_available: boolean;
   sub: SubView | null;
   gateways: GatewayView[];
+  addons: AddonsView;
   bot_link: string;
 }
 
@@ -88,6 +94,11 @@ export interface NextPlanView {
   tariff: string;
   days: number;
   starts_at: string;
+}
+
+export interface PackView {
+  gb: number;
+  price: number;
 }
 
 export interface PaymentResponse {
@@ -171,4 +182,8 @@ export interface TopupResponse {
   details: string;
   ext_amount: number;
   ext_currency: string;
+}
+
+export interface TrafficRequest {
+  gb: number;
 }

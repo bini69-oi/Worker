@@ -40,6 +40,7 @@ func appTypes() []reflect.Type {
 		reflect.TypeFor[PromoResponse](),
 		reflect.TypeFor[ConnectResponse](),
 		reflect.TypeFor[DevicesResponse](),
+		reflect.TypeFor[TrafficRequest](),
 	}
 }
 
@@ -52,6 +53,7 @@ type MeResponse struct {
 	TrialAvailable bool          `json:"trial_available"`
 	Sub            *SubView      `json:"sub"`
 	Gateways       []GatewayView `json:"gateways"`
+	Addons         AddonsView    `json:"addons"`
 	BotLink        string        `json:"bot_link"` // чат бота: поддержка и вход
 }
 
@@ -221,4 +223,21 @@ type DeviceView struct {
 	Platform  string    `json:"platform"`
 	Model     string    `json:"model"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// AddonsView это то, что можно докупить к платной подписке. DevicePrice 0 значит, что устройство докупить нельзя.
+type AddonsView struct {
+	Traffic     []PackView `json:"traffic"`
+	DevicePrice int64      `json:"device_price"` // копейки
+}
+
+// PackView это пакет трафика: гигабайты и цена в копейках.
+type PackView struct {
+	GB    int64 `json:"gb"`
+	Price int64 `json:"price"`
+}
+
+// TrafficRequest это выбранный пакет трафика.
+type TrafficRequest struct {
+	GB int64 `json:"gb"`
 }
