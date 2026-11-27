@@ -32,3 +32,6 @@ CREATE TABLE user_logins (
     session_hash BLOB                         -- сессия, выданная по этому входу: при повторной выдаче старая закрывается
 ) STRICT;
 CREATE INDEX user_logins_expires ON user_logins (expires_at);
+
+-- Откуда создан платёж: пусто это бот и Mini App, web это кабинет в браузере. От этого зависит, куда вернёт касса.
+ALTER TABLE payments ADD COLUMN source TEXT NOT NULL DEFAULT '';

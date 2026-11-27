@@ -101,6 +101,8 @@
     "app.ref_invited": "Joined",
     "app.ref_share": "Share",
     "app.ref_title": "Invite friends",
+    "app.reopen_hint": "This page was opened a while ago. Close it and open the cabinet from the bot chat again.",
+    "app.reopen_title": "Please reopen the cabinet",
     "app.retry": "Retry",
     "app.stars_desc": "Telegram Stars will be credited to your balance in rubles at the current rate",
     "app.stars_title": "Top up balance",

@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/bini69-oi/worker/core"
 )
 
 func TestTopupLink(t *testing.T) {
@@ -127,5 +129,30 @@ func TestPaymentWebhookLate(t *testing.T) {
 	u, _ := e.c.UserByTg(t.Context(), 31)
 	if u.Balance != 30000 {
 		t.Fatalf("баланс после сверки: %d", u.Balance)
+	}
+}
+
+// Платёж из кабинета в браузере помечен: касса вернёт на страницу кабинета. Из Mini App метки нет: вернёт в бота.
+func TestTopupSourceFromSessionKind(t *testing.T) {
+	e := newAppEnv(t)
+	e.enable("fake")
+	tgTok := e.login(41)
+	var tgPay TopupResponse
+	decode(t, e.as(tgTok, "POST", "/api/app/topup", `{"gateway":"fake","amount":30000}`), &tgPay)
+
+	u, _ := e.c.UserByTg(t.Context(), 41)
+	webTok, _, err := e.c.OpenSession(t.Context(), u.ID, core.SessionWeb, core.LoginInfo{IP: "1.1.1.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.clock.Add(time.Second)
+	var webPay TopupResponse
+	decode(t, e.as(webTok, "POST", "/api/app/topup", `{"gateway":"fake","amount":30000}`), &webPay)
+
+	if got := e.c.PaymentSource(t.Context(), tgPay.PaymentID); got != "" {
+		t.Errorf("платёж из Mini App: источник %q", got)
+	}
+	if got := e.c.PaymentSource(t.Context(), webPay.PaymentID); got != core.PaySourceWeb {
+		t.Errorf("платёж из браузера: источник %q", got)
 	}
 }

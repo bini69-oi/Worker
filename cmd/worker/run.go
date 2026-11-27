@@ -97,6 +97,11 @@ func build(env Env, base slog.Handler) (*app, error) {
 		Secrets:  secrets,
 		Log:      log,
 	})
+	t.source = func(id int64) string {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		return c.PaymentSource(ctx, id)
+	}
 	for _, g := range gws {
 		if tr, ok := g.(*tribute.Gateway); ok {
 			tr.Pending = func(ctx context.Context, tgID, amount int64, key string) (core.Payment, error) {

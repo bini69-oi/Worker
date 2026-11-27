@@ -23,7 +23,10 @@ type telegram struct {
 	name    atomic.Value // имя бота без @, узнаём у Telegram при старте
 	polling func() bool
 	hook    string
-	log     *slog.Logger
+	// publicURL и source нужны, чтобы вернуть из кассы в кабинет, если платёж создан в браузере.
+	publicURL string
+	source    func(paymentID int64) string
+	log       *slog.Logger
 	// retryWait это первая пауза между повторами шагов связи с Telegram.
 	retryWait time.Duration
 }
@@ -32,7 +35,7 @@ func newTelegram(token, apiURL, publicURL string, polling func() bool, log *slog
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	t := &telegram{client: &tg.Client{Token: token, BaseURL: apiURL}, updates: make(chan tg.Update, 256), secret: hex.EncodeToString(b),
-		polling: polling, hook: publicURL + "/tg/webhook", log: log, retryWait: 5 * time.Second}
+		polling: polling, hook: publicURL + "/tg/webhook", publicURL: publicURL, log: log, retryWait: 5 * time.Second}
 	t.name.Store("")
 	return t
 }
@@ -42,6 +45,10 @@ func (t *telegram) botName() string { return t.name.Load().(string) }
 
 // paidURL это адрес возврата из кассы в бота: диплинк paid_<номер платежа>.
 func (t *telegram) paidURL(paymentID int64) string {
+	// Платёж из кабинета в браузере возвращается на страницу кабинета, остальные в бота.
+	if t.source != nil && t.publicURL != "" && t.source(paymentID) == core.PaySourceWeb {
+		return t.publicURL + "/app/#/pay/" + strconv.FormatInt(paymentID, 10)
+	}
 	if t.botName() == "" {
 		return ""
 	}

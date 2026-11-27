@@ -26,7 +26,7 @@ func (a *App) topup(w http.ResponseWriter, r *http.Request, au Auth) (any, error
 	if in.Gateway == "stars" && a.StarsInvoice == nil {
 		return nil, core.ErrNoGateway
 	}
-	p, inv, err := a.Core.CreatePayment(r.Context(), au.User.ID, in.Gateway, in.Amount)
+	p, inv, err := a.Core.CreatePaymentFrom(r.Context(), au.User.ID, in.Gateway, in.Amount, paySource(au))
 	if err != nil {
 		return nil, err
 	}
@@ -60,4 +60,12 @@ func (a *App) payment(_ http.ResponseWriter, r *http.Request, au Auth) (any, err
 		out.PaidAt = &p.PaidAt
 	}
 	return out, nil
+}
+
+// paySource говорит, откуда платёж: из браузера (касса вернёт на страницу кабинета) или из Telegram (касса вернёт в бота).
+func paySource(au Auth) string {
+	if au.Session.Kind == core.SessionWeb {
+		return core.PaySourceWeb
+	}
+	return ""
 }
