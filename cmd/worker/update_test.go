@@ -471,3 +471,23 @@ func TestUpdateCommandAllowDowngradeArg(t *testing.T) {
 		t.Fatal("лишний аргумент принят")
 	}
 }
+
+// Защита от сигналов включена на всё время замены и ожидания и снята после.
+func TestUpdateGuardsWholeSwap(t *testing.T) {
+	rel := newReleases(t, "сломанная версия")
+	e := newUpdater(t, rel)
+	e.u.Guard = func() func() {
+		*e.events = append(*e.events, "guard-on")
+		return func() { *e.events = append(*e.events, "guard-off") }
+	}
+	e.u.Health = func(context.Context) error {
+		if content(t, e.bin) == "сломанная версия" {
+			return errors.New("не поднялась")
+		}
+		return nil
+	}
+	_ = e.u.Run(t.Context(), "")
+	if got := strings.Join(*e.events, ","); got != "backup,guard-on,restart,restart,guard-off" {
+		t.Errorf("порядок шагов %s", got)
+	}
+}

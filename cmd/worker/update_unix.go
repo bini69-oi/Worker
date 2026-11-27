@@ -4,6 +4,7 @@ package main
 
 import (
 	"os"
+	"os/signal"
 	"syscall"
 )
 
@@ -22,4 +23,12 @@ func asOwner(dir string) *syscall.SysProcAttr {
 		return nil
 	}
 	return &syscall.SysProcAttr{Credential: &syscall.Credential{Uid: sys.Uid, Gid: sys.Gid}}
+}
+
+// guardSignals перехватывает сигналы, которые иначе убили бы процесс посреди замены бинарника: Ctrl+C, обрыв ssh,
+// SIGTERM и SIGPIPE (запись в закрытый терминал). Возвращает функцию, которая возвращает обычное поведение.
+func guardSignals() func() {
+	ch := make(chan os.Signal, 8)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGPIPE)
+	return func() { signal.Stop(ch) }
 }

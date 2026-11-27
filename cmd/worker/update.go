@@ -47,6 +47,9 @@ type updater struct {
 	Out            io.Writer
 	Backup         func(ctx context.Context) (string, error)
 	Restart        func(ctx context.Context) error
+	// Guard вызывается перед заменой бинарника и возвращает функцию, которая снимает защиту. Пока она включена,
+	// процесс не умирает от Ctrl+C, обрыва ssh (SIGHUP, SIGPIPE) и SIGTERM: проверка и откат доводятся до конца.
+	Guard func() func()
 	// Health ждёт, пока служба ответит на /healthz. Нет (nil): проверки нет.
 	Health func(ctx context.Context) error
 }
@@ -127,6 +130,9 @@ func (u *updater) Run(ctx context.Context, tag string) error {
 // swap кладёт новый бинарник на место прежнего: прежний копируется рядом, новый встаёт переименованием.
 // Потом служба перезапускается и проверяется. Не поднялась: возвращается прежний бинарник.
 func (u *updater) swap(ctx context.Context, newPath string) error {
+	if u.Guard != nil {
+		defer u.Guard()()
+	}
 	if err := os.Chmod(newPath, 0o755); err != nil {
 		return err
 	}
@@ -156,7 +162,8 @@ func (u *updater) start(ctx context.Context) error {
 	return u.Health(ctx)
 }
 
-// rollback возвращает прежний бинарник и перезапускает службу. Идёт до конца, даже если владелец нажал Ctrl+C.
+// rollback возвращает прежний бинарник и перезапускает службу. Контекст не отменяется, а сигналы на это время
+// перехвачены через Guard, поэтому откат идёт до конца, даже если владелец нажал Ctrl+C или оборвался ssh.
 func (u *updater) rollback(ctx context.Context, oldPath string, cause error) error {
 	ctx = context.WithoutCancel(ctx)
 	fmt.Fprintf(u.Out, "Новая версия не поднялась: %v\nВозвращаю прежнюю.\n", cause)
