@@ -1,0 +1,15 @@
+{
+  "id": 67,
+  "segment": "all",
+  "text": "\u003cb\u003eПривет\u003c/b\u003e",
+  "button_text": "Открыть",
+  "button_url": "https://example.com",
+  "status": "running",
+  "total": 30,
+  "sent": 25,
+  "failed": 0,
+  "blocked": 0,
+  "created_at": "2026-01-01T12:00:00Z",
+  "started_at": "2026-01-01T12:00:00Z",
+  "done_at": null
+}

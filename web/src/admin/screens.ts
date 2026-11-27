@@ -1,4 +1,5 @@
 import type { Component } from 'svelte'
+import Broadcasts from './Broadcasts.svelte'
 import Payments from './Payments.svelte'
 import Promos from './Promos.svelte'
 import Tariffs from './Tariffs.svelte'
@@ -15,4 +16,5 @@ export const screens: Record<string, Screen> = {
   payments: plain(Payments),
   tariffs: plain(Tariffs),
   promos: plain(Promos),
+  broadcasts: plain(Broadcasts),
 }

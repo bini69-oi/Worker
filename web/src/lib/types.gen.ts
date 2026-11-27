@@ -14,6 +14,27 @@ export interface AdminBalance {
   balance: number;
 }
 
+export interface AdminBroadcast {
+  id: number;
+  segment: string;
+  text: string;
+  button_text: string;
+  button_url: string;
+  status: string;
+  total: number;
+  sent: number;
+  failed: number;
+  blocked: number;
+  created_at: string;
+  started_at: string | null;
+  done_at: string | null;
+}
+
+export interface AdminBroadcastList {
+  items: AdminBroadcast[];
+  next: number;
+}
+
 export interface AdminDevice {
   hwid: string;
   platform: string;
@@ -85,6 +106,10 @@ export interface AdminPromo {
 export interface AdminPromoList {
   items: AdminPromo[];
   next: number;
+}
+
+export interface AdminSegmentCount {
+  count: number;
 }
 
 export interface AdminSquad {

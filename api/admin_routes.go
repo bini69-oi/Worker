@@ -46,6 +46,14 @@ func (a *adminAPI) routes() []adminRoute {
 		{"POST /api/admin/promos/{id}", core.PermPromo, a.promoSave},
 		{"POST /api/admin/promos/{id}/active", core.PermPromo, a.promoActive},
 
+		{"GET /api/admin/broadcasts", core.PermBroadcast, a.broadcastsList},
+		{"GET /api/admin/broadcasts/segment", core.PermBroadcast, a.broadcastSegment},
+		{"GET /api/admin/broadcasts/{id}", core.PermBroadcast, a.broadcastGet},
+		{"POST /api/admin/broadcasts", core.PermBroadcast, a.broadcastCreate},
+		{"POST /api/admin/broadcasts/{id}/test", core.PermBroadcast, a.broadcastTest},
+		{"POST /api/admin/broadcasts/{id}/start", core.PermBroadcast, a.broadcastStart},
+		{"POST /api/admin/broadcasts/{id}/cancel", core.PermBroadcast, a.broadcastCancel},
+
 		{"GET /api/admin/payments", core.PermStats, a.paymentsList},
 		{"POST /api/admin/payments/{id}/confirm", core.PermGrant, a.paymentConfirm},
 		{"POST /api/admin/payments/{id}/refund", core.PermOwner, a.paymentRefund},

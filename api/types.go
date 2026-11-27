@@ -17,6 +17,9 @@ func Types() []reflect.Type {
 		reflect.TypeFor[AdminTariff](),
 		reflect.TypeFor[AdminPromoList](),
 		reflect.TypeFor[AdminPromo](),
+		reflect.TypeFor[AdminBroadcastList](),
+		reflect.TypeFor[AdminBroadcast](),
+		reflect.TypeFor[AdminSegmentCount](),
 		reflect.TypeFor[AdminBalance](),
 		reflect.TypeFor[AdminExpires](),
 	}

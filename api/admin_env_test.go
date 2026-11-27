@@ -29,16 +29,17 @@ var t0 = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
 // adminEnv это сервер админки на фейках: ядро, часы, хранилище, панель.
 type adminEnv struct {
-	t     *testing.T
-	s     *Server
-	c     *core.Core
-	st    *coretest.Store
-	clock *coretest.Clock
-	cfg   *settings.Settings
-	panel *coretest.Panel
-	notes *coretest.Notifier
-	stars *stars.Gateway
-	owner string // cookie владельца
+	t      *testing.T
+	s      *Server
+	c      *core.Core
+	st     *coretest.Store
+	clock  *coretest.Clock
+	cfg    *settings.Settings
+	panel  *coretest.Panel
+	notes  *coretest.Notifier
+	stars  *stars.Gateway
+	sender *coretest.Sender
+	owner  string // cookie владельца
 }
 
 func newAdminEnv(t *testing.T) *adminEnv {
@@ -51,7 +52,8 @@ func newAdminEnv(t *testing.T) *adminEnv {
 		}
 	}
 	e.stars = stars.New(e.cfg)
-	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes, OwnerID: adminOwner,
+	e.sender = &coretest.Sender{}
+	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes, OwnerID: adminOwner, Sender: e.sender,
 		Gateways: []core.Gateway{manual.New(e.cfg), e.stars}})
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	// Часы лимита запросов идут вперёд сами: тесты шлют много запросов подряд, а часы ядра стоят на месте.
