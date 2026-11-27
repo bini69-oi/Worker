@@ -18,4 +18,5 @@ export interface AdminMe {
 export interface ErrorBody {
   code: string;
   text: string;
+  detail?: string;
 }

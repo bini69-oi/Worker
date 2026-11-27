@@ -3,9 +3,11 @@ package core
 import (
 	"context"
 	"errors"
+	"html"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // maxQuery это предел текста поиска: Telegram ID, код рефералки и имя короче.
@@ -132,4 +134,34 @@ func (c *Core) cardDevices(ctx context.Context, userID int64) ([]PanelDevice, bo
 		return nil, true
 	}
 	return nil, false
+}
+
+// maxMessage это предел сообщения Telegram.
+const maxMessage = 4096
+
+// SendToUser отправляет абоненту сообщение от бота через очередь. Нужно право support. Текст админа
+// показывается как есть: разметка в нём экранируется. Абонент, заблокировавший бота, даёт ErrUnreachable.
+func (c *Core) SendToUser(ctx context.Context, actorTg, userID int64, text string) error {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ErrInvalid
+	}
+	if len([]rune(text)) > maxMessage {
+		return ErrTooLong
+	}
+	return c.asAdmin(ctx, actorTg, PermSupport, "user.message", func(tx Tx, _ Admin, now time.Time) (string, map[string]string, error) {
+		u, err := tx.User(userID)
+		if err != nil {
+			return "", nil, err
+		}
+		if !u.UnreachableAt.IsZero() {
+			return "", nil, ErrUnreachable
+		}
+		task := NotifyTask{UserID: userID, Key: "notify.support_reply", Vars: map[string]string{"text": html.EscapeString(text)}}
+		if err := enqueueNotify(tx, task, now); err != nil {
+			return "", nil, err
+		}
+		short := []rune(text)
+		return itoa(userID), map[string]string{"text": string(short[:min(len(short), 200)])}, nil
+	})
 }

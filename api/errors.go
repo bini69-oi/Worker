@@ -11,6 +11,8 @@ import (
 type ErrorBody struct {
 	Code string `json:"code"`
 	Text string `json:"text"`
+	// Detail это пояснение админу: какой тег не разрешён, какие подстановки допустимы. У абонента его нет.
+	Detail string `json:"detail,omitempty"`
 }
 
 // statuses это HTTP-статусы ошибок ядра. Ошибка ядра без записи здесь отвечает 409: запрос верный,
@@ -22,6 +24,10 @@ var statuses = map[*core.Error]int{
 	core.ErrOwnerOnly:      http.StatusForbidden,
 	core.ErrInvalid:        http.StatusBadRequest,
 	core.ErrTooLong:        http.StatusRequestEntityTooLarge,
+	core.ErrBadMarkup:      http.StatusBadRequest,
+	core.ErrBadText:        http.StatusBadRequest,
+	core.ErrBadSetting:     http.StatusBadRequest,
+	core.ErrPeriodTooLong:  http.StatusBadRequest,
 	core.ErrZeroAmount:     http.StatusBadRequest,
 	core.ErrNeedComment:    http.StatusBadRequest,
 	core.ErrMaintenance:    http.StatusServiceUnavailable,
@@ -55,5 +61,10 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	if ce == core.ErrInternal {
 		s.deps.Log.Error("внутренняя ошибка API", "method", r.Method, "path", r.URL.Path, "err", err)
 	}
-	s.write(w, status, ErrorBody{Code: ce.Code, Text: s.deps.Text(ce.Key, langOf(r.Context()))})
+	body := ErrorBody{Code: ce.Code, Text: s.deps.Text(ce.Key, langOf(r.Context()))}
+	var d interface{ Detail() string }
+	if errors.As(err, &d) {
+		body.Detail = d.Detail()
+	}
+	s.write(w, status, body)
 }
