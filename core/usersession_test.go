@@ -104,8 +104,18 @@ func TestUserSessionUnknownAndBan(t *testing.T) {
 	if err := e.c.Ban(ctx, owner, e.user.ID, ""); err != nil {
 		t.Fatal(err)
 	}
+	if _, _, err := e.c.SessionUser(ctx, tok); !errors.Is(err, core.ErrBanned) {
+		t.Fatalf("забаненный с живым токеном: %v", err)
+	}
+	// После разбана видно, что бан закрыл сессию: входить надо заново.
+	if err := e.c.Unban(ctx, owner, e.user.ID, ""); err != nil {
+		t.Fatal(err)
+	}
 	if _, _, err := e.c.SessionUser(ctx, tok); !errors.Is(err, core.ErrSessionGone) {
 		t.Fatalf("бан не закрыл сессию: %v", err)
+	}
+	if err := e.c.Ban(ctx, owner, e.user.ID, ""); err != nil {
+		t.Fatal(err)
 	}
 	if _, _, err := e.c.OpenSession(ctx, e.user.ID, core.SessionTg, webInfo); !errors.Is(err, core.ErrBanned) {
 		t.Fatalf("забаненному выдана сессия: %v", err)

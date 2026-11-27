@@ -47,6 +47,12 @@ func TestUserSessionOnSQLite(t *testing.T) {
 	if err := c.Ban(ctx, 1, u.ID, ""); err != nil {
 		t.Fatal(err)
 	}
+	if _, _, err := c.SessionUser(ctx, tok2); err != core.ErrBanned {
+		t.Fatalf("забаненный с живым токеном: %v", err)
+	}
+	if err := c.Unban(ctx, 1, u.ID, ""); err != nil {
+		t.Fatal(err)
+	}
 	if _, _, err := c.SessionUser(ctx, tok2); err != core.ErrSessionGone {
 		t.Fatalf("бан не закрыл сессию: %v", err)
 	}

@@ -12,7 +12,8 @@ const maxTopup = 1_000_000 * 100
 
 func (a *App) payRoutes() {
 	a.handle("POST /api/app/topup", a.topup)
-	a.handle("GET /api/app/payments/{id}", a.payment)
+	// Статус платежа виден и во время техработ: оплата зачисляется всегда, абонент ждёт её результата.
+	a.handleOpen("GET /api/app/payments/{id}", a.payment)
 }
 
 // topup создаёт платёж. Stars: ссылка на счёт Telegram, её открывает WebApp.openInvoice. Остальные кассы:

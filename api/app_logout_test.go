@@ -40,8 +40,15 @@ func TestBanClosesSessions(t *testing.T) {
 	if err := e.c.Ban(t.Context(), testOwner, u.ID, "спам"); err != nil {
 		t.Fatal(err)
 	}
-	if rec := e.as(tok, "POST", "/api/app/logout", "{}"); rec.Code != 401 {
+	if rec := e.as(tok, "POST", "/api/app/logout", "{}"); rec.Code != 403 {
 		t.Fatalf("сессия забаненного: %d", rec.Code)
+	}
+	// После разбана видно, что сессия закрыта.
+	if err := e.c.Unban(t.Context(), testOwner, u.ID, ""); err != nil {
+		t.Fatal(err)
+	}
+	if rec := e.as(tok, "POST", "/api/app/logout", "{}"); rec.Code != 401 {
+		t.Fatalf("сессия после разбана: %d", rec.Code)
 	}
 }
 
