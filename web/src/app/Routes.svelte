@@ -13,6 +13,7 @@
   import Pay from './Pay.svelte'
   import Promo from './Promo.svelte'
   import Ref from './Ref.svelte'
+  import Sub from './Sub.svelte'
   import Topup from './Topup.svelte'
 
   type Screen = Component<{ params: Record<string, string> }>
@@ -23,6 +24,7 @@
     ['/topup', Topup as unknown as Screen],
     ['/topup/:amount', Topup as unknown as Screen],
     ['/pay/:id', Pay as unknown as Screen],
+    ['/sub', Sub as unknown as Screen],
     ['/devices', Devices as unknown as Screen],
     ['/ref', Ref as unknown as Screen],
     ['/promo', Promo as unknown as Screen],
