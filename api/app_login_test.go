@@ -1,0 +1,115 @@
+package api
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+)
+
+// startLogin начинает вход в браузере и отдаёт ответ сайта и nonce из ссылки бота.
+func startLogin(t *testing.T, e *appEnv) (LoginStartResponse, string) {
+	t.Helper()
+	rec := e.req("POST", "/api/app/login", "{}")
+	if rec.Code != 200 {
+		t.Fatalf("начало входа: %d %s", rec.Code, rec.Body)
+	}
+	var st LoginStartResponse
+	decode(t, rec, &st)
+	nonce, ok := strings.CutPrefix(st.Link, "https://t.me/worker_bot?start=web_")
+	if !ok || st.ID == "" || len(st.Code) != 2 {
+		t.Fatalf("ответ входа: %+v", st)
+	}
+	return st, nonce
+}
+
+func poll(e *appEnv, id string) *httptest.ResponseRecorder {
+	return e.req("GET", "/api/app/login/"+id, "")
+}
+
+func TestLoginBrowserFlow(t *testing.T) {
+	e := newAppEnv(t)
+	u, _ := e.c.Register(t.Context(), 55, "ivan", "ru")
+	st, nonce := startLogin(t, e)
+	var p LoginPollResponse
+	rec := poll(e, st.ID)
+	decode(t, rec, &p)
+	if rec.Code != 200 || p.State != "pending" || cookieNamed(rec, SessionCookie) != nil {
+		t.Fatalf("до нажатия: %d %+v", rec.Code, p)
+	}
+	prompt, err := e.c.WebLoginOpen(t.Context(), nonce, u.TgID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := e.c.WebLoginAnswer(t.Context(), prompt.ID, u.TgID, st.Code); err != nil || !ok {
+		t.Fatalf("нажатие: %v %v", ok, err)
+	}
+	rec = poll(e, st.ID)
+	decode(t, rec, &p)
+	if p.State != "confirmed" {
+		t.Fatalf("после нажатия: %+v", p)
+	}
+	c := cookieNamed(rec, SessionCookie)
+	if c == nil {
+		t.Fatal("cookie не поставлена")
+	}
+	if !c.HttpOnly || !c.Secure || c.SameSite != http.SameSiteStrictMode || c.Path != "/api/app" || c.MaxAge != 30*24*3600 {
+		t.Fatalf("флаги cookie: %+v", c)
+	}
+	if strings.Contains(rec.Body.String(), c.Value) {
+		t.Fatal("токен попал в тело ответа")
+	}
+	// Cookie даёт вход: выход с ней требует X-Worker, как любой изменяющий запрос.
+	if out := e.req("POST", "/api/app/logout", "{}", "Cookie", SessionCookie+"="+c.Value); out.Code != 403 {
+		t.Fatalf("выход без X-Worker: %d", out.Code)
+	}
+	out := e.req("POST", "/api/app/logout", "{}", "Cookie", SessionCookie+"="+c.Value, "X-Worker", "1")
+	if out.Code != 200 {
+		t.Fatalf("выход: %d %s", out.Code, out.Body)
+	}
+	if gone := cookieNamed(out, SessionCookie); gone == nil || gone.MaxAge >= 0 {
+		t.Fatalf("cookie не стёрта: %+v", gone)
+	}
+	if again := e.req("POST", "/api/app/logout", "{}", "Cookie", SessionCookie+"="+c.Value, "X-Worker", "1"); again.Code != 401 {
+		t.Fatalf("закрытая сессия: %d", again.Code)
+	}
+	// Сессия выдаётся один раз.
+	rec = poll(e, st.ID)
+	decode(t, rec, &p)
+	if p.State != "expired" || cookieNamed(rec, SessionCookie) != nil {
+		t.Fatalf("повторный опрос: %+v", p)
+	}
+}
+
+func TestLoginRejectedAndExpired(t *testing.T) {
+	e := newAppEnv(t)
+	u, _ := e.c.Register(t.Context(), 55, "ivan", "ru")
+	st, nonce := startLogin(t, e)
+	prompt, _ := e.c.WebLoginOpen(t.Context(), nonce, u.TgID)
+	if _, err := e.c.WebLoginAnswer(t.Context(), prompt.ID, u.TgID, "no"); err != nil {
+		t.Fatal(err)
+	}
+	var p LoginPollResponse
+	rec := poll(e, st.ID)
+	decode(t, rec, &p)
+	if p.State != "rejected" || cookieNamed(rec, SessionCookie) != nil {
+		t.Fatalf("«Это не я»: %+v", p)
+	}
+	st2, _ := startLogin(t, e)
+	e.clock.Add(6 * time.Minute)
+	decode(t, poll(e, st2.ID), &p)
+	if p.State != "expired" {
+		t.Fatalf("истёкший запрос: %+v", p)
+	}
+	if rec := poll(e, "чужой"); rec.Code != 200 {
+		t.Fatalf("неизвестный id: %d", rec.Code)
+	}
+}
+
+func TestLoginStartBody(t *testing.T) {
+	e := newAppEnv(t)
+	if rec := e.req("POST", "/api/app/login", `{"tg_id":5}`); rec.Code != 400 {
+		t.Fatalf("лишнее поле: %d", rec.Code)
+	}
+}

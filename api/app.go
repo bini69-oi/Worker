@@ -49,6 +49,7 @@ func RegisterApp(s *Server, d AppDeps) *App {
 		loginRate: &guard.Limiter{Max: loginStarts, Window: loginWindow, Now: s.deps.Now},
 		authFail:  &guard.Limiter{Max: authFailLimit, Window: time.Minute, Now: s.deps.Now}}
 	a.sessionRoutes()
+	a.loginRoutes()
 	return a
 }
 

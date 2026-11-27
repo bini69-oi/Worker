@@ -25,5 +25,7 @@ type SessionResponse struct {
 func appTypes() []reflect.Type {
 	return []reflect.Type{
 		reflect.TypeFor[SessionResponse](),
+		reflect.TypeFor[LoginStartResponse](),
+		reflect.TypeFor[LoginPollResponse](),
 	}
 }

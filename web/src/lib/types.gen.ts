@@ -5,6 +5,17 @@ export interface ErrorBody {
   text: string;
 }
 
+export interface LoginPollResponse {
+  state: string;
+}
+
+export interface LoginStartResponse {
+  id: string;
+  code: string;
+  link: string;
+  expires_at: string;
+}
+
 export interface SessionResponse {
   token: string;
   lang: string;
