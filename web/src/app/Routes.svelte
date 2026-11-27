@@ -4,6 +4,7 @@
   import { useT } from '../lib/context'
   import { match } from '../lib/router'
   import { useApp } from './context'
+  import Buy from './Buy.svelte'
   import Connect from './Connect.svelte'
   import Home from './Home.svelte'
   import Notice from './Notice.svelte'
@@ -13,6 +14,9 @@
   const routes: [string, Screen][] = [
     ['/', Home as unknown as Screen],
     ['/connect', Connect as unknown as Screen],
+    ['/buy', Buy as unknown as Screen],
+    ['/buy/:tariff', Buy as unknown as Screen],
+    ['/buy/:tariff/:days', Buy as unknown as Screen],
   ]
 
   const t = useT()

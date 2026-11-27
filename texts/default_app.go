@@ -76,4 +76,18 @@ var appDefs = []Def{
 	{Key: "app.connect_nosub", Default: "Сначала нужна подписка", En: "You need a subscription first"},
 	{Key: "app.connect_pending", Default: "Подписку ещё оформляют. Это занимает не больше минуты.", En: "Your subscription is still being set up. It takes up to a minute."},
 	{Key: "app.connect_check", Default: "Проверить ещё раз", En: "Check again"},
+
+	// Покупка.
+	{Key: "app.buy_title", Default: "Тариф", En: "Plan"},
+	{Key: "app.buy_empty", Default: "Тарифов пока нет", En: "No plans yet"},
+	{Key: "app.buy_limits", Params: []string{"traffic", "devices"}, Default: "Трафик: {traffic}. Устройства: {devices}", En: "Traffic: {traffic}. Devices: {devices}"},
+	{Key: "app.buy_from", Params: []string{"price"}, Default: "от {price}", En: "from {price}"},
+	{Key: "app.buy_period_title", Default: "Срок", En: "Term"},
+	{Key: "app.buy_days", Params: []string{"days"}, Default: "{days} дн.", En: "{days} days"},
+	{Key: "app.buy_price", Default: "Цена", En: "Price"},
+	{Key: "app.buy_balance", Default: "На балансе", En: "On balance"},
+	{Key: "app.buy_missing", Default: "Не хватает", En: "Missing"},
+	{Key: "app.buy_pay", Default: "Оплатить с баланса", En: "Pay from balance"},
+	{Key: "app.buy_topup_diff", Params: []string{"amount"}, Default: "Пополнить на {amount}", En: "Top up {amount}"},
+	{Key: "app.buy_queued", Params: []string{"date"}, Default: "Этот тариф включится {date}, когда закончится текущий.", En: "This plan starts on {date}, when the current one ends."},
 }
