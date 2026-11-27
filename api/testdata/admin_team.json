@@ -1,0 +1,28 @@
+{
+  "items": [
+    {
+      "tg_id": 1,
+      "owner": true,
+      "perms": [
+        "users",
+        "grant",
+        "ban",
+        "promo",
+        "tariffs",
+        "broadcast",
+        "stats",
+        "support"
+      ],
+      "disabled": false
+    },
+    {
+      "tg_id": 71,
+      "owner": false,
+      "perms": [
+        "users",
+        "support"
+      ],
+      "disabled": false
+    }
+  ]
+}

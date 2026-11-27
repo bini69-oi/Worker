@@ -10,6 +10,11 @@ export interface AdminAudit {
   at: string;
 }
 
+export interface AdminAuditList {
+  items: AdminAudit[];
+  next: number;
+}
+
 export interface AdminBalance {
   balance: number;
 }
@@ -92,6 +97,13 @@ export interface AdminMe {
   perms: string[];
 }
 
+export interface AdminMember {
+  tg_id: number;
+  owner: boolean;
+  perms: string[];
+  disabled: boolean;
+}
+
 export interface AdminNotify {
   bound: boolean;
   topics: AdminTopic[];
@@ -139,6 +151,20 @@ export interface AdminPromoList {
 
 export interface AdminSegmentCount {
   count: number;
+}
+
+export interface AdminSession {
+  id: string;
+  admin_tg: number;
+  ip: string;
+  agent: string;
+  created_at: string;
+  seen_at: string;
+  current: boolean;
+}
+
+export interface AdminSessionList {
+  items: AdminSession[];
 }
 
 export interface AdminSetting {
@@ -196,6 +222,10 @@ export interface AdminTariffList {
   tariffs: AdminTariff[];
   squads: AdminSquad[];
   squads_ok: boolean;
+}
+
+export interface AdminTeam {
+  items: AdminMember[];
 }
 
 export interface AdminText {

@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "id": 5,
+      "admin_tg": 1,
+      "action": "sub.grant_days",
+      "target": "7",
+      "details": {
+        "days": "30"
+      },
+      "ip": "203.0.113.5",
+      "at": "2026-01-01T12:00:00Z"
+    }
+  ],
+  "next": 0
+}
