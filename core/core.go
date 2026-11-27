@@ -19,6 +19,7 @@ func (SystemClock) Now() time.Time { return time.Now() }
 
 // Store это хранилище ядра. Реализует его пакет store на SQLite, в тестах стоит фейк из coretest.
 type Store interface {
+	AdminStore
 	// Tx выполняет fn в одной транзакции: либо всё, либо ничего.
 	Tx(ctx context.Context, fn func(Tx) error) error
 	User(ctx context.Context, id int64) (User, error)
