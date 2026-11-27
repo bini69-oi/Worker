@@ -7,8 +7,10 @@
 ## Один раз: ключ подписи
 
 1. На своём компьютере, не на сервере с ботом: `worker sign keygen`.
-2. Закрытый ключ (строка после `RELEASE_SIGNING_KEY=`) положите в менеджер паролей и в секрет репозитория:
-   Settings, Secrets and variables, Actions, New repository secret, имя `RELEASE_SIGNING_KEY`.
+2. Закрытый ключ (строка после `RELEASE_SIGNING_KEY=`) положите в менеджер паролей и в секрет **окружения** `release`:
+   Settings, Environments, New environment `release`, там Add environment secret, имя `RELEASE_SIGNING_KEY`.
+   В окружении можно включить Required reviewers: подпись пойдёт только после вашего подтверждения.
+   Секрет доступен одной задаче `sign`, в которой нет стороннего кода.
    Больше нигде он не нужен и не показывается. Потерян ключ: выпустите новую пару, старые установки обновятся вручную.
 3. Открытый ключ (блок `BEGIN PUBLIC KEY`) сохраните в `install/release.pub` вместо заглушки.
 4. Вставьте тот же блок в `install/install.sh` между строками `BEGIN RELEASE KEY` и `END RELEASE KEY`.
@@ -19,10 +21,11 @@
 
 ## Каждый релиз
 
-1. `make check` зелёный, изменения в `main`.
+1. `make check` зелёный, изменения в `main`. Тег ставьте только на коммит из `main`: на другой коммит сборка не пойдёт.
 2. `git tag v1.2.3 && git push origin v1.2.3`.
-3. В Actions пройдёт `release`: проверки, сборка `worker-linux-amd64` и `worker-linux-arm64`, `SHA256SUMS`, подпись
-   `SHA256SUMS.sig`, проверка подписи ключом из репозитория, публикация.
+3. В Actions пройдёт `release` в три задачи: `build` (проверки, сборка `worker-linux-amd64` и `worker-linux-arm64`,
+   `SHA256SUMS`, без секретов), `sign` (подпись `SHA256SUMS.sig` и проверка ключом из репозитория, нужно подтверждение, если
+   оно включено) и `publish` (публикация).
 4. Откройте релиз: четыре файла (два бинарника, суммы, подпись). Проверьте на тестовом сервере `worker update`.
 
 Проверить релиз руками:

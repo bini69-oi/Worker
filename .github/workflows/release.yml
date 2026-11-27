@@ -1,6 +1,8 @@
 name: release
 
-# Релиз по тегу vX.Y.Z: два бинарника, SHA256SUMS и подпись SHA256SUMS.sig.
+# Релиз по тегу vX.Y.Z: два бинарника, SHA256SUMS (первая строка version vX.Y.Z) и подпись SHA256SUMS.sig.
+# Три задачи с разными правами: build собирает (стороннего кода много, секретов нет), sign подписывает
+# (секрет только здесь, чужой код не запускается), publish публикует (единственная с правом писать в релизы).
 on:
   push:
     tags:
@@ -10,30 +12,39 @@ permissions:
   contents: read
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
-    # Писать в релизы может только эта задача.
-    permissions:
-      contents: write
     steps:
       # Действия закреплены по хэшу коммита: подмена тега у автора действия не попадёт в сборку.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
-        with:
-          go-version-file: go.mod
+          fetch-depth: 0
+
+      - name: Тег стоит на коммите из main
+        run: |
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD || { echo "тег стоит не на коммите из main, релиз не собирается"; exit 1; }
 
       - name: Открытый ключ на месте
         run: grep -q 'BEGIN PUBLIC KEY' install/release.pub || { echo "в install/release.pub заглушка, ключ не создан (docs/release.md)"; exit 1; }
 
+      # Кэш выключен: отравленный кэш из другой ветки не попадёт в сборку, которую потом подпишут.
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
       - run: go install honnef.co/go/tools/cmd/staticcheck@2026.2.2
       - run: make check
 
+      # Скрипты зависимостей не запускаются: сборка Svelte их не требует, а секретов здесь нет.
       - name: Фронт
         run: |
           if [ -f web/package.json ]; then
-            (cd web && npm ci && npm run build)
+            (cd web && npm ci --ignore-scripts && npm run build)
           fi
 
       - name: Сборка
@@ -48,16 +59,68 @@ jobs:
           # Версия подписывается вместе с суммами: старый подписанный релиз нельзя выдать за новый.
           (cd dist && { echo "version $TAG"; sha256sum worker-linux-amd64 worker-linux-arm64; } > SHA256SUMS)
 
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist
+          path: dist
+          if-no-files-found: error
+
+  sign:
+    needs: build
+    runs-on: ubuntu-latest
+    # Секрет RELEASE_SIGNING_KEY лежит в окружении release, можно требовать подтверждение владельца.
+    environment: release
+    steps:
+      # Чистая проверка того же коммита: без Node и без кэшей. Подписывающий инструмент собирается здесь.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - run: go build -o "$RUNNER_TEMP/sign" ./cmd/sign
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist
+
+      - name: Артефакты те, что нужны
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          cd dist
+          [ "$(ls | sort | tr '\n' ' ')" = "SHA256SUMS worker-linux-amd64 worker-linux-arm64 " ] || { echo "в артефактах лишнее или чего-то нет"; exit 1; }
+          [ "$(head -n1 SHA256SUMS)" = "version $TAG" ] || { echo "версия в SHA256SUMS не совпадает с тегом"; exit 1; }
+          tail -n +2 SHA256SUMS | sha256sum -c -
+
       - name: Подпись
         env:
           RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
-        run: go run ./cmd/sign dist/SHA256SUMS dist/SHA256SUMS.sig
+        run: "$RUNNER_TEMP/sign" dist/SHA256SUMS dist/SHA256SUMS.sig
 
       - name: Подпись сходится с ключом в репозитории
         run: openssl pkeyutl -verify -pubin -inkey install/release.pub -rawin -in dist/SHA256SUMS -sigfile dist/SHA256SUMS.sig
 
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: signed
+          path: dist
+          if-no-files-found: error
+
+  publish:
+    needs: sign
+    runs-on: ubuntu-latest
+    # Писать в релизы может только эта задача.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: signed
+          path: dist
       - name: Публикация
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" dist/worker-linux-amd64 dist/worker-linux-arm64 dist/SHA256SUMS dist/SHA256SUMS.sig --title "$TAG" --generate-notes
+        run: gh release create "$TAG" dist/worker-linux-amd64 dist/worker-linux-arm64 dist/SHA256SUMS dist/SHA256SUMS.sig --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes
