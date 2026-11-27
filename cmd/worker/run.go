@@ -12,6 +12,7 @@ import (
 
 	"github.com/bini69-oi/worker/api"
 	"github.com/bini69-oi/worker/apps"
+	"github.com/bini69-oi/worker/backup"
 	"github.com/bini69-oi/worker/bot"
 	"github.com/bini69-oi/worker/core"
 	"github.com/bini69-oi/worker/guard"
@@ -127,9 +128,13 @@ func build(env Env, base slog.Handler) (*app, error) {
 	mux.Handle("GET /dl/{app}/{token}", hooks.Wrap(apps.Handler(c, env.SecretKey, time.Now,
 		func(key string) string { return tx.Render(key, cfg.String("lang.default"), nil) })))
 
+	bk := &backup.Service{
+		DB: db, Secret: env.SecretKey, Dir: backupDir(env.DBPath),
+		Keep: func() int { return int(cfg.Int("backup.keep")) }, Now: time.Now,
+	}
 	return &app{
 		db: db, cfg: cfg, texts: tx, core: c, tg: t, handler: guard.RealIP(mux), log: log,
-		jobs: &jobs.Scheduler{Jobs: jobs.CoreJobs(c, cfg), Log: log},
+		jobs: &jobs.Scheduler{Jobs: append(jobs.CoreJobs(c, cfg), jobs.BackupJob(bk)), Log: log},
 	}, nil
 }
 

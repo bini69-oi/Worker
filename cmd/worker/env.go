@@ -26,11 +26,47 @@ type Env struct {
 	DBPath     string
 	// TelegramURL это адрес Bot API. Пусто: боевой api.telegram.org. Нужен для своего сервера Bot API.
 	TelegramURL string
+	// HTTPAddr это адрес, на котором слушает HTTP. Пусто: берётся настройка http.addr из базы. Установщик ставит
+	// сюда 127.0.0.1:8080, чтобы служба не торчала наружу мимо https.
+	HTTPAddr string
+}
+
+// listenAddr это адрес HTTP: HTTP_ADDR из окружения главнее настройки из базы.
+func listenAddr(env Env, setting string) string {
+	if env.HTTPAddr != "" {
+		return env.HTTPAddr
+	}
+	return setting
 }
 
 var requiredKeys = []string{"BOT_TOKEN", "OWNER_TG_ID", "PUBLIC_URL", "PANEL_URL", "PANEL_TOKEN", "SECRET_KEY"}
 
 const defaultDBPath = "worker.db"
+
+// serverEnvFile это файл настроек, который создаёт install.sh.
+const serverEnvFile = "/etc/worker/env"
+
+// envPath это файл с настройками. Явный WORKER_ENV_FILE главнее всего. Дальше на установленном сервере
+// (есть /etc/worker/env) берётся серверный файл, а .env из текущей папки игнорируется: иначе чужой .env в папке,
+// куда зашёл root, подменил бы токены и пути базы. Root без серверного файла .env из папки тоже не читает.
+// Остальным (разработка на своём компьютере) нужен .env рядом.
+func envPath(getenv func(string) string, exists func(string) bool, euid int) string {
+	if p := getenv("WORKER_ENV_FILE"); p != "" {
+		return p
+	}
+	if exists(serverEnvFile) {
+		return serverEnvFile
+	}
+	if euid == 0 {
+		return ""
+	}
+	return ".env"
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
 
 // loadEnv читает файл .env (если он есть) и переменные процесса. Переменная процесса важнее файла.
 // Возвращает предупреждения, которые стоит записать в журнал. Ни ошибки, ни предупреждения не содержат значений.
@@ -71,6 +107,12 @@ func loadEnv(path string, getenv func(string) string) (Env, []string, error) {
 		}
 	}
 
+	if env.HTTPAddr = get("HTTP_ADDR"); env.HTTPAddr != "" {
+		if _, port, err := net.SplitHostPort(env.HTTPAddr); err != nil || !validPort(port) {
+			return Env{}, warns, errors.New("HTTP_ADDR: нужен адрес вида 127.0.0.1:8080")
+		}
+	}
+
 	env.OwnerID, err = strconv.ParseInt(get("OWNER_TG_ID"), 10, 64)
 	if err != nil || env.OwnerID <= 0 {
 		return Env{}, warns, errors.New("OWNER_TG_ID: нужен числовой Telegram ID владельца")
@@ -100,8 +142,8 @@ func readEnvFile(path string) (map[string]string, []string, error) {
 	defer f.Close()
 
 	var warns []string
-	if st, err := f.Stat(); err == nil && st.Mode().Perm()&0o077 != 0 {
-		warns = append(warns, fmt.Sprintf("%s читают другие пользователи сервера, выполните: chmod 600 %s", path, path))
+	if st, err := f.Stat(); err == nil && st.Mode().Perm()&0o007 != 0 {
+		warns = append(warns, fmt.Sprintf("%s читают другие пользователи сервера, выполните: chmod 640 %s (или 600)", path, path))
 	}
 
 	vals, err := parseEnv(f)
@@ -143,8 +185,13 @@ func unquote(s string) string {
 	return s
 }
 
+func validPort(p string) bool {
+	n, err := strconv.Atoi(p)
+	return err == nil && n > 0 && n < 65536
+}
+
 func knownKey(key string) bool {
-	return key == "DB_PATH" || key == "TELEGRAM_API_URL" || slices.Contains(requiredKeys, key)
+	return key == "DB_PATH" || key == "HTTP_ADDR" || key == "TELEGRAM_API_URL" || slices.Contains(requiredKeys, key)
 }
 
 // cleanURL проверяет адрес и убирает слэш в конце. Публичный адрес только https: иначе Telegram не примет вебхук.
