@@ -52,6 +52,7 @@ type Store interface {
 
 // Tx это действия внутри транзакции. Все изменения ядра идут только через Tx.
 type Tx interface {
+	CabinetTx
 	User(id int64) (User, error)
 	UserByTg(tgID int64) (User, error)
 	// CreateUser создаёт абонента. Повтор Telegram ID или реферального кода даёт ErrDuplicate.

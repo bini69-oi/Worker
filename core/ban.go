@@ -52,6 +52,11 @@ func (c *Core) setBan(ctx context.Context, actorTg, userID int64, on bool, comme
 		if err := tx.SetBanned(userID, at); err != nil {
 			return "", nil, err
 		}
+		if on { // бан закрывает все сессии кабинета сразу
+			if err := tx.CloseUserSessions(userID, now); err != nil {
+				return "", nil, err
+			}
+		}
 		if sub, err := tx.SubByUser(userID); err == nil {
 			if err := enqueueSync(tx, sub.ID, now); err != nil {
 				return "", nil, err
