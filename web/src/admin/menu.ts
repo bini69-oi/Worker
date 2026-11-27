@@ -11,6 +11,7 @@ export interface Section {
 export const sections: Section[] = [
   { id: 'overview', title: 'Сводка', perm: 'stats' },
   { id: 'users', title: 'Абоненты', perm: 'users' },
+  { id: 'payments', title: 'Платежи', perm: 'stats' },
 ]
 
 export function visible(me: AdminMe): Section[] {

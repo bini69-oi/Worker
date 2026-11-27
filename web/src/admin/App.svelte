@@ -3,7 +3,7 @@
   import { session, loadMe, logout } from './session.svelte'
   import { visible } from './menu'
   import Login from './Login.svelte'
-  import Users from './Users.svelte'
+  import { screens } from './screens'
 
   let hash = $state(location.hash)
   let fail = $state('')
@@ -18,6 +18,7 @@
   const parts = $derived(hash.replace(/^#\/?/, '').split('/').filter(Boolean))
   const menu = $derived(session.me ? visible(session.me) : [])
   const current = $derived(parts[0] ?? menu[0]?.id ?? '')
+  const Screen = $derived(menu.some((s) => s.id === current) ? screens[current] : undefined)
 </script>
 
 {#if fail}
@@ -35,8 +36,8 @@
     <button onclick={() => logout()}>Выйти</button>
   </nav>
   <main>
-    {#if current === 'users' && menu.some((s) => s.id === 'users')}
-      <Users id={parts[1] ? Number(parts[1]) : 0} />
+    {#if Screen}
+      <Screen arg={parts[1] ?? ''} />
     {:else}
       <p class="muted">Выберите раздел.</p>
     {/if}

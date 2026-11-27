@@ -4,7 +4,8 @@
   import { filters, rowView } from './usersView'
   import UserCard from './UserCard.svelte'
 
-  let { id = 0 }: { id?: number } = $props()
+  let { arg = '' }: { arg?: string } = $props()
+  const id = $derived(Number(arg) || 0)
 
   let q = $state('')
   let filter = $state('')
