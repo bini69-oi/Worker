@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Установщик Worker для Debian 11+ и Ubuntu 22.04+. Запуск от root:
+# Установщик Worker для Debian 12+ и Ubuntu 22.04+ (нужен OpenSSL 3). Запуск от root:
 #
 #   curl -fsSL https://raw.githubusercontent.com/bini69-oi/worker/main/install/install.sh | sudo bash
 #
@@ -53,15 +53,15 @@ require_root() {
 
 check_os() {
   local id version_id
-  [ -r "$OS_RELEASE" ] || die "не найден $OS_RELEASE: поддерживаются только Debian 11+ и Ubuntu 22.04+"
+  [ -r "$OS_RELEASE" ] || die "не найден $OS_RELEASE: поддерживаются только Debian 12+ и Ubuntu 22.04+"
   # shellcheck source=/dev/null
   id=$(. "$OS_RELEASE" && echo "${ID:-}")
   # shellcheck source=/dev/null
   version_id=$(. "$OS_RELEASE" && echo "${VERSION_ID:-}")
   case "$id" in
-    debian) version_at_least "$version_id" 11 || die "нужен Debian 11 или новее, у вас ${version_id:-неизвестная версия}" ;;
+    debian) version_at_least "$version_id" 12 || die "нужен Debian 12 или новее, у вас ${version_id:-неизвестная версия}" ;;
     ubuntu) version_at_least "$version_id" 22.04 || die "нужен Ubuntu 22.04 или новее, у вас ${version_id:-неизвестная версия}" ;;
-    *) die "поддерживаются только Debian 11+ и Ubuntu 22.04+, у вас: ${id:-неизвестная система}" ;;
+    *) die "поддерживаются только Debian 12+ и Ubuntu 22.04+, у вас: ${id:-неизвестная система}" ;;
   esac
 }
 
@@ -115,10 +115,24 @@ download_release() {
   fetch "$base/worker-linux-$arch" "$dir/worker-linux-$arch"
 }
 
-# verify_ed25519 KEY MSG SIG: подпись Ed25519 сходится. OpenSSL 3 просит -rawin, OpenSSL 1.1.1 такого ключа не знает.
+# verify_ed25519 KEY MSG SIG: подпись Ed25519 сходится. Нужен OpenSSL 3 (-rawin), это проверяет check_openssl.
 verify_ed25519() {
-  openssl pkeyutl -verify -pubin -inkey "$1" -rawin -in "$2" -sigfile "$3" >/dev/null 2>&1 ||
-    openssl pkeyutl -verify -pubin -inkey "$1" -in "$2" -sigfile "$3" >/dev/null 2>&1
+  openssl pkeyutl -verify -pubin -inkey "$1" -rawin -in "$2" -sigfile "$3" >/dev/null 2>&1
+}
+
+# openssl_version печатает вывод openssl version. Отдельной функцией, чтобы подменять в тестах.
+openssl_version() { openssl version 2>/dev/null || true; }
+
+# check_openssl: подпись релиза проверяется через OpenSSL 3. В OpenSSL 1.1.1 (Debian 11) проверки Ed25519 нет, а ставить
+# без проверки подписи нельзя, поэтому такие системы не поддерживаются. Проверка идёт раньше всего остального.
+check_openssl() {
+  local v
+  v=$(openssl_version)
+  case "$v" in
+    "OpenSSL "[3-9].* | "OpenSSL "[1-9][0-9].*) ;;
+    "") die "не найден openssl. Нужен OpenSSL 3: Debian 12+ или Ubuntu 22.04+ (apt install openssl)" ;;
+    *) die "нужен OpenSSL 3 для проверки подписи релиза (Debian 12+, Ubuntu 22.04+), у вас: $v. Установка без проверки подписи не делается" ;;
+  esac
 }
 
 # verify_release DIR ARCH VERSION: подпись списка сумм вшитым ключом, подписанная версия, сумма бинарника.
@@ -570,6 +584,7 @@ main() {
     printf '%s' "$version" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || die "версия задаётся как v1.2.3"
   fi
 
+  check_openssl
   require_root
   check_os
   check_tools

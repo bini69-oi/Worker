@@ -92,7 +92,7 @@ func TestScriptCheckOS(t *testing.T) {
 		ok            bool
 	}{
 		{"debian 12", "ID=debian\nVERSION_ID=\"12\"\n", true},
-		{"debian 11", "ID=debian\nVERSION_ID=\"11\"\n", true},
+		{"debian 11", "ID=debian\nVERSION_ID=\"11\"\n", false},
 		{"debian 10", "ID=debian\nVERSION_ID=\"10\"\n", false},
 		{"ubuntu 24.04", "ID=ubuntu\nVERSION_ID=\"24.04\"\n", true},
 		{"ubuntu 22.04", "ID=ubuntu\nVERSION_ID=\"22.04\"\n", true},
@@ -260,5 +260,34 @@ func TestScriptCheckNotDowngrade(t *testing.T) {
 		if (err == nil) != c.ok {
 			t.Errorf("%s: err=%v\n%s", c.name, err, out)
 		}
+	}
+}
+
+func TestScriptCheckOpenSSL(t *testing.T) {
+	cases := map[string]bool{
+		"OpenSSL 3.0.15 3 Sep 2024 (Library: OpenSSL 3.0.15 3 Sep 2024)": true,
+		"OpenSSL 3.5.0 8 Apr 2025":                                       true,
+		"OpenSSL 4.1.0 23 Oct 2026":                                      true,
+		"OpenSSL 1.1.1w  11 Sep 2023":                                    false,
+		"LibreSSL 3.3.6":                                                 false,
+		"":                                                               false,
+	}
+	for v, ok := range cases {
+		out, err := bash(t, nil, "openssl_version() { echo '"+v+"'; }; check_openssl")
+		if (err == nil) != ok {
+			t.Errorf("%q: ждали ok=%v, err=%v\n%s", v, ok, err, out)
+		}
+		if !ok && !strings.Contains(out, "OpenSSL 3") {
+			t.Errorf("%q: сообщение не говорит про OpenSSL 3: %s", v, out)
+		}
+	}
+}
+
+// Проверка OpenSSL идёт до всего остального в main.
+func TestScriptOpenSSLCheckedFirst(t *testing.T) {
+	s := scriptText(t)
+	main := s[strings.Index(s, "main() {"):]
+	if strings.Index(main, "check_openssl") > strings.Index(main, "require_root") {
+		t.Fatal("check_openssl должен идти раньше require_root")
 	}
 }
