@@ -117,6 +117,13 @@ type PaymentRow struct {
 type AdminStore interface {
 	// FindUsers ищет абонентов, новые первыми. Отдаёт не больше limit строк.
 	FindUsers(ctx context.Context, q UserQuery, now time.Time, limit int) ([]UserRow, error)
+	// Broadcasts отдаёт рассылки, новые первыми.
+	Broadcasts(ctx context.Context, after int64, limit int) ([]Broadcast, error)
+	BroadcastByID(ctx context.Context, id int64) (Broadcast, error)
+	// SegmentCount считает получателей сегмента: без забаненных и недоступных.
+	SegmentCount(ctx context.Context, segment string, now time.Time) (int, error)
+	// SegmentUsers отдаёт получателей сегмента с id больше after по возрастанию.
+	SegmentUsers(ctx context.Context, segment string, after int64, now time.Time, limit int) ([]User, error)
 	// PromoList отдаёт промокоды с числом активаций, новые первыми.
 	PromoList(ctx context.Context, after int64, limit int) ([]Promo, error)
 	// PromoByID отдаёт промокод. Нет такого: ErrNotFound.
@@ -127,4 +134,25 @@ type AdminStore interface {
 	UserPayments(ctx context.Context, userID int64, limit int) ([]Payment, error)
 	// AuditLog отдаёт записи журнала, новые первыми.
 	AuditLog(ctx context.Context, f AuditFilter, limit int) ([]AuditRow, error)
+}
+
+// AdminTx это записи админки внутри транзакции: рассылки.
+type AdminTx interface {
+	CreateBroadcast(b Broadcast) (int64, error)
+	// Broadcast отдаёт рассылку. Нет такой: ErrNotFound.
+	Broadcast(id int64) (Broadcast, error)
+	// RunningBroadcast отдаёт идущую рассылку. Нет идущей: ErrNotFound.
+	RunningBroadcast() (Broadcast, error)
+	// StartBroadcast переводит черновик в «идёт». false значит, что это уже не черновик. Вторая идущая рассылка
+	// даёт ErrDuplicate: база не пускает две сразу.
+	StartBroadcast(id int64, total int, at time.Time) (bool, error)
+	// CancelBroadcast отменяет черновик или идущую рассылку. false значит, что она уже закончена.
+	CancelBroadcast(id int64, at time.Time) (bool, error)
+	// BroadcastStep записывает итог по одному абоненту и двигает курсор, только если рассылка идёт.
+	// false значит, что её уже отменили: пачку надо остановить.
+	BroadcastStep(id, userID int64, sent, failed, blocked int) (bool, error)
+	// FinishBroadcast переводит идущую рассылку в «готово».
+	FinishBroadcast(id int64, at time.Time) (bool, error)
+	// SegmentCount считает получателей сегмента: без забаненных и недоступных.
+	SegmentCount(segment string, now time.Time) (int, error)
 }

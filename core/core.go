@@ -53,6 +53,7 @@ type Store interface {
 
 // Tx это действия внутри транзакции. Все изменения ядра идут только через Tx.
 type Tx interface {
+	AdminTx
 	User(id int64) (User, error)
 	UserByTg(tgID int64) (User, error)
 	// CreateUser создаёт абонента. Повтор Telegram ID или реферального кода даёт ErrDuplicate.
@@ -181,6 +182,8 @@ type Deps struct {
 	Notifier Notifier
 	Gateways []Gateway
 	Telegram TelegramAPI
+	// Sender шлёт сообщения рассылки. Может быть nil: рассылки не отправляются.
+	Sender BroadcastSender
 	// Channels проверяет подписку на канал перед пробным периодом. Может быть nil: проверки не будет.
 	Channels Channels
 	// OwnerID это Telegram ID владельца из окружения. Изнутри системы он не меняется.
@@ -206,6 +209,7 @@ type Core struct {
 	notifier Notifier
 	gateways []Gateway
 	telegram TelegramAPI
+	sender   BroadcastSender
 	channels Channels
 	owner    int64
 	log      *slog.Logger
@@ -227,11 +231,13 @@ func New(d Deps) *Core {
 	if d.Log == nil {
 		d.Log = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	return &Core{
+	c := &Core{
 		store: d.Store, clock: d.Clock, cfg: d.Config, panel: d.Panel,
 		notifier: d.Notifier, gateways: d.Gateways, telegram: d.Telegram, channels: d.Channels, owner: d.OwnerID, log: d.Log,
 		kick: make(chan struct{}, 1), actions: map[string]action{}, filter: d.Secrets,
+		sender: d.Sender,
 	}
+	return c
 }
 
 // Kick сигналит воркеру очереди, что появились задачи. Воркер слушает его вместе с таймером.
