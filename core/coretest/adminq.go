@@ -99,3 +99,26 @@ func (s *Store) Payments(_ context.Context, f core.PaymentFilter, limit int) ([]
 	}
 	return out, nil
 }
+
+func (s *Store) PromoList(_ context.Context, after int64, limit int) ([]core.Promo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var all []core.Promo
+	for _, p := range s.st.promos {
+		if after == 0 || p.ID < after {
+			all = append(all, p)
+		}
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].ID > all[j].ID })
+	return all[:min(len(all), limit)], nil
+}
+
+func (s *Store) PromoByID(_ context.Context, id int64) (core.Promo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, ok := s.st.promos[id]
+	if !ok {
+		return p, core.ErrNotFound
+	}
+	return p, nil
+}

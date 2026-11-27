@@ -117,6 +117,10 @@ type PaymentRow struct {
 type AdminStore interface {
 	// FindUsers ищет абонентов, новые первыми. Отдаёт не больше limit строк.
 	FindUsers(ctx context.Context, q UserQuery, now time.Time, limit int) ([]UserRow, error)
+	// PromoList отдаёт промокоды с числом активаций, новые первыми.
+	PromoList(ctx context.Context, after int64, limit int) ([]Promo, error)
+	// PromoByID отдаёт промокод. Нет такого: ErrNotFound.
+	PromoByID(ctx context.Context, id int64) (Promo, error)
 	// Payments отдаёт платежи всех касс с абонентами, новые первыми.
 	Payments(ctx context.Context, f PaymentFilter, limit int) ([]PaymentRow, error)
 	// UserPayments отдаёт платежи абонента, новые первыми.

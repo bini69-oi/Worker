@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -212,4 +213,45 @@ func (s *CoreStore) Payments(ctx context.Context, f core.PaymentFilter, limit in
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+func scanPromo(r scanner) (core.Promo, error) {
+	var p core.Promo
+	var kind string
+	var tariff, expires sql.NullInt64
+	var created int64
+	if err := r.Scan(&p.ID, &p.Code, &kind, &p.Value, &tariff, &p.MaxUses, &p.Uses, &p.NewOnly, &expires, &p.Active, &created); err != nil {
+		return p, err
+	}
+	p.Kind, p.TariffID, p.ExpiresAt, p.CreatedAt = core.PromoKind(kind), tariff.Int64, unix(expires), time.Unix(created, 0).UTC()
+	return p, nil
+}
+
+func (s *CoreStore) PromoList(ctx context.Context, after int64, limit int) ([]core.Promo, error) {
+	q, args := "SELECT "+promoCols+" FROM promo_codes", []any{}
+	if after > 0 {
+		q, args = q+" WHERE id < ?", append(args, after)
+	}
+	rows, err := s.db.R.QueryContext(ctx, q+" ORDER BY id DESC LIMIT ?", append(args, limit)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []core.Promo
+	for rows.Next() {
+		p, err := scanPromo(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (s *CoreStore) PromoByID(ctx context.Context, id int64) (core.Promo, error) {
+	p, err := scanPromo(s.db.R.QueryRowContext(ctx, "SELECT "+promoCols+" FROM promo_codes WHERE id = ?", id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return p, core.ErrNotFound
+	}
+	return p, err
 }

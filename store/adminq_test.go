@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -197,5 +198,32 @@ func TestPaymentsList(t *testing.T) {
 	}
 	if rows, _ = s.Payments(ctx, core.PaymentFilter{After: 2}, 50); len(rows) != 1 || rows[0].Payment.ID != 1 {
 		t.Errorf("курсор: %+v", rows)
+	}
+}
+
+func TestPromoList(t *testing.T) {
+	s, _ := newCoreStore(t)
+	ctx := context.Background()
+	tx(t, s, func(tx core.Tx) error {
+		for _, code := range []string{"AAAAAA", "BBBBBB", "CCCCCC"} {
+			if _, err := tx.SavePromo(core.Promo{Code: code, Kind: core.PromoDays, Value: 7, Active: true, CreatedAt: tNow}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	list, err := s.PromoList(ctx, 0, 2)
+	if err != nil || len(list) != 2 || list[0].Code != "CCCCCC" {
+		t.Fatalf("%+v %v", list, err)
+	}
+	if list, _ = s.PromoList(ctx, list[1].ID, 5); len(list) != 1 || list[0].Code != "AAAAAA" {
+		t.Errorf("курсор: %+v", list)
+	}
+	p, err := s.PromoByID(ctx, 2)
+	if err != nil || p.Code != "BBBBBB" {
+		t.Errorf("%+v %v", p, err)
+	}
+	if _, err := s.PromoByID(ctx, 99); !errors.Is(err, core.ErrNotFound) {
+		t.Errorf("%v", err)
 	}
 }
