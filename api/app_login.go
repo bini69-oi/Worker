@@ -22,7 +22,7 @@ func (a *App) loginStart(w http.ResponseWriter, r *http.Request) (any, error) {
 	if err := Decode(w, r, &in); err != nil {
 		return nil, err
 	}
-	if !a.loginRate.Allow(guard.Host(r.RemoteAddr)) {
+	if !a.loginRate.Allow(guard.Key(r.RemoteAddr)) {
 		return nil, core.ErrTooManyTries
 	}
 	st, err := a.Core.WebLoginStart(r.Context(), info(r))

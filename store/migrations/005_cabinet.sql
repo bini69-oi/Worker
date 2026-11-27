@@ -13,6 +13,7 @@ CREATE TABLE user_sessions (
     closed_at  INTEGER
 ) STRICT;
 CREATE INDEX user_sessions_user ON user_sessions (user_id) WHERE closed_at IS NULL;
+CREATE INDEX user_sessions_expires ON user_sessions (expires_at); -- чистка просроченных фоновой задачей
 
 -- Запросы входа в браузере: id знает браузер, nonce только ссылка на бота. В базе их хэши.
 CREATE TABLE user_logins (
@@ -29,3 +30,4 @@ CREATE TABLE user_logins (
     answered_at INTEGER,
     used_at     INTEGER                       -- когда браузер забрал сессию
 ) STRICT;
+CREATE INDEX user_logins_expires ON user_logins (expires_at);

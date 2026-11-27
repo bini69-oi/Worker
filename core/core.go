@@ -43,6 +43,9 @@ type Store interface {
 	// Уведомления админу сюда не попадают, иначе тревога о тревоге шла бы по кругу.
 	StuckTasks(ctx context.Context, before time.Time) ([]Task, error)
 
+	// UserSession читает сессию абонента с читающего соединения: проверка токена на каждом запросе не занимает пишущее.
+	UserSession(ctx context.Context, tokenHash []byte) (UserSession, error)
+
 	// DeleteSupportBefore удаляет связи поддержки старше before.
 	DeleteSupportBefore(ctx context.Context, before time.Time) (int, error)
 

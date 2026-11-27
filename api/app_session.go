@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/bini69-oi/worker/core"
@@ -26,12 +27,20 @@ func (a *App) sessionTg(w http.ResponseWriter, r *http.Request) (any, error) {
 	if err := Decode(w, r, &in); err != nil {
 		return nil, err
 	}
+	ip := guard.Key(r.RemoteAddr)
+	if !a.tgIP.Allow(ip) {
+		return nil, core.ErrTooManyTries
+	}
 	data, err := tgsign.VerifyInitData(in.InitData, a.BotToken(), a.now(), initDataMaxAge)
 	if err != nil {
-		if !a.authFail.Allow(guard.Host(r.RemoteAddr)) {
+		if !a.authFail.Allow(ip) {
 			return nil, core.ErrTooManyTries
 		}
 		return nil, core.ErrBadInitData
+	}
+	// Подписанные данные годятся час: без предела по ID одни и те же initData плодили бы сессии и записи в базе.
+	if !a.tgID.Allow(itoa(data.User.ID)) {
+		return nil, core.ErrTooManyTries
 	}
 	token, u, err := a.Core.TgLogin(r.Context(), data.User.ID, data.User.Username, data.User.LanguageCode, data.StartParam, info(r))
 	if err != nil {
@@ -39,6 +48,8 @@ func (a *App) sessionTg(w http.ResponseWriter, r *http.Request) (any, error) {
 	}
 	return SessionResponse{Token: token, Lang: u.Lang, ExpiresAt: a.now().Add(24 * time.Hour)}, nil
 }
+
+func itoa(n int64) string { return strconv.FormatInt(n, 10) }
 
 func (a *App) now() time.Time {
 	if a.srv.deps.Now != nil {

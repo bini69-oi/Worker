@@ -1,11 +1,8 @@
 package api
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"mime"
 	"net/http"
-	"strings"
 
 	"github.com/bini69-oi/worker/core"
 	"github.com/bini69-oi/worker/guard"
@@ -20,38 +17,34 @@ const sessionRate = 10
 
 // admit это проверки, общие для каждого запроса: частота и защита от подделки.
 func (s *Server) admit(r *http.Request) error {
-	if !s.limit.Allow(sessionKey(r)) {
+	if !s.limit.Allow(s.sessionKey(r)) {
 		return core.ErrTooManyTries
 	}
 	return checkOrigin(r)
 }
 
-// sessionKey это то, по чему считается частота: хэш токена сессии (заголовок или cookie), а без сессии IP.
-// Хэш, чтобы сам токен не лежал в памяти счётчика.
-func sessionKey(r *http.Request) string {
-	if tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && tok != "" {
-		return hashKey(tok)
+// sessionKey это то, по чему считается частота: номер проверенной сессии, а без неё IP (IPv6 по сети /64).
+// Токен, который сервер не признал, ключа не получает: случайные токены не плодят счётчики.
+func (s *Server) sessionKey(r *http.Request) string {
+	if s.deps.SessionID != nil {
+		if id := s.deps.SessionID(r); id != "" {
+			return "s:" + id
+		}
 	}
-	if c, err := r.Cookie(SessionCookie); err == nil && c.Value != "" {
-		return hashKey(c.Value)
-	}
-	return "ip:" + guard.Host(r.RemoteAddr)
-}
-
-func hashKey(tok string) string {
-	sum := sha256.Sum256([]byte(tok))
-	return "s:" + hex.EncodeToString(sum[:8])
+	return "ip:" + guard.Key(r.RemoteAddr)
 }
 
 // checkOrigin защищает от запроса с чужого сайта. Браузер сам прикладывает cookie, поэтому изменяющий запрос
 // с cookie обязан нести X-Worker: 1 и Content-Type: application/json. Чужая форма не может поставить ни то, ни другое
-// без разрешения CORS. Запрос с токеном в Authorization браузер сам не добавит, ему это не нужно.
+// без разрешения CORS.
 func checkOrigin(r *http.Request) error {
 	switch r.Method {
 	case http.MethodGet, http.MethodHead, http.MethodOptions:
 		return nil
 	}
-	if r.Header.Get("Authorization") != "" || len(r.Cookies()) == 0 {
+	// Cookie сессии есть: браузер приложит её к любому запросу, в том числе чужому, поэтому X-Worker обязателен
+	// всегда, с заголовком Authorization или без. Нет cookie сессии: подделывать нечего.
+	if _, err := r.Cookie(SessionCookie); err != nil {
 		return nil
 	}
 	mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))

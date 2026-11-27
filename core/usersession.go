@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"strings"
 	"time"
 )
@@ -87,44 +88,51 @@ func (c *Core) openSessionTx(tx Tx, userID int64, kind SessionKind, info LoginIn
 	if err := tx.CreateUserSession(hash, s); err != nil {
 		return "", UserSession{}, err
 	}
-	// Заодно чистим то, что давно не нужно: отдельной задачи для этого нет.
-	return token, s, tx.PruneCabinet(now.Add(-webSessionTTL))
+	return token, s, nil
 }
 
 // SessionUser проверяет токен на каждом запросе кабинета и отдаёт абонента. Закрытая, истёкшая и забытая
 // (браузер без запросов 7 дней) сессия и неизвестный токен дают одну и ту же ErrSessionGone, забаненный ErrBanned.
+// Проверка идёт на читающих соединениях и ничего не пишет; время последнего запроса обновляется не чаще раза в минуту.
 func (c *Core) SessionUser(ctx context.Context, token string) (User, UserSession, error) {
-	var u User
-	var s UserSession
 	if token == "" || len(token) > 128 {
-		return u, s, ErrSessionGone
+		return User{}, UserSession{}, ErrSessionGone
 	}
-	err := c.tx(ctx, func(tx Tx) error {
-		now := c.clock.Now()
-		hash := sha(token)
-		var err error
-		if s, err = tx.UserSession(hash); err != nil {
-			return ErrSessionGone
+	hash := sha(token)
+	s, err := c.store.UserSession(ctx, hash)
+	if errors.Is(err, ErrNotFound) {
+		return User{}, UserSession{}, ErrSessionGone
+	}
+	if err != nil {
+		return User{}, UserSession{}, err
+	}
+	u, err := c.store.User(ctx, s.UserID)
+	if errors.Is(err, ErrNotFound) {
+		return User{}, UserSession{}, ErrSessionGone
+	}
+	if err != nil {
+		return User{}, UserSession{}, err
+	}
+	now := c.clock.Now()
+	// Забаненный получает отказ на любой запрос со своим токеном, даже когда бан уже закрыл его сессии.
+	if !u.BannedAt.IsZero() {
+		return u, s, ErrBanned
+	}
+	if !s.ClosedAt.IsZero() || !now.Before(s.ExpiresAt) || (s.Kind == SessionWeb && now.Sub(s.SeenAt) > webSessionIdle) {
+		return User{}, UserSession{}, ErrSessionGone
+	}
+	if now.Sub(s.SeenAt) >= touchEvery {
+		if err := c.tx(ctx, func(tx Tx) error { return tx.TouchUserSession(hash, now) }); err != nil {
+			return User{}, UserSession{}, err
 		}
-		if u, err = tx.User(s.UserID); err != nil {
-			return ErrSessionGone
-		}
-		// Забаненный получает отказ на любой запрос со своим токеном, даже когда бан уже закрыл его сессии.
-		if !u.BannedAt.IsZero() {
-			return ErrBanned
-		}
-		if !s.ClosedAt.IsZero() || !now.Before(s.ExpiresAt) || (s.Kind == SessionWeb && now.Sub(s.SeenAt) > webSessionIdle) {
-			return ErrSessionGone
-		}
-		if now.Sub(s.SeenAt) >= touchEvery {
-			if err := tx.TouchUserSession(hash, now); err != nil {
-				return err
-			}
-			s.SeenAt = now
-		}
-		return nil
-	})
-	return u, s, err
+		s.SeenAt = now
+	}
+	return u, s, nil
+}
+
+// CleanCabinet стирает закрытые и истёкшие больше суток назад сессии и старые запросы входа. Зовёт фоновая задача.
+func (c *Core) CleanCabinet(ctx context.Context) (int, error) {
+	return 0, c.tx(ctx, func(tx Tx) error { return tx.PruneCabinet(c.clock.Now().Add(-24 * time.Hour)) })
 }
 
 // Logout закрывает сессию с этим токеном. Неизвестный токен не ошибка: выйти из выхода нельзя.

@@ -34,6 +34,8 @@ type App struct {
 	srv       *Server
 	loginRate *guard.Limiter // запуски входа в браузере с одного IP
 	authFail  *guard.Limiter // неудачные проверки токена с одного IP: перебор токенов
+	tgIP      *guard.Limiter // входы Mini App с одного IP
+	tgID      *guard.Limiter // входы Mini App одного Telegram ID: подпись initData живёт час и годится на повтор
 }
 
 // Предел запусков входа: 10 за 10 минут с одного IP. Предел неудачных проверок токена: 30 в минуту.
@@ -41,13 +43,20 @@ const (
 	loginStarts   = 10
 	loginWindow   = 10 * time.Minute
 	authFailLimit = 30
+	// Входы Mini App: с одного адреса 60 в минуту (за адресом бывает целая сеть), одному Telegram ID 10 за 10 минут.
+	tgPerIP  = 60
+	tgPerID  = 10
+	tgWindow = 10 * time.Minute
 )
 
 // RegisterApp заводит адреса /api/app/* на сервере.
 func RegisterApp(s *Server, d AppDeps) *App {
 	a := &App{AppDeps: d, srv: s,
 		loginRate: &guard.Limiter{Max: loginStarts, Window: loginWindow, Now: s.deps.Now},
-		authFail:  &guard.Limiter{Max: authFailLimit, Window: time.Minute, Now: s.deps.Now}}
+		authFail:  &guard.Limiter{Max: authFailLimit, Window: time.Minute, Now: s.deps.Now},
+		tgIP:      &guard.Limiter{Max: tgPerIP, Window: time.Minute, Now: s.deps.Now},
+		tgID:      &guard.Limiter{Max: tgPerID, Window: tgWindow, Now: s.deps.Now}}
+	s.deps.SessionID = a.sessionID
 	a.sessionRoutes()
 	a.loginRoutes()
 	a.meRoutes()
@@ -102,27 +111,64 @@ func (a *App) auth(h AuthHandler, gated bool) Handler {
 	}
 }
 
-// authenticate ищет токен (заголовок Authorization, потом cookie) и проверяет его у ядра.
-// Закрытая сессия в cookie стирает cookie. Перебор токенов с одного адреса упирается в предел.
-func (a *App) authenticate(w http.ResponseWriter, r *http.Request) (Auth, error) {
+// tokenOf берёт токен запроса. Если есть заголовок Authorization, берётся только он, и cookie не смотрится вовсе:
+// заголовок браузер сам не добавит, а смешивать два источника значит дать подделке второй шанс.
+func tokenOf(r *http.Request) (token string, cookie bool) {
+	if h := r.Header.Get("Authorization"); h != "" {
+		tok, _ := strings.CutPrefix(h, "Bearer ")
+		if tok == h {
+			return "", false // не Bearer: токена нет, cookie в расчёт не идёт
+		}
+		return tok, false
+	}
+	if c, err := r.Cookie(SessionCookie); err == nil {
+		return c.Value, true
+	}
+	return "", false
+}
+
+// lookup проверяет сессию запроса один раз: и счётчик частоты, и обработчик получают один ответ. Если с этого IP
+// накопилось слишком много неверных токенов, в базу не ходим вовсе. Перебор токенов и мусор в заголовке дальше предела не идут.
+func (a *App) lookup(r *http.Request) (Auth, error) {
+	m := memoOf(r.Context())
+	if m == nil {
+		return a.check(r)
+	}
+	m.once.Do(func() { m.auth, m.err = a.check(r) })
+	return m.auth, m.err
+}
+
+func (a *App) check(r *http.Request) (Auth, error) {
 	au := Auth{}
-	if tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
-		au.Token = tok
-	} else if c, err := r.Cookie(SessionCookie); err == nil {
-		au.Token, au.cookie = c.Value, true
+	au.Token, au.cookie = tokenOf(r)
+	if au.Token == "" {
+		return au, core.ErrSessionGone
+	}
+	ip := guard.Key(r.RemoteAddr)
+	if a.authFail.Over(ip) {
+		return au, core.ErrTooManyTries
 	}
 	var err error
 	au.User, au.Session, err = a.Core.SessionUser(r.Context(), au.Token)
-	if err == nil {
-		return au, nil
-	}
 	if errors.Is(err, core.ErrSessionGone) {
-		if au.cookie {
-			http.SetCookie(w, clearedCookie())
-		}
-		if !a.authFail.Allow(guard.Host(r.RemoteAddr)) {
-			return au, core.ErrTooManyTries
-		}
+		a.authFail.Allow(ip)
+	}
+	return au, err
+}
+
+// sessionID отдаёт номер проверенной сессии для счётчика частоты.
+func (a *App) sessionID(r *http.Request) string {
+	if au, err := a.lookup(r); err == nil {
+		return au.Session.ID
+	}
+	return ""
+}
+
+// authenticate отдаёт абонента запроса. Закрытая сессия в cookie стирает cookie.
+func (a *App) authenticate(w http.ResponseWriter, r *http.Request) (Auth, error) {
+	au, err := a.lookup(r)
+	if errors.Is(err, core.ErrSessionGone) && au.cookie {
+		http.SetCookie(w, clearedCookie())
 	}
 	return au, err
 }

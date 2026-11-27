@@ -1,6 +1,7 @@
 package coretest
 
 import (
+	"context"
 	"encoding/hex"
 	"maps"
 	"time"
@@ -116,4 +117,11 @@ func (t *tx) PruneCabinet(before time.Time) error {
 		}
 	}
 	return nil
+}
+
+// UserSession читает сессию абонента вне транзакции.
+func (s *Store) UserSession(_ context.Context, hash []byte) (core.UserSession, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return (&tx{st: s.st}).UserSession(hash)
 }

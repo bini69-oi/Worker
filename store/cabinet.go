@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"encoding/hex"
 	"errors"
@@ -110,4 +111,9 @@ func (t *coreTx) PruneCabinet(before time.Time) error {
 	}
 	_, err := t.q.ExecContext(t.ctx, "DELETE FROM user_logins WHERE expires_at < ?", before.Unix())
 	return err
+}
+
+// UserSession читает сессию с читающего соединения.
+func (s *CoreStore) UserSession(ctx context.Context, hash []byte) (core.UserSession, error) {
+	return (&coreTx{ctx: ctx, q: s.db.R}).UserSession(hash)
 }

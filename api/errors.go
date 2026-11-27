@@ -78,7 +78,7 @@ func classify(err error) (*core.Error, int) {
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	ce, status := classify(err)
 	if ce == core.ErrInternal {
-		s.deps.Log.Error("внутренняя ошибка API", "method", r.Method, "path", r.URL.Path, "err", err)
+		s.deps.Log.Error("внутренняя ошибка API", "method", r.Method, "route", r.Pattern, "err", err)
 	}
 	lang := langOf(r.Context())
 	var lerr *langError
