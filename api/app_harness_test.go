@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -19,7 +20,9 @@ import (
 
 	"github.com/bini69-oi/worker/core"
 	"github.com/bini69-oi/worker/core/coretest"
+	"github.com/bini69-oi/worker/pay/gatewaytest"
 	"github.com/bini69-oi/worker/pay/manual"
+	"github.com/bini69-oi/worker/pay/stars"
 	"github.com/bini69-oi/worker/settings"
 	"github.com/bini69-oi/worker/store"
 )
@@ -40,6 +43,14 @@ type appEnv struct {
 	clock *coretest.Clock
 	panel *coretest.Panel
 	db    *store.DB
+	fake  *gatewaytest.Fake
+	// invoices это счета Stars, которые API выставил через Telegram.
+	invoices []starsInvoice
+}
+
+type starsInvoice struct {
+	Title, Desc, Payload string
+	Stars                int64
 }
 
 func newAppEnv(t *testing.T) *appEnv {
@@ -55,11 +66,12 @@ func newAppEnv(t *testing.T) *appEnv {
 			t.Fatal(err)
 		}
 	}
+	e.fake = &gatewaytest.Fake{Secret: "s", Paid: map[string]bool{}}
 	e.c = core.New(core.Deps{Store: store.NewCoreStore(db), Clock: e.clock, Config: e.cfg, Panel: e.panel,
-		Gateways: []core.Gateway{manual.New(e.cfg)}, OwnerID: testOwner})
+		Gateways: []core.Gateway{manual.New(e.cfg), e.fake, stars.New(e.cfg)}, OwnerID: testOwner})
 	e.s = New(Deps{Text: fakeTexts, Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Now: e.clock.Now})
 	RegisterApp(e.s, AppDeps{Core: e.c, Config: e.cfg, BotToken: func() string { return testBotToken },
-		BotName: func() string { return "worker_bot" }, Texts: fakeTextMap, PublicURL: "https://w.test", DLKey: []byte(strings.Repeat("k", 32))})
+		BotName: func() string { return "worker_bot" }, Texts: fakeTextMap, PublicURL: "https://w.test", StarsInvoice: e.starsInvoice, DLKey: []byte(strings.Repeat("k", 32))})
 	return e
 }
 
@@ -158,4 +170,19 @@ func fakeTextMap(lang string, prefixes ...string) map[string]string {
 		out[k] = lang + ":" + k
 	}
 	return out
+}
+
+func (e *appEnv) starsInvoice(_ context.Context, title, desc, payload string, n int64) (string, error) {
+	e.invoices = append(e.invoices, starsInvoice{title, desc, payload, n})
+	return "https://t.me/$invoice-" + payload, nil
+}
+
+// enable включает кассы по имени.
+func (e *appEnv) enable(names ...string) {
+	e.t.Helper()
+	for _, n := range names {
+		if err := e.cfg.Set(n+".enabled", "true"); err != nil {
+			e.t.Fatal(err)
+		}
+	}
 }

@@ -46,6 +46,7 @@ var statuses = map[*core.Error]int{
 	core.ErrInvalid:        http.StatusBadRequest,
 	core.ErrTooLong:        http.StatusRequestEntityTooLarge,
 	core.ErrZeroAmount:     http.StatusBadRequest,
+	core.ErrAmountLimits:   http.StatusBadRequest,
 	core.ErrNeedComment:    http.StatusBadRequest,
 	core.ErrMaintenance:    http.StatusServiceUnavailable,
 	core.ErrPanelDown:      http.StatusServiceUnavailable,

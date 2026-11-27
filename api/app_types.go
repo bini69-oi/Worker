@@ -33,6 +33,8 @@ func appTypes() []reflect.Type {
 		reflect.TypeFor[TariffsResponse](),
 		reflect.TypeFor[QuoteResponse](),
 		reflect.TypeFor[BuyResponse](),
+		reflect.TypeFor[TopupResponse](),
+		reflect.TypeFor[PaymentResponse](),
 	}
 }
 
@@ -124,4 +126,31 @@ type QuoteResponse struct {
 type BuyResponse struct {
 	Sub    SubView `json:"sub"`
 	Queued bool    `json:"queued"`
+}
+
+// TopupRequest это пополнение: касса и сумма в копейках.
+type TopupRequest struct {
+	Gateway string `json:"gateway"`
+	Amount  int64  `json:"amount"`
+}
+
+// TopupResponse это созданный платёж. URL есть у касс со ссылкой, InvoiceLink у Stars, Details у ручной кассы.
+type TopupResponse struct {
+	PaymentID   int64  `json:"payment_id"`
+	Gateway     string `json:"gateway"`
+	URL         string `json:"url"`
+	InvoiceLink string `json:"invoice_link"`
+	Details     string `json:"details"`
+	ExtAmount   int64  `json:"ext_amount"`
+	ExtCurrency string `json:"ext_currency"`
+}
+
+// PaymentResponse это платёж абонента. Status: pending, paid, expired, refunded или failed.
+type PaymentResponse struct {
+	ID        int64      `json:"id"`
+	Gateway   string     `json:"gateway"`
+	Amount    int64      `json:"amount"`
+	Status    string     `json:"status"`
+	CreatedAt time.Time  `json:"created_at"`
+	PaidAt    *time.Time `json:"paid_at"`
 }

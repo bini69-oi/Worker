@@ -57,6 +57,15 @@ export interface NextPlanView {
   starts_at: string;
 }
 
+export interface PaymentResponse {
+  id: number;
+  gateway: string;
+  amount: number;
+  status: string;
+  created_at: string;
+  paid_at: string | null;
+}
+
 export interface PeriodView {
   days: number;
   price: number;
@@ -107,4 +116,14 @@ export interface TariffsResponse {
 export interface TextsResponse {
   lang: string;
   texts: Record<string, string>;
+}
+
+export interface TopupResponse {
+  payment_id: number;
+  gateway: string;
+  url: string;
+  invoice_link: string;
+  details: string;
+  ext_amount: number;
+  ext_currency: string;
 }

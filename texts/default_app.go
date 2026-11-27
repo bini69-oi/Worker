@@ -9,4 +9,6 @@ var appDefs = []Def{
 		En: "✅ Login confirmed. Go back to the site."},
 	{Key: "bot.web_login_no", Default: "🚫 Вход отклонён. Если это были не вы, ничего делать не нужно.",
 		En: "🚫 Login rejected. If it wasn't you, there's nothing to do."},
+	{Key: "app.stars_title", Default: "Пополнение баланса", En: "Top up balance"},
+	{Key: "app.stars_desc", Default: "Звёзды Telegram зачислятся на баланс в рублях по курсу", En: "Telegram Stars will be credited to your balance in rubles at the current rate"},
 }
