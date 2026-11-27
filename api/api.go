@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/bini69-oi/worker/core"
+	"github.com/bini69-oi/worker/guard"
 )
 
 // Handler это обработчик адреса. Вернул значение: оно уйдёт JSON с кодом 200 (nil даёт `{}`).
@@ -21,12 +23,15 @@ type Deps struct {
 	Text func(key, lang string) string
 	// Log принимает подробности внутренних ошибок. Секреты чистит сам журнал.
 	Log *slog.Logger
+	// Now это часы для лимита запросов. Пусто: настоящее время.
+	Now func() time.Time
 }
 
 // Server это роутер API. Один на кабинет и админку: адреса заводятся через Handle.
 type Server struct {
-	deps Deps
-	mux  *http.ServeMux
+	deps  Deps
+	mux   *http.ServeMux
+	limit *guard.Limiter
 }
 
 // New собирает сервер без адресов.
@@ -34,7 +39,8 @@ func New(d Deps) *Server {
 	if d.Log == nil {
 		d.Log = slog.Default()
 	}
-	s := &Server{deps: d, mux: http.NewServeMux()}
+	s := &Server{deps: d, mux: http.NewServeMux(),
+		limit: &guard.Limiter{Max: sessionRate, Window: time.Second, Now: d.Now}}
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { s.fail(w, r, core.ErrNotFound) })
 	return s
 }
@@ -51,6 +57,10 @@ func (s *Server) Handle(pattern string, h Handler) {
 				s.fail(w, r, core.ErrInternal)
 			}
 		}()
+		if err := s.admit(r); err != nil {
+			s.fail(w, r, err)
+			return
+		}
 		res, err := h(w, r)
 		if err != nil {
 			s.fail(w, r, err)
