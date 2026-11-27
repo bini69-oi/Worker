@@ -4,6 +4,7 @@
 //
 //	worker rotate            сменить мастер-ключ и перешифровать секреты
 //	worker admin password    задать пароль владельца
+//	worker sign keygen       создать пару ключей подписи релизов (без .env)
 package main
 
 import (
@@ -23,6 +24,14 @@ func main() {
 	privateFiles()
 	base := slog.NewJSONHandler(os.Stdout, nil)
 	log := slog.New(base)
+
+	if len(os.Args) > 1 && os.Args[1] == "sign" {
+		if err := signCommand(os.Args[2:], os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, "ошибка:", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	env, warns, err := loadEnv(".env", os.Getenv)
 	for _, w := range warns {
