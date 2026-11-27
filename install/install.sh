@@ -9,6 +9,7 @@
 # Ключи:
 #   --version v1.2.3   поставить эту версию вместо последней
 #   --update-binary    только заменить бинарник уже установленного Worker (после смены ключа подписи)
+#   --allow-downgrade  разрешить версию ниже установленной (вместе с --update-binary)
 set -euo pipefail
 
 RELEASES_URL="${WORKER_RELEASES_URL:-https://github.com/bini69-oi/worker/releases}"
@@ -94,14 +95,21 @@ fetch() {
   curl -fsSL --proto '=https' --tlsv1.2 --retry 2 --max-time 300 -o "$2" "$1" || die "не скачался $1"
 }
 
-# download_release DIR ARCH [VERSION] кладёт в DIR бинарник, SHA256SUMS и подпись.
+# latest_tag печатает тег последнего релиза по перенаправлению /latest. Скачивание идёт по этому тегу,
+# поэтому выход нового релиза посреди установки не смешает файлы двух версий.
+latest_tag() {
+  local loc tag
+  loc=$(curl -sS -o /dev/null -w '%{redirect_url}' --proto '=https' --tlsv1.2 --max-time 30 "$RELEASES_URL/latest") ||
+    die "не удалось узнать последний релиз"
+  tag="${loc##*/}"
+  printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || die "не удалось узнать версию последнего релиза, укажите --version v1.2.3"
+  echo "$tag"
+}
+
+# download_release DIR ARCH VERSION кладёт в DIR бинарник, SHA256SUMS и подпись.
 download_release() {
-  local dir="$1" arch="$2" version="${3:-}" base
-  if [ -n "$version" ]; then
-    base="$RELEASES_URL/download/$version"
-  else
-    base="$RELEASES_URL/latest/download"
-  fi
+  local dir="$1" arch="$2" version="$3" base
+  base="$RELEASES_URL/download/$version"
   fetch "$base/SHA256SUMS" "$dir/SHA256SUMS"
   fetch "$base/SHA256SUMS.sig" "$dir/SHA256SUMS.sig"
   fetch "$base/worker-linux-$arch" "$dir/worker-linux-$arch"
@@ -113,9 +121,10 @@ verify_ed25519() {
     openssl pkeyutl -verify -pubin -inkey "$1" -in "$2" -sigfile "$3" >/dev/null 2>&1
 }
 
-# verify_release DIR ARCH: подпись списка сумм вшитым ключом, потом сумма бинарника. Любая неудача: выход.
+# verify_release DIR ARCH VERSION: подпись списка сумм вшитым ключом, подписанная версия, сумма бинарника.
+# Любая неудача: выход. Версия подписана вместе с суммами: старый подписанный релиз под новым тегом не пройдёт.
 verify_release() {
-  local dir="$1" arch="$2" key want got
+  local dir="$1" arch="$2" version="$3" key want got signed
   case "$RELEASE_KEY" in
     *"BEGIN PUBLIC KEY"*) ;;
     *) die "в этом установщике нет ключа подписи релизов, установка остановлена" ;;
@@ -124,11 +133,25 @@ verify_release() {
   printf '%s\n' "$RELEASE_KEY" >"$key"
   verify_ed25519 "$key" "$dir/SHA256SUMS" "$dir/SHA256SUMS.sig" ||
     die "подпись релиза не сошлась, установка остановлена, на сервере ничего не изменено"
+  signed=$(awk '$1 == "version" {print $2; exit}' "$dir/SHA256SUMS")
+  [ "$signed" = "$version" ] || die "версия в подписи (${signed:-нет}) не совпадает с запрошенной ($version): релиз подменён или перепутан"
   want=$(awk -v n="worker-linux-$arch" '$2 == n {print $1}' "$dir/SHA256SUMS")
   [ -n "$want" ] || die "в подписанном списке нет worker-linux-$arch"
   got=$(sha256_of "$dir/worker-linux-$arch")
   [ "$want" = "$got" ] || die "сумма бинарника не совпала с подписанным списком, установка остановлена"
   say "Подпись и сумма проверены."
+}
+
+# check_not_downgrade ВЕРСИЯ РАЗРЕШЕНО: версию ниже установленной ставим только с --allow-downgrade.
+installed_version() { "$BIN" version 2>/dev/null || true; }
+
+check_not_downgrade() {
+  local current
+  current=$(installed_version)
+  printf '%s' "$current" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || return 0
+  if [ "$2" -ne 1 ] && ! version_at_least "$1" "$current"; then
+    die "версия $1 ниже установленной $current; если это нужно, добавьте --allow-downgrade"
+  fi
 }
 
 # install_binary кладёт бинарник атомарным переименованием.
@@ -519,7 +542,7 @@ usage() {
 }
 
 main() {
-  local version="" update_only=0 arch
+  local version="" update_only=0 allow_downgrade=0 arch
   # tmp не local: ловушка EXIT срабатывает уже после выхода из main
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -530,6 +553,10 @@ main() {
         ;;
       --update-binary)
         update_only=1
+        shift
+        ;;
+      --allow-downgrade)
+        allow_downgrade=1
         shift
         ;;
       -h | --help)
@@ -556,12 +583,14 @@ main() {
 
   tmp=$(mktemp -d)
   trap 'rm -rf "$tmp"' EXIT
-  say "Скачиваю релиз ($arch)..."
+  [ -n "$version" ] || version=$(latest_tag)
+  say "Скачиваю релиз $version ($arch)..."
   download_release "$tmp" "$arch" "$version"
-  verify_release "$tmp" "$arch"
+  verify_release "$tmp" "$arch" "$version"
 
   if [ "$update_only" -eq 1 ]; then
     [ -x "$BIN" ] || die "Worker не установлен: $BIN не найден, --update-binary здесь не нужен"
+    check_not_downgrade "$version" "$allow_downgrade"
     install_binary "$tmp/worker-linux-$arch"
     systemctl restart worker
     say "Бинарник заменён, служба перезапущена."

@@ -42,7 +42,7 @@ func TestReleaseWorkflowShape(t *testing.T) {
 	s := string(b)
 	for _, want := range []string{
 		"tags:", "worker-linux-amd64", "worker-linux-arm64", "SHA256SUMS", "cmd/sign",
-		"RELEASE_SIGNING_KEY", "persist-credentials: false", "contents: write",
+		"RELEASE_SIGNING_KEY", `echo "version $TAG"`, "persist-credentials: false", "contents: write",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("в release.yml нет %q", want)

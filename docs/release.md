@@ -29,8 +29,12 @@
 
 ```sh
 openssl pkeyutl -verify -pubin -inkey install/release.pub -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig
-sha256sum -c SHA256SUMS --ignore-missing
+grep -v '^version ' SHA256SUMS | sha256sum -c --ignore-missing
 ```
+
+В `SHA256SUMS` первой строкой стоит `version vX.Y.Z`, она подписана вместе с суммами. `worker update` и `install.sh`
+сверяют её с запрошенным тегом и не принимают версию ниже установленной без `--allow-downgrade`: так старый подписанный
+релиз нельзя выдать за новый.
 
 ## Если ключ подписи утёк
 

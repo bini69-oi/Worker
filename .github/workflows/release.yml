@@ -45,7 +45,8 @@ jobs:
             CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
               -ldflags "-s -w -X main.version=$TAG" -o "dist/worker-linux-$arch" ./cmd/worker
           done
-          (cd dist && sha256sum worker-linux-amd64 worker-linux-arm64 > SHA256SUMS)
+          # Версия подписывается вместе с суммами: старый подписанный релиз нельзя выдать за новый.
+          (cd dist && { echo "version $TAG"; sha256sum worker-linux-amd64 worker-linux-arm64; } > SHA256SUMS)
 
       - name: Подпись
         env:

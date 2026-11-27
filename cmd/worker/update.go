@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/bini69-oi/worker/release"
@@ -39,9 +40,13 @@ type updater struct {
 	PubKey  []byte // открытый ключ подписи релизов (PEM)
 	Arch    string // amd64 или arm64
 	BinPath string // путь к бинарнику, который заменяется
-	Out     io.Writer
-	Backup  func(ctx context.Context) (string, error)
-	Restart func(ctx context.Context) error
+	// Current это версия работающего бинарника (vX.Y.Z). Не тег (сборка dev): сравнение версий пропускается.
+	Current string
+	// AllowDowngrade разрешает поставить версию ниже текущей (флаг --allow-downgrade).
+	AllowDowngrade bool
+	Out            io.Writer
+	Backup         func(ctx context.Context) (string, error)
+	Restart        func(ctx context.Context) error
 	// Health ждёт, пока служба ответит на /healthz. Нет (nil): проверки нет.
 	Health func(ctx context.Context) error
 }
@@ -55,10 +60,13 @@ func (u *updater) Run(ctx context.Context, tag string) error {
 	if u.Arch != "amd64" && u.Arch != "arm64" {
 		return fmt.Errorf("архитектура %s не поддерживается, есть amd64 и arm64", u.Arch)
 	}
-	base := u.BaseURL + "/latest/download/"
-	if tag != "" {
-		base = u.BaseURL + "/download/" + tag + "/"
+	if tag == "" {
+		var err error
+		if tag, err = u.latestTag(ctx); err != nil {
+			return err
+		}
 	}
+	base := u.BaseURL + "/download/" + tag + "/"
 	name := "worker-linux-" + u.Arch
 
 	sums, err := u.get(ctx, base+"SHA256SUMS", maxSums)
@@ -71,6 +79,17 @@ func (u *updater) Run(ctx context.Context, tag string) error {
 	}
 	if err := release.Verify(u.PubKey, sums, sig); err != nil {
 		return fmt.Errorf("релиз не принят, прежняя версия работает: %w", err)
+	}
+	// Версия подписана вместе с суммами: старый подписанный релиз под новым тегом не пройдёт.
+	signed, err := signedVersion(sums)
+	if err != nil {
+		return err
+	}
+	if signed != tag {
+		return fmt.Errorf("версия в подписи (%s) не совпадает с запрошенной (%s): релиз подменён или перепутан, прежняя версия работает", signed, tag)
+	}
+	if versionTag.MatchString(u.Current) && compareVersions(signed, u.Current) < 0 && !u.AllowDowngrade {
+		return fmt.Errorf("версия %s ниже установленной %s; если это нужно, добавьте --allow-downgrade", signed, u.Current)
 	}
 	want, err := sumFor(sums, name)
 	if err != nil {
@@ -150,6 +169,54 @@ func (u *updater) rollback(ctx context.Context, oldPath string, cause error) err
 			"смотрите: journalctl -u %s -n 50", cause, err, serviceName)
 	}
 	return fmt.Errorf("новая версия не поднялась (%v); прежняя версия возвращена и отвечает", cause)
+}
+
+// latestTag узнаёт тег последнего релиза по перенаправлению /latest. Дальше всё скачивается по этому тегу,
+// поэтому выход нового релиза посреди обновления не смешает файлы двух версий.
+func (u *updater) latestTag(ctx context.Context) (string, error) {
+	c := *u.Client
+	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.BaseURL+"/latest", nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := c.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("последний релиз: %w", err)
+	}
+	resp.Body.Close()
+	loc := resp.Header.Get("Location")
+	tag := loc[strings.LastIndex(loc, "/")+1:]
+	if resp.StatusCode < 300 || resp.StatusCode > 399 || !versionTag.MatchString(tag) {
+		return "", errors.New("не удалось узнать версию последнего релиза, укажите --version v1.2.3")
+	}
+	return tag, nil
+}
+
+// signedVersion достаёт из подписанного списка строку "version vX.Y.Z".
+func signedVersion(sums []byte) (string, error) {
+	for _, line := range bytes.Split(sums, []byte("\n")) {
+		if f := strings.Fields(string(line)); len(f) == 2 && f[0] == "version" && versionTag.MatchString(f[1]) {
+			return f[1], nil
+		}
+	}
+	return "", errors.New("в подписанном списке нет строки version: релиз собран по старым правилам")
+}
+
+// compareVersions сравнивает теги vX.Y.Z: -1, 0, 1.
+func compareVersions(a, b string) int {
+	pa, pb := strings.Split(a[1:], "."), strings.Split(b[1:], ".")
+	for i := range 3 {
+		x, _ := strconv.Atoi(pa[i])
+		y, _ := strconv.Atoi(pb[i])
+		if x != y {
+			if x < y {
+				return -1
+			}
+			return 1
+		}
+	}
+	return 0
 }
 
 // get скачивает небольшой файл целиком, не больше limit байт.

@@ -26,13 +26,9 @@ const healthTimeout = 60 * time.Second
 // updateCommand это `worker update [--version v1.2.3]`. Запускается от root: заменяет бинарник и перезапускает службу.
 // Базу root не открывает: бэкап делает копия этого же бинарника от владельца базы.
 func updateCommand(env Env, args []string, out io.Writer) error {
-	tag := ""
-	switch {
-	case len(args) == 0:
-	case len(args) == 2 && args[0] == "--version":
-		tag = args[1]
-	default:
-		return errors.New("запуск: worker update [--version v1.2.3]")
+	tag, allowDowngrade, err := parseUpdateArgs(args)
+	if err != nil {
+		return err
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -43,7 +39,7 @@ func updateCommand(env Env, args []string, out io.Writer) error {
 	}
 	u := &updater{
 		BaseURL: releasesURL, Client: &http.Client{Timeout: 5 * time.Minute}, PubKey: install.ReleasePub,
-		Arch: runtime.GOARCH, BinPath: exe, Out: out,
+		Arch: runtime.GOARCH, BinPath: exe, Out: out, Current: version, AllowDowngrade: allowDowngrade,
 		Backup:  func(ctx context.Context) (string, error) { return ownerBackup(ctx, exe, env.DBPath) },
 		Restart: restartService,
 		Health: func(ctx context.Context) error {
@@ -129,4 +125,20 @@ func probe(ctx context.Context, c *http.Client, url string) error {
 		return fmt.Errorf("ответ %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// parseUpdateArgs разбирает [--version vX.Y.Z] [--allow-downgrade] в любом порядке.
+func parseUpdateArgs(args []string) (tag string, allowDowngrade bool, err error) {
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--allow-downgrade":
+			allowDowngrade = true
+		case args[i] == "--version" && i+1 < len(args) && tag == "":
+			i++
+			tag = args[i]
+		default:
+			return "", false, errors.New("запуск: worker update [--version v1.2.3] [--allow-downgrade]")
+		}
+	}
+	return tag, allowDowngrade, nil
 }

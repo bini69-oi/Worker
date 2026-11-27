@@ -136,7 +136,7 @@ func releaseDir(t *testing.T, bin string) (dir string, pubPEM []byte) {
 	}
 	dir = t.TempDir()
 	sum := sha256.Sum256([]byte(bin))
-	sums := hex.EncodeToString(sum[:]) + "  worker-linux-amd64\n"
+	sums := "version v1.2.3\n" + hex.EncodeToString(sum[:]) + "  worker-linux-amd64\n"
 	for name, body := range map[string][]byte{
 		"worker-linux-amd64": []byte(bin), "SHA256SUMS": []byte(sums), "SHA256SUMS.sig": release.Sign(priv, []byte(sums)),
 	} {
@@ -155,6 +155,10 @@ func requireOpenSSL(t *testing.T) {
 }
 
 func verify(t *testing.T, dir string, key []byte) (string, error) {
+	return verifyTag(t, dir, key, "v1.2.3")
+}
+
+func verifyTag(t *testing.T, dir string, key []byte, tag string) (string, error) {
 	t.Helper()
 	work := t.TempDir()
 	for _, f := range []string{"worker-linux-amd64", "SHA256SUMS", "SHA256SUMS.sig"} {
@@ -165,7 +169,7 @@ func verify(t *testing.T, dir string, key []byte) (string, error) {
 	}
 	keyFile := filepath.Join(t.TempDir(), "key")
 	_ = os.WriteFile(keyFile, key, 0o644)
-	return bash(t, nil, `RELEASE_KEY="$(cat `+keyFile+`)"; verify_release `+work+` amd64`)
+	return bash(t, nil, `RELEASE_KEY="$(cat `+keyFile+`)"; verify_release `+work+` amd64 `+tag)
 }
 
 func TestScriptVerifyRelease(t *testing.T) {
@@ -189,9 +193,15 @@ func TestScriptVerifyRelease(t *testing.T) {
 
 	// Список сумм изменён: подпись не сходится.
 	dir2, pub2 := releaseDir(t, "бинарник")
-	_ = os.WriteFile(filepath.Join(dir2, "SHA256SUMS"), []byte(strings.Repeat("0", 64)+"  worker-linux-amd64\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir2, "SHA256SUMS"), []byte("version v1.2.3\n"+strings.Repeat("0", 64)+"  worker-linux-amd64\n"), 0o644)
 	if out, err := verify(t, dir2, pub2); err == nil || !strings.Contains(out, "подпись") {
 		t.Errorf("изменённый список принят: %v\n%s", err, out)
+	}
+
+	// Подписан старый релиз, а запрошен новый тег.
+	dir4, pub4 := releaseDir(t, "бинарник")
+	if out, err := verifyTag(t, dir4, pub4, "v1.3.0"); err == nil || !strings.Contains(out, "версия в подписи") {
+		t.Errorf("старый релиз под новым тегом принят: %v\n%s", err, out)
 	}
 
 	// Подписи нет вовсе.
@@ -229,6 +239,26 @@ func TestScriptRejectsBadArgs(t *testing.T) {
 		out, err := bash(t, []string{"WORKER_OS_RELEASE=/нет"}, "main "+args)
 		if err == nil {
 			t.Errorf("аргументы %q приняты: %s", args, out)
+		}
+	}
+}
+
+func TestScriptCheckNotDowngrade(t *testing.T) {
+	cases := []struct {
+		name, current, target, allow string
+		ok                           bool
+	}{
+		{"новее", "v1.2.3", "v1.3.0", "0", true},
+		{"та же", "v1.2.3", "v1.2.3", "0", true},
+		{"ниже", "v1.2.3", "v1.2.0", "0", false},
+		{"ниже, 10 против 9", "v1.10.0", "v1.9.0", "0", false},
+		{"ниже с разрешением", "v1.2.3", "v1.2.0", "1", true},
+		{"версия не тег", "dev", "v1.0.0", "0", true},
+	}
+	for _, c := range cases {
+		out, err := bash(t, nil, "installed_version() { echo "+c.current+"; }; check_not_downgrade "+c.target+" "+c.allow)
+		if (err == nil) != c.ok {
+			t.Errorf("%s: err=%v\n%s", c.name, err, out)
 		}
 	}
 }

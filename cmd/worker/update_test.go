@@ -27,8 +27,10 @@ type fakeReleases struct {
 	priv  ed25519.PrivateKey
 	pub   []byte
 	files map[string][]byte // имя файла в релизе -> содержимое
-	hits  []string
-	mu    sync.Mutex
+	// version это тег, который подписан внутри SHA256SUMS. Сервер отдаёт релиз под тегом v1.2.3.
+	version string
+	hits    []string
+	mu      sync.Mutex
 }
 
 func newReleases(t *testing.T, bin string) *fakeReleases {
@@ -37,15 +39,19 @@ func newReleases(t *testing.T, bin string) *fakeReleases {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := &fakeReleases{priv: priv, pub: pub, files: map[string][]byte{}}
+	f := &fakeReleases{priv: priv, pub: pub, files: map[string][]byte{}, version: "v1.2.3"}
 	f.publish("worker-linux-amd64", []byte(bin))
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		f.hits = append(f.hits, r.URL.Path)
 		f.mu.Unlock()
+		if r.URL.Path == "/latest" {
+			http.Redirect(w, r, "/tag/v1.2.3", http.StatusFound)
+			return
+		}
 		name := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
 		body, ok := f.files[name]
-		if !ok || !(strings.HasPrefix(r.URL.Path, "/latest/download/") || strings.HasPrefix(r.URL.Path, "/download/v1.2.3/")) {
+		if !ok || !strings.HasPrefix(r.URL.Path, "/download/v1.2.3/") {
 			http.NotFound(w, r)
 			return
 		}
@@ -59,7 +65,7 @@ func newReleases(t *testing.T, bin string) *fakeReleases {
 func (f *fakeReleases) publish(name string, body []byte) {
 	f.files[name] = body
 	sum := sha256.Sum256(f.files["worker-linux-amd64"])
-	sums := hex.EncodeToString(sum[:]) + "  worker-linux-amd64\n"
+	sums := "version " + f.version + "\n" + hex.EncodeToString(sum[:]) + "  worker-linux-amd64\n"
 	if b, ok := f.files["worker-linux-arm64"]; ok {
 		s2 := sha256.Sum256(b)
 		sums += hex.EncodeToString(s2[:]) + "  worker-linux-arm64\n"
@@ -85,6 +91,7 @@ func newUpdater(t *testing.T, rel *fakeReleases) upEnv {
 	out := &bytes.Buffer{}
 	u := &updater{
 		BaseURL: rel.srv.URL, Client: rel.srv.Client(), PubKey: rel.pub, Arch: "amd64", BinPath: bin, Out: out,
+		Current: "v1.0.0",
 		Backup: func(context.Context) (string, error) {
 			events = append(events, "backup")
 			b, _ := os.ReadFile(bin)
@@ -167,6 +174,10 @@ func TestUpdateRefusals(t *testing.T) {
 		{"список изменён после подписи", func(f *fakeReleases) {
 			f.files["SHA256SUMS"] = append(f.files["SHA256SUMS"], "\n"...)
 		}, "подпись"},
+		{"подписана другая версия", func(f *fakeReleases) {
+			f.version = "v1.0.0"
+			f.publish("worker-linux-amd64", f.files["worker-linux-amd64"])
+		}, "версия"},
 		{"бинарник подменён", func(f *fakeReleases) { f.files["worker-linux-amd64"] = []byte("подмена") }, "сумма"},
 		{"нет файла подписи", func(f *fakeReleases) { delete(f.files, "SHA256SUMS.sig") }, ""},
 		{"нет бинарника под архитектуру", func(f *fakeReleases) { delete(f.files, "worker-linux-amd64") }, ""},
@@ -391,5 +402,72 @@ func TestHealthURL(t *testing.T) {
 		if got := healthURL(in); got != want {
 			t.Errorf("healthURL(%q) = %q, ждали %q", in, got, want)
 		}
+	}
+}
+
+// Старый подписанный релиз, выложенный под новым тегом, отклоняется и при latest, и при явной версии.
+func TestUpdateRefusesOldReleaseUnderNewTag(t *testing.T) {
+	for _, tag := range []string{"", "v1.2.3"} {
+		rel := newReleases(t, "старый релиз")
+		rel.version = "v1.1.0"
+		rel.publish("worker-linux-amd64", rel.files["worker-linux-amd64"])
+		e := newUpdater(t, rel)
+		err := e.u.Run(t.Context(), tag)
+		if err == nil || !strings.Contains(err.Error(), "версия") {
+			t.Fatalf("tag=%q: старый релиз под новым тегом принят: %v", tag, err)
+		}
+		if content(t, e.bin) != oldBin || len(*e.events) != 0 {
+			t.Fatalf("tag=%q: что-то изменено", tag)
+		}
+	}
+}
+
+func TestUpdateDowngrade(t *testing.T) {
+	rel := newReleases(t, "версия 1.2.3")
+	e := newUpdater(t, rel)
+	e.u.Current = "v1.5.0"
+	err := e.u.Run(t.Context(), "v1.2.3")
+	if err == nil || !strings.Contains(err.Error(), "allow-downgrade") {
+		t.Fatalf("откат на старую версию без флага принят: %v", err)
+	}
+	if content(t, e.bin) != oldBin {
+		t.Fatal("бинарник изменён")
+	}
+	e.u.AllowDowngrade = true
+	if err := e.u.Run(t.Context(), "v1.2.3"); err != nil {
+		t.Fatalf("с флагом понижение должно пройти: %v", err)
+	}
+}
+
+func TestUpdateDevBuildSkipsDowngradeCheck(t *testing.T) {
+	rel := newReleases(t, "версия 1.2.3")
+	e := newUpdater(t, rel)
+	e.u.Current = "dev"
+	if err := e.u.Run(t.Context(), ""); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCompareVersions(t *testing.T) {
+	for _, c := range []struct {
+		a, b string
+		want int
+	}{{"v1.2.3", "v1.2.3", 0}, {"v1.2.4", "v1.2.3", 1}, {"v1.10.0", "v1.9.9", 1}, {"v0.9.0", "v1.0.0", -1}, {"v2.0.0", "v1.99.99", 1}} {
+		if got := compareVersions(c.a, c.b); got != c.want {
+			t.Errorf("%s vs %s = %d, ждали %d", c.a, c.b, got, c.want)
+		}
+	}
+}
+
+func TestUpdateCommandAllowDowngradeArg(t *testing.T) {
+	if _, _, err := parseUpdateArgs([]string{"--allow-downgrade", "--version", "v1.2.3"}); err != nil {
+		t.Fatal(err)
+	}
+	tag, allow, err := parseUpdateArgs([]string{"--version", "v1.2.3", "--allow-downgrade"})
+	if err != nil || tag != "v1.2.3" || !allow {
+		t.Fatalf("%q %v %v", tag, allow, err)
+	}
+	if _, _, err := parseUpdateArgs([]string{"--allow-downgrade", "x"}); err == nil {
+		t.Fatal("лишний аргумент принят")
 	}
 }
