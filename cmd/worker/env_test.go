@@ -93,7 +93,7 @@ func TestLoadEnvWideRights(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(warns) != 1 || !strings.Contains(warns[0], "chmod 600") {
+	if len(warns) != 1 || !strings.Contains(warns[0], "chmod 640") {
 		t.Fatalf("ждали предупреждение о правах, получили %v", warns)
 	}
 }
@@ -137,5 +137,72 @@ func TestPanelHTTPInside(t *testing.T) {
 		if _, err := cleanURL(u, false); err != nil {
 			t.Errorf("%s: %v", u, err)
 		}
+	}
+}
+
+func TestEnvPath(t *testing.T) {
+	none := func(string) bool { return false }
+	both := func(p string) bool { return p == ".env" || p == "/etc/worker/env" }
+	onlyDotEnv := func(p string) bool { return p == ".env" }
+	withVar := func(k string) string {
+		if k == "WORKER_ENV_FILE" {
+			return "/opt/w/env"
+		}
+		return ""
+	}
+	cases := []struct {
+		name   string
+		getenv func(string) string
+		exists func(string) bool
+		euid   int
+		want   string
+	}{
+		{"разработка: .env рядом", noEnv, onlyDotEnv, 1000, ".env"},
+		{"разработка без файла", noEnv, none, 1000, ".env"},
+		{"сервер, обычный пользователь: серверный файл главнее чужого .env", noEnv, both, 1000, "/etc/worker/env"},
+		{"сервер, root: серверный файл", noEnv, both, 0, "/etc/worker/env"},
+		{"root без серверного файла не читает .env из папки", noEnv, onlyDotEnv, 0, ""},
+		{"явный файл главнее всего, и для root", withVar, both, 0, "/opt/w/env"},
+		{"явный файл главнее .env", withVar, onlyDotEnv, 1000, "/opt/w/env"},
+	}
+	for _, c := range cases {
+		if got := envPath(c.getenv, c.exists, c.euid); got != c.want {
+			t.Errorf("%s: %q, ждали %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestLoadEnvHTTPAddr(t *testing.T) {
+	env, warns, err := loadEnv(writeEnv(t, goodFile()+"HTTP_ADDR=127.0.0.1:8080\n", 0o600), noEnv)
+	if err != nil || len(warns) != 0 || env.HTTPAddr != "127.0.0.1:8080" {
+		t.Fatalf("HTTP_ADDR не прочитан: %+v %v %v", env, warns, err)
+	}
+	env, _, _ = loadEnv(writeEnv(t, goodFile(), 0o600), noEnv)
+	if env.HTTPAddr != "" {
+		t.Errorf("без переменной адрес должен быть пустым: %q", env.HTTPAddr)
+	}
+	for _, bad := range []string{"8080", "127.0.0.1", "host:port", "127.0.0.1:99999"} {
+		if _, _, err := loadEnv(writeEnv(t, goodFile()+"HTTP_ADDR="+bad+"\n", 0o600), noEnv); err == nil {
+			t.Errorf("HTTP_ADDR=%s принят", bad)
+		}
+	}
+}
+
+func TestListenAddr(t *testing.T) {
+	if got := listenAddr(Env{HTTPAddr: "127.0.0.1:8080"}, ":9999"); got != "127.0.0.1:8080" {
+		t.Errorf("HTTP_ADDR должен быть главнее настройки: %q", got)
+	}
+	if got := listenAddr(Env{}, ":9999"); got != ":9999" {
+		t.Errorf("без HTTP_ADDR адрес из настройки: %q", got)
+	}
+}
+
+// Группа worker читает серверный файл (640): это не предупреждение. Читать всем (644, 604) предупреждение.
+func TestLoadEnvGroupReadable(t *testing.T) {
+	if _, warns, err := loadEnv(writeEnv(t, goodFile(), 0o640), noEnv); err != nil || len(warns) != 0 {
+		t.Errorf("640: %v %v", warns, err)
+	}
+	if _, warns, _ := loadEnv(writeEnv(t, goodFile(), 0o604), noEnv); len(warns) != 1 {
+		t.Errorf("604 должен давать предупреждение: %v", warns)
 	}
 }

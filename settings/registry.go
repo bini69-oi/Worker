@@ -166,6 +166,8 @@ var base = []Def{
 		Desc: "С каких адресов можно открывать админку: IP и сети через запятую, например 203.0.113.5, 10.0.0.0/8. Пусто: с любых. Меняется только через «Да» владельца"},
 	{Key: "http.addr", Kind: KindString, Default: ":8080", Group: "http",
 		Desc: "Адрес, на котором Worker принимает вебхуки (за обратным прокси с https)"},
+	{Key: "backup.keep", Kind: KindInt, Default: "14", Group: "backup",
+		Desc: "Сколько последних ежедневных бэкапов базы хранить, остальные удаляются"},
 	{Key: "bot.token", Kind: KindString, Default: "", Group: "bot", Secret: true,
 		Desc: "Новый токен бота после смены из админки. Пустой значит токен из .env"},
 	{Key: "panel.reconcile_minutes", Kind: KindInt, Default: "60", Group: "panel",

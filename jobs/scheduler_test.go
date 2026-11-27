@@ -160,3 +160,22 @@ func TestCoreJobsList(t *testing.T) {
 		}
 	}
 }
+
+type fakeBackuper struct{ n atomic.Int32 }
+
+func (f *fakeBackuper) RunDue(context.Context) error { f.n.Add(1); return nil }
+
+func TestBackupJobRunsHourly(t *testing.T) {
+	b := &fakeBackuper{}
+	tk := newTicks()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	s := &Scheduler{Jobs: []Job{BackupJob(b)}, Log: quiet, After: tk.after}
+	go func() { s.Run(ctx); close(done) }()
+
+	waitFor(t, func() bool { return b.n.Load() == 1 }) // сразу при старте
+	tk.fire(time.Hour)
+	waitFor(t, func() bool { return b.n.Load() == 2 })
+	cancel()
+	<-done
+}

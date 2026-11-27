@@ -162,3 +162,37 @@ func TestTelegramRetry(t *testing.T) {
 		t.Fatalf("попыток %d, ждали 3", n)
 	}
 }
+
+// Ежедневный бэкап подключён к процессу: после старта в папке рядом с базой появляется файл.
+func TestServeMakesBackup(t *testing.T) {
+	tgSrv, _ := fakeTelegram(t)
+	env := Env{
+		BotToken: "123456:secret-bot-token", OwnerID: 1, PublicURL: "https://bot.example.com",
+		PanelURL: "http://127.0.0.1:1", PanelToken: "secret-panel-token",
+		SecretKey: settings.NewKey(), DBPath: filepath.Join(t.TempDir(), "w.db"), TelegramURL: tgSrv.URL,
+	}
+	a, err := build(env, slog.NewJSONHandler(io.Discard, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln, _ := net.Listen("tcp", "127.0.0.1:0")
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- a.serve(ctx, ln) }()
+
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		files, _ := filepath.Glob(filepath.Join(filepath.Dir(env.DBPath), "backups", "worker-*.db.enc"))
+		if len(files) == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("ежедневный бэкап не сделан после старта")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
