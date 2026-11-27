@@ -131,7 +131,7 @@ Cookie админки и кабинета разные и живут на раз
 
 ### Новые данные
 
-Миграция `004_admin.sql`: таблица `broadcasts`, индексы `users(username)`, `payments(status, created_at)`, `audit_log(created_at)`.
+Миграция `006_admin.sql`: таблица `broadcasts`, индексы `users(username)`, `payments(status, created_at)`, `audit_log(created_at)`.
 
 ### Тесты
 
@@ -149,7 +149,7 @@ Cookie админки и кабинета разные и живут на раз
 
 ## Migration Plan
 
-Миграция `004_admin.sql` только добавляет таблицу и индексы. Откат: старый бинарник их не читает.
+Миграция `006_admin.sql` только добавляет таблицу и индексы. Откат: старый бинарник их не читает.
 
 ## Open Questions
 

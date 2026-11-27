@@ -29,5 +29,5 @@
 ## Impact
 
 - Ядро: `core/plan.go`, `core/addons.go`, правки `core/buy.go`, `core/expire.go`, `core/panel.go`, `core/cart.go` (автопродление).
-- Хранилище: миграция `005_plans.sql`.
+- Хранилище: миграция `003_plans.sql`.
 - Бот: экраны смены тарифа и докупки.
