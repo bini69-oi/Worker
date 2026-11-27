@@ -155,3 +155,12 @@ func TestNilResultIsEmptyObject(t *testing.T) {
 		t.Errorf("%d %q", rec.Code, rec.Body)
 	}
 }
+
+func TestTypesListHasErrorBody(t *testing.T) {
+	for _, typ := range Types() {
+		if typ.Name() == "ErrorBody" {
+			return
+		}
+	}
+	t.Error("ErrorBody не отдан генератору типов")
+}

@@ -1,7 +1,7 @@
 STATICCHECK ?= $(shell go env GOPATH)/bin/staticcheck
 GOVULNCHECK ?= $(shell go env GOPATH)/bin/govulncheck
 
-.PHONY: check vuln build
+.PHONY: check vuln build types
 
 # Всё, что должно быть зелёным перед коммитом.
 check:
@@ -16,3 +16,7 @@ vuln:
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o bin/worker ./cmd/worker
+
+# Типы фронта из структур ответов api. CI запускает это и падает, если файл изменился.
+types:
+	go run ./cmd/gen-types -o web/src/lib/types.gen.ts
