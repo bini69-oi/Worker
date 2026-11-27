@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -132,5 +133,43 @@ func TestAdminUserActionNeedsOrigin(t *testing.T) {
 	}
 	if after, _ := e.c.User(contextBG, u.ID); after.Balance != before.Balance {
 		t.Errorf("баланс изменился")
+	}
+}
+
+// Карточка показывает ждущую смену тарифа, докупленное и перенесённую из панели подписку.
+func TestAdminUserCardExtrasGolden(t *testing.T) {
+	e := newAdminEnv(t)
+	u := e.subscriber(2001, "ivan")
+	tr2, err := e.c.SaveTariff(contextBG, adminOwner, core.Tariff{Name: "Год", Active: true, Squads: []string{"a"},
+		Periods: []core.Period{{Days: 365, Price: 150000}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sub, _ := e.c.Sub(contextBG, u.ID)
+	sub.NextTariffID, sub.NextDays, sub.NextPrice = tr2.ID, 365, 150000
+	sub.ExtraTrafficBytes, sub.ExtraTrafficUntil, sub.ExtraDevices = 10<<30, sub.ExpiresAt, 2
+	e.st.SetSub(sub)
+	rec := e.get(e.owner, fmt.Sprintf("/api/admin/users/%d", u.ID))
+	if rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	golden(t, "admin_user_card_extras", rec.Body.Bytes())
+	var card AdminUserCard
+	if err := json.Unmarshal(rec.Body.Bytes(), &card); err != nil || card.Sub == nil || card.Sub.NextTariff != "Год" || card.Sub.ExtraDevices != 2 || card.Sub.Imported {
+		t.Errorf("%+v %v", card.Sub, err)
+	}
+
+	// Перенесённая подписка: пометка и лимиты из панели, даже без нашего тарифа.
+	imp, err := e.c.Register(contextBG, 2002, "moved", "ru")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.st.SetSub(core.Subscription{UserID: imp.ID, Status: core.SubActive, PeriodDays: 30, ExpiresAt: t0.AddDate(0, 1, 0), CreatedAt: t0, UpdatedAt: t0,
+		Imported: true, Own: core.PanelLimits{Username: "old_moved", TrafficBytes: 50 << 30, Devices: 3, Reset: "MONTH"}})
+	rec = e.get(e.owner, fmt.Sprintf("/api/admin/users/%d", imp.ID))
+	golden(t, "admin_user_card_imported", rec.Body.Bytes())
+	if err := json.Unmarshal(rec.Body.Bytes(), &card); err != nil || !card.Sub.Imported || card.Sub.Own == nil ||
+		card.Sub.TrafficBytes != 50<<30 || card.Sub.DeviceLimit != 3 || card.Sub.Own.Username != "old_moved" {
+		t.Errorf("перенесённая: %+v %v", card.Sub, err)
 	}
 }

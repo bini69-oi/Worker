@@ -17,7 +17,15 @@
     "expires_at": "2026-01-31T12:00:00Z",
     "auto_renew": false,
     "traffic_bytes": 0,
-    "device_limit": 0
+    "device_limit": 0,
+    "next_tariff": "",
+    "next_days": 0,
+    "next_price": 0,
+    "extra_traffic_bytes": 0,
+    "extra_traffic_until": null,
+    "extra_devices": 0,
+    "imported": false,
+    "own": null
   },
   "ledger": [
     {

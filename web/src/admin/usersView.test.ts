@@ -31,6 +31,30 @@ describe('абоненты на эталонах API', () => {
   })
 })
 
+describe('подписка в карточке: смена, докупка, перенос', () => {
+  it('ждущая смена тарифа и докупленное', () => {
+    const v = cardView(golden<AdminUserCard>('admin_user_card_extras')).sub!
+    expect(v.queued).toMatch(/^Год, 365 дн., .* уже списано$/)
+    expect(v.extras).toHaveLength(2)
+    expect(v.extras[0]).toMatch(/^трафик \+10 ГБ до /)
+    expect(v.extras[1]).toBe('устройства +2')
+    expect(v.imported).toBe('')
+  })
+
+  it('перенесённая подписка с лимитами из панели', () => {
+    const v = cardView(golden<AdminUserCard>('admin_user_card_imported')).sub!
+    expect(v.imported).toBe('перенесён из панели (old_moved): 50 ГБ, устройств 3')
+    expect(v.traffic).toBe('50 ГБ')
+    expect(v.queued).toBe('')
+    expect(v.extras).toEqual([])
+  })
+
+  it('обычная подписка без пометок', () => {
+    const v = cardView(golden<AdminUserCard>('admin_user_card')).sub!
+    expect([v.queued, v.imported, v.extras.length]).toEqual(['', '', 0])
+  })
+})
+
 describe('деньги', () => {
   it('копейки в рубли и обратно', () => {
     expect(rub(12345)).toBe('123,45 ₽')

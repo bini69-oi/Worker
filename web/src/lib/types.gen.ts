@@ -138,6 +138,13 @@ export interface AdminNotify {
   topics: AdminTopic[];
 }
 
+export interface AdminOwnLimits {
+  username: string;
+  traffic_bytes: number;
+  devices: number;
+  reset: string;
+}
+
 export interface AdminPayment {
   id: number;
   user_id: number;
@@ -247,6 +254,14 @@ export interface AdminSub {
   auto_renew: boolean;
   traffic_bytes: number;
   device_limit: number;
+  next_tariff: string;
+  next_days: number;
+  next_price: number;
+  extra_traffic_bytes: number;
+  extra_traffic_until: string | null;
+  extra_devices: number;
+  imported: boolean;
+  own: AdminOwnLimits | null;
 }
 
 export interface AdminTariff {

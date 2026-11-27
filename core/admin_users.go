@@ -120,13 +120,17 @@ func (c *Core) cardTariffs(ctx context.Context, card *UserCard, sub Subscription
 	if err != nil {
 		return err
 	}
-	if sub.Trial {
+	switch {
+	case sub.Trial:
 		card.TrafficBytes, card.DeviceLimit = c.cfg.Int("trial.traffic_gb")*gib, int(c.cfg.Int("trial.devices"))
+	case sub.Imported:
+		// Перенесённая подписка живёт по лимитам из панели, у неё может не быть нашего тарифа.
+		card.TrafficBytes, card.DeviceLimit = Limits(sub, Tariff{})
 	}
 	for _, t := range all {
 		if t.ID == sub.TariffID {
 			card.Tariff = t.Name
-			if !sub.Trial {
+			if !sub.Trial && !sub.Imported {
 				card.TrafficBytes, card.DeviceLimit = Limits(sub, t)
 			}
 		}

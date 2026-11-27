@@ -1,0 +1,40 @@
+{
+  "id": 15,
+  "tg_id": 2002,
+  "username": "moved",
+  "lang": "ru",
+  "balance": 0,
+  "banned": false,
+  "unreachable": false,
+  "created_at": "2026-01-01T12:00:00Z",
+  "referrer_tg": 0,
+  "sub": {
+    "tariff": "",
+    "trial": false,
+    "status": "active",
+    "period_days": 30,
+    "price": 0,
+    "expires_at": "2026-02-01T12:00:00Z",
+    "auto_renew": false,
+    "traffic_bytes": 53687091200,
+    "device_limit": 3,
+    "next_tariff": "",
+    "next_days": 0,
+    "next_price": 0,
+    "extra_traffic_bytes": 0,
+    "extra_traffic_until": null,
+    "extra_devices": 0,
+    "imported": true,
+    "own": {
+      "username": "old_moved",
+      "traffic_bytes": 53687091200,
+      "devices": 3,
+      "reset": "MONTH"
+    }
+  },
+  "ledger": [],
+  "payments": [],
+  "audit": [],
+  "devices": [],
+  "devices_ok": true
+}

@@ -36,6 +36,26 @@ type AdminSub struct {
 	AutoRenew    bool      `json:"auto_renew"`
 	TrafficBytes int64     `json:"traffic_bytes"` // 0 без лимита
 	DeviceLimit  int       `json:"device_limit"`  // 0 без лимита
+
+	// Ждущая смена тарифа: включится, когда кончится текущий период. Цена уже списана.
+	NextTariff string `json:"next_tariff"` // пусто, если смены нет
+	NextDays   int    `json:"next_days"`
+	NextPrice  int64  `json:"next_price"`
+	// Докупленное: трафик действует до конца периода, устройства переходят в следующий.
+	ExtraTrafficBytes int64      `json:"extra_traffic_bytes"`
+	ExtraTrafficUntil *time.Time `json:"extra_traffic_until"`
+	ExtraDevices      int        `json:"extra_devices"`
+	// Imported значит, что подписка перенесена из панели: лимиты берутся оттуда, а не из тарифа.
+	Imported bool            `json:"imported"`
+	Own      *AdminOwnLimits `json:"own"`
+}
+
+// AdminOwnLimits это лимиты и имя пользователя перенесённой подписки в панели.
+type AdminOwnLimits struct {
+	Username     string `json:"username"`
+	TrafficBytes int64  `json:"traffic_bytes"`
+	Devices      int    `json:"devices"`
+	Reset        string `json:"reset"`
 }
 
 // AdminLedger это движение денег в карточке.
@@ -134,7 +154,12 @@ func (a *adminAPI) userCard(_ http.ResponseWriter, r *http.Request, ad adminCtx)
 	}
 	if s := c.Sub; s != nil {
 		out.Sub = &AdminSub{Tariff: c.Tariff, Trial: s.Trial, Status: string(s.Status), PeriodDays: s.PeriodDays, Price: s.Price,
-			ExpiresAt: s.ExpiresAt, AutoRenew: s.AutoRenew, TrafficBytes: c.TrafficBytes, DeviceLimit: c.DeviceLimit}
+			ExpiresAt: s.ExpiresAt, AutoRenew: s.AutoRenew, TrafficBytes: c.TrafficBytes, DeviceLimit: c.DeviceLimit,
+			NextTariff: c.NextTariff, NextDays: s.NextDays, NextPrice: s.NextPrice, ExtraTrafficBytes: s.ExtraTrafficBytes,
+			ExtraTrafficUntil: optTime(s.ExtraTrafficUntil), ExtraDevices: s.ExtraDevices, Imported: s.Imported}
+		if s.Imported {
+			out.Sub.Own = &AdminOwnLimits{Username: s.Own.Username, TrafficBytes: s.Own.TrafficBytes, Devices: s.Own.Devices, Reset: s.Own.Reset}
+		}
 	}
 	for _, e := range c.Ledger {
 		out.Ledger = append(out.Ledger, AdminLedger{Amount: e.Amount, Reason: string(e.Reason), Comment: e.Comment,

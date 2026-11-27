@@ -75,6 +75,9 @@
         <dt>Трафик</dt><dd>{view.sub.traffic}</dd>
         <dt>Устройств</dt><dd>{view.sub.devices}</dd>
         <dt>Автопродление</dt><dd>{view.sub.autoRenew}</dd>
+        {#if view.sub.imported}<dt>Перенос</dt><dd>{view.sub.imported}</dd>{/if}
+        {#if view.sub.queued}<dt>Ждёт смена тарифа</dt><dd>{view.sub.queued}</dd>{/if}
+        {#each view.sub.extras as x (x)}<dt>Докуплено</dt><dd>{x}</dd>{/each}
       </dl>
     {:else}
       <p class="muted">Подписки нет.</p>

@@ -42,6 +42,15 @@ export function cardView(c: AdminUserCard) {
           traffic: gib(s.traffic_bytes),
           devices: s.device_limit > 0 ? String(s.device_limit) : 'без лимита',
           autoRenew: s.auto_renew ? 'включено' : 'выключено',
+          // Ждущая смена тарифа, докупленное и пометка «перенесён» из панели.
+          queued: s.next_tariff ? `${s.next_tariff}, ${s.next_days} дн., ${rub(s.next_price)} уже списано` : '',
+          extras: [
+            s.extra_traffic_bytes > 0 ? `трафик +${gib(s.extra_traffic_bytes)} до ${dt(s.extra_traffic_until)}` : '',
+            s.extra_devices > 0 ? `устройства +${s.extra_devices}` : '',
+          ].filter(Boolean),
+          imported: s.imported
+            ? `перенесён из панели${s.own?.username ? ` (${s.own.username})` : ''}: ${gib(s.own?.traffic_bytes ?? 0)}, устройств ${s.own?.devices ? s.own.devices : 'без лимита'}`
+            : '',
         }
       : null,
     flags: [c.banned ? 'забанен' : '', c.unreachable ? 'заблокировал бота' : ''].filter(Boolean),
