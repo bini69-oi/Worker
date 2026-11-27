@@ -151,3 +151,21 @@ func parseDetails(raw string) (map[string]string, error) {
 	}
 	return m, nil
 }
+
+func (s *CoreStore) UserPayments(ctx context.Context, userID int64, limit int) ([]core.Payment, error) {
+	rows, err := s.db.R.QueryContext(ctx,
+		"SELECT "+payCols+" FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT ?", userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []core.Payment
+	for rows.Next() {
+		p, err := scanPayment(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}

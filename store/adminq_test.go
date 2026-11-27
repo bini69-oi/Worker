@@ -158,3 +158,19 @@ func TestAuditQuery(t *testing.T) {
 		t.Errorf("курсор: %d", len(rows))
 	}
 }
+
+func TestUserPayments(t *testing.T) {
+	s, uid := newCoreStore(t)
+	tx(t, s, func(tx core.Tx) error {
+		for i := range 3 {
+			if _, err := tx.CreatePayment(core.Payment{UserID: uid, Gateway: "manual", Amount: int64(100 + i), Status: core.PayPending, CreatedAt: tNow}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	got, err := s.UserPayments(context.Background(), uid, 2)
+	if err != nil || len(got) != 2 || got[0].Amount != 102 || got[1].Amount != 101 {
+		t.Fatalf("%+v %v", got, err)
+	}
+}

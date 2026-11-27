@@ -64,3 +64,16 @@ func (s *Store) AuditLog(_ context.Context, f core.AuditFilter, limit int) ([]co
 	}
 	return out, nil
 }
+
+func (s *Store) UserPayments(_ context.Context, userID int64, limit int) ([]core.Payment, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []core.Payment
+	for _, p := range s.st.pays {
+		if p.UserID == userID {
+			out = append(out, p)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID > out[j].ID })
+	return out[:min(len(out), limit)], nil
+}

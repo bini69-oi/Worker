@@ -99,6 +99,8 @@ type AuditFilter struct {
 type AdminStore interface {
 	// FindUsers ищет абонентов, новые первыми. Отдаёт не больше limit строк.
 	FindUsers(ctx context.Context, q UserQuery, now time.Time, limit int) ([]UserRow, error)
+	// UserPayments отдаёт платежи абонента, новые первыми.
+	UserPayments(ctx context.Context, userID int64, limit int) ([]Payment, error)
 	// AuditLog отдаёт записи журнала, новые первыми.
 	AuditLog(ctx context.Context, f AuditFilter, limit int) ([]AuditRow, error)
 }
