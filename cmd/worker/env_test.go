@@ -142,27 +142,33 @@ func TestPanelHTTPInside(t *testing.T) {
 
 func TestEnvPath(t *testing.T) {
 	none := func(string) bool { return false }
-	if got := envPath(noEnv, none); got != ".env" {
-		t.Errorf("по умолчанию %q", got)
-	}
+	both := func(p string) bool { return p == ".env" || p == "/etc/worker/env" }
+	onlyDotEnv := func(p string) bool { return p == ".env" }
 	withVar := func(k string) string {
 		if k == "WORKER_ENV_FILE" {
 			return "/opt/w/env"
 		}
 		return ""
 	}
-	if got := envPath(withVar, func(string) bool { return true }); got != "/opt/w/env" {
-		t.Errorf("с переменной %q", got)
+	cases := []struct {
+		name   string
+		getenv func(string) string
+		exists func(string) bool
+		euid   int
+		want   string
+	}{
+		{"разработка: .env рядом", noEnv, onlyDotEnv, 1000, ".env"},
+		{"разработка без файла", noEnv, none, 1000, ".env"},
+		{"сервер, обычный пользователь: серверный файл главнее чужого .env", noEnv, both, 1000, "/etc/worker/env"},
+		{"сервер, root: серверный файл", noEnv, both, 0, "/etc/worker/env"},
+		{"root без серверного файла не читает .env из папки", noEnv, onlyDotEnv, 0, ""},
+		{"явный файл главнее всего, и для root", withVar, both, 0, "/opt/w/env"},
+		{"явный файл главнее .env", withVar, onlyDotEnv, 1000, "/opt/w/env"},
 	}
-	// Установленный сервис: .env рядом нет, а /etc/worker/env есть, берётся он.
-	onlyEtc := func(p string) bool { return p == "/etc/worker/env" }
-	if got := envPath(noEnv, onlyEtc); got != "/etc/worker/env" {
-		t.Errorf("на сервере после установки %q", got)
-	}
-	// Свой .env в текущей папке важнее серверного.
-	both := func(p string) bool { return p == ".env" || p == "/etc/worker/env" }
-	if got := envPath(noEnv, both); got != ".env" {
-		t.Errorf("рядом лежащий .env должен быть главнее: %q", got)
+	for _, c := range cases {
+		if got := envPath(c.getenv, c.exists, c.euid); got != c.want {
+			t.Errorf("%s: %q, ждали %q", c.name, got, c.want)
+		}
 	}
 }
 

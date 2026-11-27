@@ -42,7 +42,7 @@ func main() {
 		return
 	}
 
-	env, warns, err := loadEnv(envPath(os.Getenv, fileExists), os.Getenv)
+	env, warns, err := loadEnv(envPath(os.Getenv, fileExists, os.Geteuid()), os.Getenv)
 	for _, w := range warns {
 		log.Warn(w)
 	}

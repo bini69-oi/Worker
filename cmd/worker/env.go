@@ -46,14 +46,19 @@ const defaultDBPath = "worker.db"
 // serverEnvFile это файл настроек, который создаёт install.sh.
 const serverEnvFile = "/etc/worker/env"
 
-// envPath это файл с настройками: WORKER_ENV_FILE, иначе .env в текущей папке, иначе /etc/worker/env, если он есть
-// (так команды на установленном сервере работают из любой папки).
-func envPath(getenv func(string) string, exists func(string) bool) string {
+// envPath это файл с настройками. Явный WORKER_ENV_FILE главнее всего. Дальше на установленном сервере
+// (есть /etc/worker/env) берётся серверный файл, а .env из текущей папки игнорируется: иначе чужой .env в папке,
+// куда зашёл root, подменил бы токены и пути базы. Root без серверного файла .env из папки тоже не читает.
+// Остальным (разработка на своём компьютере) нужен .env рядом.
+func envPath(getenv func(string) string, exists func(string) bool, euid int) string {
 	if p := getenv("WORKER_ENV_FILE"); p != "" {
 		return p
 	}
-	if !exists(".env") && exists(serverEnvFile) {
+	if exists(serverEnvFile) {
 		return serverEnvFile
+	}
+	if euid == 0 {
+		return ""
 	}
 	return ".env"
 }
