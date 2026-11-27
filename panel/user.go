@@ -45,8 +45,9 @@ func (c contract) result(u wireUser, created bool) Result {
 		ShortUUID:       u.ShortUUID,
 		SubscriptionURL: u.SubscriptionURL,
 		ExpireAt:        u.ExpireAt.UTC(),
-		Enabled:         u.Status == "ACTIVE",
-		Created:         created,
+		// LIMITED значит, что кончился трафик, а не что админ выключил: абонент включён, сверке трогать нечего.
+		Enabled: u.Status == "ACTIVE" || u.Status == "LIMITED",
+		Created: created,
 	}
 }
 

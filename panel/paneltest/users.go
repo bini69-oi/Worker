@@ -18,7 +18,7 @@ type userBody struct {
 	Strategy    string   `json:"trafficLimitStrategy"`
 	DeviceLimit int64    `json:"hwidDeviceLimit"`
 	Squads      []string `json:"activeInternalSquads"`
-	Description string   `json:"description"`
+	Description *string  `json:"description"` // нет в запросе: панель оставляет прежнее
 }
 
 // view это абонент в виде ответа панели своего поколения.
@@ -86,7 +86,10 @@ func (p *Panel) apply(u *User, b userBody) string {
 	}
 	u.Username, u.Status, u.ExpireAt = b.Username, b.Status, exp
 	u.TelegramID, u.TrafficMax, u.Strategy = b.TelegramID, b.TrafficMax, b.Strategy
-	u.DeviceLimit, u.Description = b.DeviceLimit, b.Description
+	u.DeviceLimit = b.DeviceLimit
+	if b.Description != nil {
+		u.Description = *b.Description
+	}
 	if b.Squads != nil {
 		u.Squads = b.Squads
 	}

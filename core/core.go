@@ -86,6 +86,8 @@ type Tx interface {
 	SaveSub(s Subscription) (int64, error)
 	// ActiveSubsUntil отдаёт активные подписки, которые кончаются не позже t.
 	ActiveSubsUntil(t time.Time) ([]Subscription, error)
+	// ExtraTrafficEnded отдаёт активные подписки, у которых докупленный трафик кончился не позже t.
+	ExtraTrafficEnded(t time.Time) ([]Subscription, error)
 
 	// Enqueue кладёт задачу в очередь (outbox). Она выполнится после коммита и будет повторяться до успеха.
 	Enqueue(kind string, payload []byte, at time.Time) (int64, error)

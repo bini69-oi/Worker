@@ -13,6 +13,9 @@ import (
 // MaxPageSize это наибольшая страница списка пользователей, ограничение клиента.
 const MaxPageSize = 500
 
+// MaxUsers это предел списка: панель, приславшая огромный total, не заставит читать вечно.
+const MaxUsers = 1_000_000
+
 // MonthRolling это скользящий месяц, стратегия сброса трафика, которую знает панель.
 const MonthRolling Strategy = "MONTH_ROLLING"
 
@@ -116,6 +119,9 @@ func (c *Client) EachUsersPage(ctx context.Context, size int, fn func(UsersPage)
 			if err := fn(page); err != nil {
 				return err
 			}
+		}
+		if page.Total > MaxUsers {
+			return errors.New("panel: GET /api/users: панель сообщила больше " + strconv.Itoa(MaxUsers) + " пользователей")
 		}
 		start += page.Fetched
 		if page.Fetched == 0 || start >= page.Total {

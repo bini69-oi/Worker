@@ -20,7 +20,10 @@ func (c *Core) BuyTraffic(ctx context.Context, userID, gb int64) (Subscription, 
 		if t.TrafficBytes <= 0 {
 			return 0, ErrUnlimited
 		}
+		// Пакет живёт до конца текущего периода. Пакет прошлого периода, ещё не сгоревший после
+		// продления, продлевается вместе с новым: два срока у одного числа не хранятся.
 		sub.ExtraTrafficBytes += gb * gib
+		sub.ExtraTrafficUntil = sub.ExpiresAt
 		return price, nil
 	})
 }

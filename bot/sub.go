@@ -27,19 +27,15 @@ func (b *Bot) showSub(ctx context.Context, r *req) error {
 	name, traffic, devices := b.t(r, "sub.trial_name", nil), b.t(r, "sub.unlimited", nil), b.t(r, "sub.unlimited", nil)
 	switch {
 	case sub.Imported:
-		name, traffic, devices = b.t(r, "sub.imported_name", nil), b.gb(r, sub.Own.TrafficBytes), b.count(r, sub.Own.Devices)
+		tb, dv := core.Limits(sub, core.Tariff{})
+		name, traffic, devices = b.t(r, "sub.imported_name", nil), b.gb(r, tb), b.count(r, dv)
 	case !sub.Trial:
 		t, err := b.core.Tariff(ctx, sub.TariffID)
 		if err != nil {
 			return err
 		}
-		name, traffic, devices = t.Name, b.gb(r, t.TrafficBytes), b.count(r, t.Devices)
-		if t.TrafficBytes > 0 { // с докупленным
-			traffic = b.gb(r, t.TrafficBytes+sub.ExtraTrafficBytes)
-		}
-		if t.Devices > 0 {
-			devices = b.count(r, t.Devices+sub.ExtraDevices)
-		}
+		tb, dv := core.Limits(sub, t)
+		name, traffic, devices = t.Name, b.gb(r, tb), b.count(r, dv)
 	}
 	auto := b.t(r, "sub.off", nil)
 	if sub.AutoRenew {
@@ -112,11 +108,14 @@ func (b *Bot) showDevices(ctx context.Context, r *req) error {
 		return err
 	}
 	limit := b.t(r, "sub.unlimited", nil)
-	if sub, hasSub, err := b.sub(ctx, r); err == nil && hasSub && sub.Imported {
-		limit = b.count(r, sub.Own.Devices)
-	} else if err == nil && hasSub && !sub.Trial {
-		if t, err := b.core.Tariff(ctx, sub.TariffID); err == nil {
-			limit = b.count(r, t.Devices)
+	if sub, hasSub, err := b.sub(ctx, r); err == nil && hasSub && !sub.Trial {
+		var t core.Tariff
+		if !sub.Imported {
+			t, err = b.core.Tariff(ctx, sub.TariffID)
+		}
+		if err == nil {
+			_, dv := core.Limits(sub, t)
+			limit = b.count(r, dv)
 		}
 	}
 	s := Screen{}

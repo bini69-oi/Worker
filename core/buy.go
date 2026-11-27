@@ -86,18 +86,23 @@ func (c *Core) buyTx(tx Tx, userID, tariffID int64, days int, now time.Time) (Su
 	}
 	buyer, t, sub, exists, live := b.buyer, b.tariff, b.sub, b.exists, b.live
 
+	var buyID int64
 	if b.cost > 0 {
 		buy, err := move(tx, now, LedgerEntry{UserID: userID, Amount: -b.cost, Reason: ReasonBuy, RefType: "tariff", Comment: t.Name})
 		if err != nil {
 			return Subscription{}, needMoney(tx, userID, b.cost, err)
 		}
-		if err := c.referralBonus(tx, buyer, buy, b.cost, now); err != nil {
-			return Subscription{}, err
+		buyID = buy.ID
+		// За ждущую смену бонус платится в день смены: до него её можно отменить с возвратом.
+		if !b.queue {
+			if err := c.referralBonus(tx, buyer, "ref_buy", buy.ID, b.cost, now); err != nil {
+				return Subscription{}, err
+			}
 		}
 	}
 	if b.queue {
 		// Текущий тариф доживает срок, новый ждёт. Панель не меняется до дня смены.
-		sub.NextTariffID, sub.NextDays, sub.NextPrice, sub.UpdatedAt = tariffID, days, b.cost, now
+		sub.NextTariffID, sub.NextDays, sub.NextPrice, sub.NextBuyID, sub.UpdatedAt = tariffID, days, b.cost, buyID, now
 		_, err := tx.SaveSub(sub)
 		return sub, err
 	}

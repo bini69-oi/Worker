@@ -229,3 +229,27 @@ func TestListUsersStopsOnEmptyPage(t *testing.T) {
 		t.Fatalf("pages %d queries %v err %v", pages, *queries, err)
 	}
 }
+
+// Панель, приславшая огромный total, не заставит читать страницы вечно.
+func TestEachUsersPageHugeTotal(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "list", "v2_page1.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = []byte(strings.Replace(string(data), `"total":4`, `"total":2000000`, 1))
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/system/metadata" {
+			_, _ = w.Write([]byte(`{"response":{"version":"2.8.4"}}`))
+			return
+		}
+		calls++ // start не смотрим: всегда одна и та же страница
+		_, _ = w.Write(data)
+	}))
+	t.Cleanup(srv.Close)
+	err = panel.New(srv.URL, listToken, nil).EachUsersPage(context.Background(), 2, func(panel.UsersPage) error { return nil })
+	if err == nil || calls != 1 {
+		t.Fatalf("огромный total: %v, запросов %d", err, calls)
+	}
+}

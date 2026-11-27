@@ -83,7 +83,7 @@ func (c *Core) welcomeBonus(tx Tx, userID int64, now time.Time) error {
 // ref.first_percent и ref.first_fixed, за следующие ref.each_percent. Бонус уникален для каждой покупки.
 // Бонус идёт только за абонента, который хоть раз платил настоящими деньгами: свои аккаунты по своей
 // ссылке, купившие на подарки и промокоды, ничего не приносят.
-func (c *Core) referralBonus(tx Tx, buyer User, buy LedgerEntry, price int64, now time.Time) error {
+func (c *Core) referralBonus(tx Tx, buyer User, refType string, refID, price int64, now time.Time) error {
 	if buyer.ReferrerID == 0 || price <= 0 {
 		return nil
 	}
@@ -104,7 +104,7 @@ func (c *Core) referralBonus(tx Tx, buyer User, buy LedgerEntry, price int64, no
 		return nil
 	}
 	if _, err := move(tx, now, LedgerEntry{UserID: buyer.ReferrerID, Amount: bonus, Reason: ReasonReferral,
-		RefType: "ref_buy", RefID: buy.ID}); err != nil {
+		RefType: refType, RefID: refID}); err != nil {
 		return err
 	}
 	return enqueueNotify(tx, NotifyTask{UserID: buyer.ReferrerID, Key: "notify.ref_bonus",

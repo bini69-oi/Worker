@@ -34,7 +34,7 @@ func (c *Core) ExpireDue(ctx context.Context) (int, error) {
 					return err
 				}
 			}
-			s.ExtraTrafficBytes, s.ExtraDevices = 0, 0 // докупленное живёт, пока идёт подписка
+			s.ExtraTrafficBytes, s.ExtraTrafficUntil, s.ExtraDevices = 0, time.Time{}, 0 // докупленное живёт, пока идёт подписка
 			s.Status, s.UpdatedAt = SubExpired, now
 			if _, err := tx.SaveSub(s); err != nil {
 				return err
@@ -52,9 +52,28 @@ func (c *Core) ExpireDue(ctx context.Context) (int, error) {
 			}
 			n++
 		}
-		return nil
+		return c.dropExtraTraffic(tx, now)
 	})
 	return n, err
+}
+
+// dropExtraTraffic обнуляет докупленный трафик, период которого кончился: подписку продлили, и новый
+// период начался с лимитом тарифа.
+func (c *Core) dropExtraTraffic(tx Tx, now time.Time) error {
+	subs, err := tx.ExtraTrafficEnded(now)
+	if err != nil {
+		return err
+	}
+	for _, s := range subs {
+		s.ExtraTrafficBytes, s.ExtraTrafficUntil, s.UpdatedAt = 0, time.Time{}, now
+		if _, err := tx.SaveSub(s); err != nil {
+			return err
+		}
+		if err := enqueueSync(tx, s.ID, now); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // RemindDue напоминает об окончании подписки. Пороги в днях берутся из настройки remind.days (например «3,1»).
@@ -74,7 +93,7 @@ func (c *Core) RemindDue(ctx context.Context) (int, error) {
 		}
 		for _, s := range subs {
 			left := s.ExpiresAt.Sub(now)
-			if left <= 0 {
+			if left <= 0 || s.NextTariffID != 0 { // смена уже оплачена: продлевать нечего
 				continue
 			}
 			mark := pickMark(marks, int(math.Ceil(left.Hours()/24)))

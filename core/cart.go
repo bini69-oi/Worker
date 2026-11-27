@@ -61,8 +61,13 @@ func (c *Core) buyFromCart(ctx context.Context, userID int64) {
 		if err := tx.DeletePendingBuy(userID); err != nil {
 			return err
 		}
-		return enqueueNotify(tx, NotifyTask{UserID: userID, Key: "notify.bought",
-			Vars: map[string]string{"days": strconv.Itoa(pb.Days), "until": sub.ExpiresAt.Format("02.01.2006")}}, now)
+		n := NotifyTask{UserID: userID, Key: "notify.bought",
+			Vars: map[string]string{"days": strconv.Itoa(pb.Days), "until": sub.ExpiresAt.Format("02.01.2006")}}
+		if sub.NextTariffID != 0 { // встало сменой: срок пока прежний
+			n = NotifyTask{UserID: userID, Key: "notify.bought_queued",
+				Vars: map[string]string{"days": strconv.Itoa(pb.Days), "from": sub.ExpiresAt.Format("02.01.2006")}}
+		}
+		return enqueueNotify(tx, n, now)
 	})
 	if permanent(err) {
 		// Этот выбор уже не купить. Остальные ошибки (нехватка денег, сбой базы) оставляют выбор до следующего раза.

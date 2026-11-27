@@ -180,6 +180,10 @@ func find(key string) (Def, bool) {
 
 // normalize проверяет значение по типу и приводит к одному виду записи.
 // Значение в текст ошибки не попадает: оно может оказаться секретом.
+// maxMoney это предел денежной настройки: 100 млн ₽ в копейках. Цена, умноженная на дни и устройства,
+// не переполнит int64 и не уйдёт в минус.
+const maxMoney = 10_000_000_000
+
 func normalize(k Kind, raw string) (string, error) {
 	bad := fmt.Errorf("%w: нужен тип %s", ErrBadValue, k)
 	switch k {
@@ -197,7 +201,7 @@ func normalize(k Kind, raw string) (string, error) {
 		return strconv.FormatInt(n, 10), nil
 	case KindMoney:
 		n, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || n < 0 {
+		if err != nil || n < 0 || n > maxMoney {
 			return "", bad
 		}
 		return strconv.FormatInt(n, 10), nil

@@ -303,3 +303,27 @@ func TestBuyClearsCart(t *testing.T) {
 		t.Fatalf("старая корзина купила после пополнения: срок %v → %v, баланс %d", before.ExpiresAt, after.ExpiresAt, e.balance(t))
 	}
 }
+
+// Корзина при живой подписке на другой тариф встаёт сменой: уведомление говорит, когда она включится,
+// а не что срок уже продлён.
+func TestSmartCartQueuedPlanNotice(t *testing.T) {
+	e := newPayEnv(t)
+	ctx := context.Background()
+	month := e.tariff(t, "Месяц", core.Period{Days: 30, Price: 100})
+	year := e.tariff(t, "Год", core.Period{Days: 365, Price: 1000})
+	e.pay(t, 100)
+	if _, err := e.c.Buy(ctx, e.user.ID, month.ID, 30); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.c.RememberBuy(ctx, e.user.ID, year.ID, 365); err != nil {
+		t.Fatal(err)
+	}
+	e.pay(t, 1000)
+	e.process(t)
+	if sub, _ := e.c.Sub(ctx, e.user.ID); sub.NextTariffID != year.ID {
+		t.Fatalf("корзина не встала сменой: %+v", sub)
+	}
+	if notified(e.env, "notify.bought_queued") != 1 || notified(e.env, "notify.bought") != 0 {
+		t.Fatalf("уведомления: %+v", e.notes.ToUsers)
+	}
+}

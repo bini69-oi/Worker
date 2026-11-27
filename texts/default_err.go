@@ -38,6 +38,8 @@ var errDefs = []Def{
 		En: "This user has no subscription"},
 	{Key: "err.not_subscribed", Default: "Сначала подпишитесь на канал",
 		En: "Please join the channel first"},
+	{Key: "err.other_tariff", Default: "У вас подписка на другой тариф",
+		En: "Your subscription is on another plan"},
 	{Key: "err.plan_queued", Default: "Уже ждёт смена тарифа. Отмените её или дождитесь начала",
 		En: "A plan change is already scheduled. Cancel it or wait until it starts"},
 	{Key: "err.unlimited", Default: "В тарифе и так без лимита",

@@ -165,6 +165,17 @@ func (t *tx) ActiveSubsUntil(until time.Time) ([]core.Subscription, error) {
 	return out, nil
 }
 
+func (t *tx) ExtraTrafficEnded(until time.Time) ([]core.Subscription, error) {
+	var out []core.Subscription
+	for _, s := range t.st.subs {
+		if s.Status == core.SubActive && s.ExtraTrafficBytes > 0 && !s.ExtraTrafficUntil.After(until) {
+			out = append(out, s)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
 func (t *tx) Enqueue(kind string, payload []byte, at time.Time) (int64, error) {
 	id := t.st.id()
 	t.st.tasks = append(t.st.tasks, taskRow{

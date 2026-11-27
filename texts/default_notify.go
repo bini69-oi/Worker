@@ -9,6 +9,8 @@ var notifyDefs = []Def{
 		En: "⛔ Your subscription has ended and the VPN is off. Renew and it works again right away."},
 	{Key: "notify.bought", Params: []string{"days", "until"}, Default: "✅ Баланс пополнен, подписка на {days} дн. оформлена. Действует до {until}.",
 		En: "✅ Balance topped up, {days}-day subscription set up. Valid until {until}."},
+	{Key: "notify.bought_queued", Params: []string{"days", "from"}, Default: "✅ Баланс пополнен, подписка на {days} дн. оплачена. Включится {from}, когда кончится текущая.",
+		En: "✅ Balance topped up, {days}-day subscription paid. It starts on {from}, when the current one ends."},
 	{Key: "notify.topup", Params: []string{"amount"}, Default: "💰 Баланс пополнен на {amount}.",
 		En: "💰 Balance topped up by {amount}."},
 	{Key: "notify.autorenew_ok", Params: []string{"until"}, Default: "🔁 Подписка продлена с баланса до {until}.",

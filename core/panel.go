@@ -66,11 +66,12 @@ func (c *Core) panelUser(s Subscription, u User, t Tariff, now time.Time) PanelU
 		Enabled:     s.Status == SubActive && s.ExpiresAt.After(now) && u.BannedAt.IsZero(),
 		Description: fmt.Sprintf("worker user %d", u.ID),
 	}
-	if s.Own.Username != "" {
-		p.Username = s.Own.Username
+	if s.Own.Username != "" { // перенесён из панели: имя и описание там остаются свои
+		p.Username, p.Description = s.Own.Username, ""
 	}
 	if s.Imported {
-		p.TrafficBytes, p.Devices, p.Reset, p.Squads = s.Own.TrafficBytes, s.Own.Devices, s.Own.Reset, s.Own.Squads
+		p.Reset, p.Squads = s.Own.Reset, s.Own.Squads
+		p.TrafficBytes, p.Devices = Limits(s, t)
 		return p
 	}
 	if s.Trial {
@@ -80,15 +81,26 @@ func (c *Core) panelUser(s Subscription, u User, t Tariff, now time.Time) PanelU
 		p.Squads = splitList(c.cfg.String("trial.squads"))
 		return p
 	}
-	p.TrafficBytes, p.Devices, p.Reset, p.Squads = t.TrafficBytes, t.Devices, t.Reset, t.Squads
-	// Докупленное добавляется к лимиту тарифа. К безлимиту добавлять нечего: 0 так и остаётся «без лимита».
-	if p.TrafficBytes > 0 {
-		p.TrafficBytes += s.ExtraTrafficBytes
-	}
-	if p.Devices > 0 {
-		p.Devices += s.ExtraDevices
-	}
+	p.Reset, p.Squads = t.Reset, t.Squads
+	p.TrafficBytes, p.Devices = Limits(s, t)
 	return p
+}
+
+// Limits это лимиты трафика и устройств платной или перенесённой подписки, 0 значит без лимита.
+// Перенесённая берёт снимок из панели, платная лимиты тарифа с докупленным. К безлимиту добавлять
+// нечего: 0 так и остаётся «без лимита». Пробный период сюда не относится: его лимиты в настройках.
+func Limits(s Subscription, t Tariff) (trafficBytes int64, devices int) {
+	if s.Imported {
+		return s.Own.TrafficBytes, s.Own.Devices
+	}
+	trafficBytes, devices = t.TrafficBytes, t.Devices
+	if trafficBytes > 0 {
+		trafficBytes += s.ExtraTrafficBytes
+	}
+	if devices > 0 {
+		devices += s.ExtraDevices
+	}
+	return trafficBytes, devices
 }
 
 // syncSub приводит панель к состоянию подписки из базы и запоминает ссылку и идентификатор в панели.

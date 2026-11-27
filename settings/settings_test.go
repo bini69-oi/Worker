@@ -94,6 +94,8 @@ func TestBadTypesAllKinds(t *testing.T) {
 	cases := map[string]string{
 		"trial.enabled": "может быть",
 		"stars.rate":    "-5",
+		// Сверх предела денег: цена на дни и устройства переполнила бы int64.
+		"addons.device_month": "10000000001",
 	}
 	for key, v := range cases {
 		if err := s.Set(key, v); !errors.Is(err, ErrBadValue) {

@@ -62,6 +62,7 @@ var (
 	ErrPlanQueued    = newErr("E3012", "err.plan_queued", "уже ждёт смена тарифа: отмените её или дождитесь начала")
 	ErrUnlimited     = newErr("E3013", "err.unlimited", "в тарифе и так без лимита")
 	ErrAddonOff      = newErr("E3014", "err.addon_off", "докупка выключена")
+	ErrOtherTariff   = newErr("E3003", "err.other_tariff", "у абонента подписка на другой тариф")
 )
 
 // Кассы

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"os"
 	"slices"
 	"time"
 
@@ -23,6 +24,10 @@ func importPanel(env Env, apply bool, out io.Writer) error {
 		return err
 	}
 	defer unlock()
+	// Опечатка в пути не должна создать пустую базу: импорт идёт только в уже работавшую.
+	if _, err := os.Stat(env.DBPath); err != nil {
+		return fmt.Errorf("база не найдена: %w", err)
+	}
 	db, err := store.Open(env.DBPath)
 	if err != nil {
 		return err

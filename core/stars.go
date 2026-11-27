@@ -68,6 +68,13 @@ func (c *Core) ChargeRecurring(ctx context.Context, userID, tariffID int64, char
 			done = true
 			return nil
 		}
+		// Автоподписка продлевает только свой тариф. Абонент перешёл на другой: смену назад она не ставит.
+		if cur, err := tx.SubByUser(userID); err == nil && !cur.Trial && cur.TariffID != tariffID &&
+			cur.Status == SubActive && cur.ExpiresAt.After(now) {
+			return ErrOtherTariff
+		} else if err != nil && !errors.Is(err, ErrNotFound) {
+			return err
+		}
 		sub, err = c.buyTx(tx, userID, tariffID, recurringDays, now)
 		return err
 	})

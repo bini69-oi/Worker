@@ -42,7 +42,7 @@ func (c *Core) dropPlan(tx Tx, sub Subscription, now time.Time) error {
 			return err
 		}
 	}
-	sub.NextTariffID, sub.NextDays, sub.NextPrice, sub.UpdatedAt = 0, 0, 0, now
+	sub.NextTariffID, sub.NextDays, sub.NextPrice, sub.NextBuyID, sub.UpdatedAt = 0, 0, 0, 0, now
 	_, err := tx.SaveSub(sub)
 	return err
 }
@@ -61,16 +61,27 @@ func (c *Core) startPlan(tx Tx, s Subscription, now time.Time) (switched bool, e
 	if err != nil {
 		return false, err
 	}
+	buyID := s.NextBuyID
 	s.TariffID, s.PeriodDays, s.Price, s.Imported = t.ID, s.NextDays, s.NextPrice, false
 	s.ExpiresAt = s.ExpiresAt.Add(time.Duration(s.NextDays) * day)
-	s.NextTariffID, s.NextDays, s.NextPrice = 0, 0, 0
-	s.ExtraTrafficBytes, s.ExtraDevices = 0, 0 // у нового тарифа свои лимиты
+	s.NextTariffID, s.NextDays, s.NextPrice, s.NextBuyID = 0, 0, 0, 0
+	s.ExtraTrafficBytes, s.ExtraTrafficUntil, s.ExtraDevices = 0, time.Time{}, 0 // у нового тарифа свои лимиты
 	s.Status, s.UpdatedAt = SubActive, now
 	if _, err := tx.SaveSub(s); err != nil {
 		return false, err
 	}
 	if err := enqueueSync(tx, s.ID, now); err != nil {
 		return false, err
+	}
+	buyer, err := tx.User(s.UserID)
+	if err != nil {
+		return false, err
+	}
+	// Бонус за смену платится сейчас, когда отменить её уже нельзя. Бесплатная смена (buyID 0) бонуса не даёт.
+	if buyID != 0 {
+		if err := c.referralBonus(tx, buyer, "ref_buy", buyID, s.Price, now); err != nil {
+			return false, err
+		}
 	}
 	return true, enqueueNotify(tx, NotifyTask{UserID: s.UserID, Key: "notify.plan_started",
 		Vars: map[string]string{"tariff": t.Name, "until": s.ExpiresAt.Format("02.01.2006")}}, now)

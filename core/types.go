@@ -99,7 +99,9 @@ type Subscription struct {
 	NextDays     int
 	NextPrice    int64 // копейки, уже списаны с баланса
 	// Докупленное: трафик действует до конца периода, устройства переходят в следующий.
+	NextBuyID         int64 // списание за ждущую смену
 	ExtraTrafficBytes int64
+	ExtraTrafficUntil time.Time // конец периода, в котором куплен трафик
 	ExtraDevices      int
 
 	// Imported значит, что подписка перенесена из панели: лимиты и имя берутся из снимка Own, а не из тарифа.
