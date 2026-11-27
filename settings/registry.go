@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -41,7 +42,10 @@ type Def struct {
 	Default string // умолчание в том же виде, в каком значение хранится в базе
 	Desc    string
 	Group   string
-	Secret  bool // секрет хранится в базе зашифрованным и наружу целиком не отдаётся
+	// Money значит, что настройка меняет деньги или куда они идут (реквизиты, курсы, проценты, цены, адреса касс):
+	// её меняют только через «Да» владельца в Telegram.
+	Money  bool
+	Secret bool // секрет хранится в базе зашифрованным и наружу целиком не отдаётся
 }
 
 // Ошибки, по которым вызывающий отличает отказы.
@@ -66,6 +70,10 @@ func SetCheck(key string, fn func(string) error) { checks[key] = fn }
 // например ключи. Касса зовёт его в init своего файла, поэтому новая касса не правит этот реестр.
 // Зовётся только при старте программы, до чтения настроек.
 func AddGateway(name, title string, extra ...Def) {
+	for i := range extra {
+		// Всё, что касса настраивает сама (ключи, адреса, магазин), ведёт деньги: только title и sort безобидны.
+		extra[i].Money = !strings.HasSuffix(extra[i].Key, ".title") && !strings.HasSuffix(extra[i].Key, ".sort")
+	}
 	for _, d := range append(gatewayDefs(name, title), extra...) {
 		if _, ok := find(d.Key); !ok {
 			registry = append(registry, d)
@@ -77,11 +85,11 @@ func AddGateway(name, title string, extra ...Def) {
 func gatewayDefs(name, title string) []Def {
 	g := "pay." + name
 	return []Def{
-		{Key: name + ".enabled", Kind: KindBool, Default: "false", Group: g, Desc: "Показывать ли кассу абонентам"},
+		{Key: name + ".enabled", Kind: KindBool, Default: "false", Group: g, Money: true, Desc: "Показывать ли кассу абонентам"},
 		{Key: name + ".title", Kind: KindString, Default: title, Group: g, Desc: "Название кассы для абонента"},
 		{Key: name + ".sort", Kind: KindInt, Default: "0", Group: g, Desc: "Порядок в списке касс, меньше значит выше"},
-		{Key: name + ".min", Kind: KindMoney, Default: "0", Group: g, Desc: "Минимальная сумма пополнения, копейки, 0 без предела"},
-		{Key: name + ".max", Kind: KindMoney, Default: "0", Group: g, Desc: "Максимальная сумма пополнения, копейки, 0 без предела"},
+		{Key: name + ".min", Kind: KindMoney, Default: "0", Group: g, Money: true, Desc: "Минимальная сумма пополнения, копейки, 0 без предела"},
+		{Key: name + ".max", Kind: KindMoney, Default: "0", Group: g, Money: true, Desc: "Максимальная сумма пополнения, копейки, 0 без предела"},
 	}
 }
 
@@ -120,27 +128,27 @@ var base = []Def{
 		Desc: "Слать в группу тему «Сводка за день»"},
 	{Key: "autorenew.days_before", Kind: KindInt, Default: "1", Group: "notify",
 		Desc: "За сколько дней до окончания продлевать подписку с баланса"},
-	{Key: "ref.first_percent", Kind: KindInt, Default: "10", Group: "referral",
+	{Key: "ref.first_percent", Kind: KindInt, Default: "10", Group: "referral", Money: true,
 		Desc: "Процент пригласившему с первой покупки приглашённого"},
-	{Key: "ref.first_fixed", Kind: KindMoney, Default: "0", Group: "referral",
+	{Key: "ref.first_fixed", Kind: KindMoney, Default: "0", Group: "referral", Money: true,
 		Desc: "Фиксированный бонус пригласившему за первую покупку приглашённого, копейки"},
-	{Key: "ref.each_percent", Kind: KindInt, Default: "0", Group: "referral",
+	{Key: "ref.each_percent", Kind: KindInt, Default: "0", Group: "referral", Money: true,
 		Desc: "Процент пригласившему с каждой следующей покупки приглашённого, 0 выключено"},
-	{Key: "ref.welcome_bonus", Kind: KindMoney, Default: "0", Group: "referral",
+	{Key: "ref.welcome_bonus", Kind: KindMoney, Default: "0", Group: "referral", Money: true,
 		Desc: "Бонус приглашённому после его первой оплаты, копейки"},
 	{Key: "summary.hour", Kind: KindInt, Default: "9", Group: "notify",
 		Desc: "В котором часу (0-23, по времени сервера) слать в тему «Сводка» итог вчерашнего дня"},
 	{Key: "remind.days", Kind: KindString, Default: "3,1", Group: "notify",
 		Desc: "За сколько дней до окончания напоминать, через запятую"},
-	{Key: "addons.traffic", Kind: KindString, Default: "", Group: "pay",
+	{Key: "addons.traffic", Kind: KindString, Default: "", Group: "pay", Money: true,
 		Desc: "Пакеты докупки трафика: гигабайты и цена в копейках через двоеточие, пакеты через запятую, например 10:15000,50:50000. Пусто: докупки нет"},
-	{Key: "addons.device_month", Kind: KindMoney, Default: "0", Group: "pay",
+	{Key: "addons.device_month", Kind: KindMoney, Default: "0", Group: "pay", Money: true,
 		Desc: "Цена одного дополнительного устройства за 30 дней в копейках, 0: докупки устройств нет"},
-	{Key: "stars.subscription", Kind: KindBool, Default: "false", Group: "pay",
+	{Key: "stars.subscription", Kind: KindBool, Default: "false", Group: "pay", Money: true,
 		Desc: "Автоподписка Stars: Telegram сам списывает звёзды раз в 30 дней за 30-дневный срок тарифа"},
 	{Key: "pay.presets", Kind: KindString, Default: "100,250,500,1000", Group: "pay",
 		Desc: "Готовые суммы пополнения в рублях через запятую"},
-	{Key: "stars.rate", Kind: KindMoney, Default: "150", Group: "pay",
+	{Key: "stars.rate", Kind: KindMoney, Default: "150", Group: "pay", Money: true,
 		Desc: "Сколько копеек стоит одна звезда Telegram"},
 	{Key: "connect.apps", Kind: KindString, Default: "happ,v2raytun", Group: "bot",
 		Desc: "Приложения на экране подключения через запятую, первое главное. Лучше одно-два"},

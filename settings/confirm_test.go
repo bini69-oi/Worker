@@ -7,10 +7,8 @@ func TestIsMoneyAndNeedsConfirm(t *testing.T) {
 		key        string
 		money, ask bool
 	}{
-		{"manual.details", true, true},
 		{"stars.rate", true, true},
 		{"ref.first_percent", true, true},
-		{"yookassa.return_url", true, true},
 		{"yookassa.secret_key", false, true},
 		{"panel.webhook_secret", false, true},
 		{"admin.allow_ips", false, true},

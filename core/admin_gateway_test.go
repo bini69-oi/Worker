@@ -39,8 +39,12 @@ func TestEnableGatewayWithoutKeys(t *testing.T) {
 	if err := e.cfg.Set("manual.details", "Карта 0000"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.SetSetting(ctx, owner, "manual.enabled", "true"); err != nil || !e.cfg.Bool("manual.enabled") {
-		t.Errorf("включение после ключей: %v", err)
+	res, err := c.SetSetting(ctx, owner, "manual.enabled", "true")
+	if err != nil || !res.Pending || e.cfg.Bool("manual.enabled") {
+		t.Fatalf("включение после ключей ждёт «Да»: %+v %v", res, err)
+	}
+	if err := c.AnswerConfirm(ctx, res.ConfirmID, owner, true); err != nil || !e.cfg.Bool("manual.enabled") {
+		t.Errorf("после «Да»: %v", err)
 	}
 }
 

@@ -18,7 +18,7 @@
           "value": "true",
           "changed": true,
           "secret": false,
-          "confirm": false
+          "confirm": true
         },
         {
           "key": "manual.title",
@@ -51,7 +51,7 @@
           "value": "0",
           "changed": false,
           "secret": false,
-          "confirm": false
+          "confirm": true
         },
         {
           "key": "manual.max",
@@ -62,7 +62,7 @@
           "value": "0",
           "changed": false,
           "secret": false,
-          "confirm": false
+          "confirm": true
         },
         {
           "key": "manual.details",
@@ -95,7 +95,7 @@
           "value": "false",
           "changed": false,
           "secret": false,
-          "confirm": false
+          "confirm": true
         },
         {
           "key": "stars.rate",
@@ -117,7 +117,7 @@
           "value": "true",
           "changed": true,
           "secret": false,
-          "confirm": false
+          "confirm": true
         },
         {
           "key": "stars.title",
@@ -150,7 +150,7 @@
           "value": "0",
           "changed": false,
           "secret": false,
-          "confirm": false
+          "confirm": true
         },
         {
           "key": "stars.max",
@@ -161,7 +161,7 @@
           "value": "0",
           "changed": false,
           "secret": false,
-          "confirm": false
+          "confirm": true
         }
       ]
     }

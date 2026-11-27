@@ -1,20 +1,12 @@
 package settings
 
-import "strings"
-
 // IsMoney говорит, что настройка денежная: реквизиты ручной оплаты, курс Stars, проценты и бонусы рефералки,
-// цены докупки, адрес возврата из кассы. Её меняют только через «Да» владельца в Telegram: подмена реквизитов
-// или процента угнанной сессией стоит денег.
+// цены докупки, всё, что касса настраивает сама (ключи, адреса возврата и вебхуков, магазин, пределы суммы,
+// включение). Её меняют только через «Да» владельца в Telegram: подмена реквизитов или процента угнанной
+// сессией стоит денег. Признак стоит в самой настройке (Def.Money), новая касса получает его сама.
 func IsMoney(key string) bool {
-	switch key {
-	case "manual.details", "stars.rate", "ref.first_percent", "ref.first_fixed", "ref.each_percent", "ref.welcome_bonus",
-		"addons.traffic", "addons.device_month":
-		return true
-	}
-	if d, ok := find(key); ok && d.Group == "money" {
-		return true
-	}
-	return strings.HasSuffix(key, ".return_url")
+	d, ok := find(key)
+	return ok && d.Money
 }
 
 // NeedsConfirm говорит, что настройка меняется только через «Да» владельца: секрет, денежная или та, что
