@@ -92,6 +92,7 @@ func build(env Env, base slog.Handler) (*app, error) {
 		Gateways: pay.CoreGateways(gws),
 		Notifier: notes,
 		Sender:   casts,
+		Texts:    tx,
 		Telegram: bot.Tokens{BaseURL: env.TelegramURL, Hook: t.hook, Secret: func() string { return t.secret }},
 		Channels: bot.Channels{API: t.client},
 		OwnerID:  env.OwnerID,

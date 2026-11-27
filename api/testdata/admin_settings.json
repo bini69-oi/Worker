@@ -1,0 +1,15 @@
+{
+  "items": [
+    {
+      "key": "trial.days",
+      "kind": "int",
+      "group": "trial",
+      "desc": "Сколько дней длится пробный период",
+      "default": "3",
+      "value": "7",
+      "changed": true,
+      "secret": false,
+      "confirm": false
+    }
+  ]
+}

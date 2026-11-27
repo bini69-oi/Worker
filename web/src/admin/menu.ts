@@ -15,6 +15,9 @@ export const sections: Section[] = [
   { id: 'tariffs', title: 'Тарифы', perm: 'tariffs' },
   { id: 'promos', title: 'Промокоды', perm: 'promo' },
   { id: 'broadcasts', title: 'Рассылки', perm: 'broadcast' },
+  { id: 'texts', title: 'Тексты', perm: 'owner' },
+  { id: 'settings', title: 'Настройки', perm: 'owner' },
+  { id: 'gateways', title: 'Кассы', perm: 'owner' },
 ]
 
 export function visible(me: AdminMe): Section[] {

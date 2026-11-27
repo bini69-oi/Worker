@@ -45,6 +45,21 @@ export interface AdminExpires {
   expires_at: string;
 }
 
+export interface AdminGateway {
+  name: string;
+  title: string;
+  enabled: boolean;
+  configured: boolean;
+  sort: number;
+  last_paid_at: string | null;
+  pending: number;
+  settings: AdminSetting[];
+}
+
+export interface AdminGatewayList {
+  items: AdminGateway[];
+}
+
 export interface AdminLedger {
   amount: number;
   reason: string;
@@ -112,6 +127,27 @@ export interface AdminSegmentCount {
   count: number;
 }
 
+export interface AdminSetting {
+  key: string;
+  kind: string;
+  group: string;
+  desc: string;
+  default: string;
+  value: string;
+  changed: boolean;
+  secret: boolean;
+  confirm: boolean;
+}
+
+export interface AdminSettingList {
+  items: AdminSetting[];
+}
+
+export interface AdminSettingResult {
+  pending: boolean;
+  confirm_id: number;
+}
+
 export interface AdminSquad {
   uuid: string;
   name: string;
@@ -146,6 +182,21 @@ export interface AdminTariffList {
   tariffs: AdminTariff[];
   squads: AdminSquad[];
   squads_ok: boolean;
+}
+
+export interface AdminText {
+  key: string;
+  params: string[];
+  default_ru: string;
+  default_en: string;
+  ru: string;
+  en: string;
+  changed_ru: boolean;
+  changed_en: boolean;
+}
+
+export interface AdminTextList {
+  items: AdminText[];
 }
 
 export interface AdminUserCard {

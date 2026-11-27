@@ -1,8 +1,11 @@
 import type { Component } from 'svelte'
 import Broadcasts from './Broadcasts.svelte'
+import Gateways from './Gateways.svelte'
 import Payments from './Payments.svelte'
 import Promos from './Promos.svelte'
+import Settings from './Settings.svelte'
 import Tariffs from './Tariffs.svelte'
+import Texts from './Texts.svelte'
 import Users from './Users.svelte'
 
 type Screen = Component<{ arg?: string }>
@@ -17,4 +20,7 @@ export const screens: Record<string, Screen> = {
   tariffs: plain(Tariffs),
   promos: plain(Promos),
   broadcasts: plain(Broadcasts),
+  texts: plain(Texts),
+  settings: plain(Settings),
+  gateways: plain(Gateways),
 }

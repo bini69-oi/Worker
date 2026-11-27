@@ -1,0 +1,169 @@
+{
+  "items": [
+    {
+      "name": "manual",
+      "title": "Перевод по реквизитам",
+      "enabled": true,
+      "configured": true,
+      "sort": 0,
+      "last_paid_at": null,
+      "pending": 0,
+      "settings": [
+        {
+          "key": "manual.enabled",
+          "kind": "bool",
+          "group": "pay.manual",
+          "desc": "Показывать ли кассу абонентам",
+          "default": "false",
+          "value": "true",
+          "changed": true,
+          "secret": false,
+          "confirm": false
+        },
+        {
+          "key": "manual.title",
+          "kind": "string",
+          "group": "pay.manual",
+          "desc": "Название кассы для абонента",
+          "default": "Перевод по реквизитам",
+          "value": "Перевод по реквизитам",
+          "changed": false,
+          "secret": false,
+          "confirm": false
+        },
+        {
+          "key": "manual.sort",
+          "kind": "int",
+          "group": "pay.manual",
+          "desc": "Порядок в списке касс, меньше значит выше",
+          "default": "0",
+          "value": "0",
+          "changed": false,
+          "secret": false,
+          "confirm": false
+        },
+        {
+          "key": "manual.min",
+          "kind": "money",
+          "group": "pay.manual",
+          "desc": "Минимальная сумма пополнения, копейки, 0 без предела",
+          "default": "0",
+          "value": "0",
+          "changed": false,
+          "secret": false,
+          "confirm": false
+        },
+        {
+          "key": "manual.max",
+          "kind": "money",
+          "group": "pay.manual",
+          "desc": "Максимальная сумма пополнения, копейки, 0 без предела",
+          "default": "0",
+          "value": "0",
+          "changed": false,
+          "secret": false,
+          "confirm": false
+        },
+        {
+          "key": "manual.details",
+          "kind": "string",
+          "group": "pay.manual",
+          "desc": "Реквизиты и инструкция для абонента: куда переводить и что написать в комментарии",
+          "default": "",
+          "value": "Карта 0000",
+          "changed": true,
+          "secret": false,
+          "confirm": true
+        }
+      ]
+    },
+    {
+      "name": "stars",
+      "title": "Telegram Stars",
+      "enabled": true,
+      "configured": true,
+      "sort": 0,
+      "last_paid_at": null,
+      "pending": 0,
+      "settings": [
+        {
+          "key": "stars.subscription",
+          "kind": "bool",
+          "group": "pay",
+          "desc": "Автоподписка Stars: Telegram сам списывает звёзды раз в 30 дней за 30-дневный срок тарифа",
+          "default": "false",
+          "value": "false",
+          "changed": false,
+          "secret": false,
+          "confirm": false
+        },
+        {
+          "key": "stars.rate",
+          "kind": "money",
+          "group": "pay",
+          "desc": "Сколько копеек стоит одна звезда Telegram",
+          "default": "150",
+          "value": "150",
+          "changed": false,
+          "secret": false,
+          "confirm": true
+        },
+        {
+          "key": "stars.enabled",
+          "kind": "bool",
+          "group": "pay.stars",
+          "desc": "Показывать ли кассу абонентам",
+          "default": "false",
+          "value": "true",
+          "changed": true,
+          "secret": false,
+          "confirm": false
+        },
+        {
+          "key": "stars.title",
+          "kind": "string",
+          "group": "pay.stars",
+          "desc": "Название кассы для абонента",
+          "default": "Telegram Stars",
+          "value": "Telegram Stars",
+          "changed": false,
+          "secret": false,
+          "confirm": false
+        },
+        {
+          "key": "stars.sort",
+          "kind": "int",
+          "group": "pay.stars",
+          "desc": "Порядок в списке касс, меньше значит выше",
+          "default": "0",
+          "value": "0",
+          "changed": false,
+          "secret": false,
+          "confirm": false
+        },
+        {
+          "key": "stars.min",
+          "kind": "money",
+          "group": "pay.stars",
+          "desc": "Минимальная сумма пополнения, копейки, 0 без предела",
+          "default": "0",
+          "value": "0",
+          "changed": false,
+          "secret": false,
+          "confirm": false
+        },
+        {
+          "key": "stars.max",
+          "kind": "money",
+          "group": "pay.stars",
+          "desc": "Максимальная сумма пополнения, копейки, 0 без предела",
+          "default": "0",
+          "value": "0",
+          "changed": false,
+          "secret": false,
+          "confirm": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "key": "buy.success",
+      "params": [
+        "days"
+      ],
+      "default_ru": "Подписка оплачена. Она действует ещё {days} дн.",
+      "default_en": "Subscription paid. It runs for {days} more days.",
+      "ru": "Готово, ещё {days} дн.",
+      "en": "Subscription paid. It runs for {days} more days.",
+      "changed_ru": true,
+      "changed_en": false
+    }
+  ]
+}

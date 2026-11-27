@@ -53,7 +53,7 @@ func newAdminEnv(t *testing.T) *adminEnv {
 	}
 	e.stars = stars.New(e.cfg)
 	e.sender = &coretest.Sender{}
-	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes, OwnerID: adminOwner, Sender: e.sender,
+	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes, OwnerID: adminOwner, Sender: e.sender, Texts: coretest.NewTexts(t),
 		Gateways: []core.Gateway{manual.New(e.cfg), e.stars}})
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	// Часы лимита запросов идут вперёд сами: тесты шлют много запросов подряд, а часы ядра стоят на месте.
@@ -177,4 +177,24 @@ func serve(e *adminEnv, req *http.Request) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
 	e.s.ServeHTTP(rec, req)
 	return rec
+}
+
+// confirmLast отвечает «Да» на последнее подтверждение владельцу.
+func (e *adminEnv) confirmLast(yes bool) {
+	e.t.Helper()
+	var last int64
+	for _, task := range e.st.Tasks() {
+		if task.Kind == core.KindNotifyConfirm {
+			var n core.ConfirmTask
+			if err := json.Unmarshal(task.Payload, &n); err == nil && n.Kind != "login" {
+				last = n.ConfirmID
+			}
+		}
+	}
+	if last == 0 {
+		e.t.Fatal("нет подтверждения владельцу")
+	}
+	if err := e.c.AnswerConfirm(context.Background(), last, adminOwner, yes); err != nil {
+		e.t.Fatal(err)
+	}
 }

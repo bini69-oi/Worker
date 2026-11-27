@@ -20,6 +20,10 @@ func Types() []reflect.Type {
 		reflect.TypeFor[AdminBroadcastList](),
 		reflect.TypeFor[AdminBroadcast](),
 		reflect.TypeFor[AdminSegmentCount](),
+		reflect.TypeFor[AdminTextList](),
+		reflect.TypeFor[AdminSettingList](),
+		reflect.TypeFor[AdminSettingResult](),
+		reflect.TypeFor[AdminGatewayList](),
 		reflect.TypeFor[AdminBalance](),
 		reflect.TypeFor[AdminExpires](),
 	}
