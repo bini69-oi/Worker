@@ -176,3 +176,25 @@ func (a *adminAPI) gatewaysList(_ http.ResponseWriter, r *http.Request, ad admin
 	}
 	return out, nil
 }
+
+// AdminMaintenance это техработы: идут ли и какой текст видят абоненты.
+type AdminMaintenance struct {
+	On   bool   `json:"on"`
+	Text string `json:"text"`
+}
+
+func (a *adminAPI) maintenanceGet(_ http.ResponseWriter, r *http.Request, ad adminCtx) (any, error) {
+	m, err := a.d.Core.MaintenanceState(r.Context(), ad.Admin.TgID)
+	return AdminMaintenance{On: m.On, Text: m.Text}, err
+}
+
+func (a *adminAPI) maintenanceSet(w http.ResponseWriter, r *http.Request, ad adminCtx) (any, error) {
+	var in AdminMaintenance
+	if err := Decode(w, r, &in); err != nil {
+		return nil, err
+	}
+	if err := a.d.Core.SetMaintenance(r.Context(), ad.Admin.TgID, in.On, in.Text); err != nil {
+		return nil, err
+	}
+	return a.maintenanceGet(w, r, ad)
+}

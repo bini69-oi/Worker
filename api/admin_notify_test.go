@@ -48,3 +48,18 @@ func TestAdminNotifications(t *testing.T) {
 		t.Errorf("безопасность выключилась: %d", rec.Code)
 	}
 }
+
+func TestAdminMaintenance(t *testing.T) {
+	e := newAdminEnv(t)
+	rec := e.post(e.owner, "/api/admin/maintenance", `{"on":true,"text":"Работы до 15:00"}`)
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"on":true`) {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	golden(t, "admin_maintenance", e.get(e.owner, "/api/admin/maintenance").Body.Bytes())
+	if !e.c.Maintenance() {
+		t.Error("ядро не знает о техработах")
+	}
+	if rec = e.post(e.owner, "/api/admin/maintenance", `{"on":false,"text":""}`); !strings.Contains(rec.Body.String(), `"on":false`) {
+		t.Errorf("%s", rec.Body)
+	}
+}

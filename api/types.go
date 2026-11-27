@@ -26,6 +26,7 @@ func Types() []reflect.Type {
 		reflect.TypeFor[AdminGatewayList](),
 		reflect.TypeFor[AdminNotify](),
 		reflect.TypeFor[AdminChatCode](),
+		reflect.TypeFor[AdminMaintenance](),
 		reflect.TypeFor[AdminBalance](),
 		reflect.TypeFor[AdminExpires](),
 	}

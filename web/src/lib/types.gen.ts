@@ -81,6 +81,11 @@ export interface AdminLoginState {
   status: string;
 }
 
+export interface AdminMaintenance {
+  on: boolean;
+  text: string;
+}
+
 export interface AdminMe {
   tg_id: number;
   owner: boolean;

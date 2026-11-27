@@ -2,6 +2,7 @@
   import type { AdminSettingList } from '../lib/types.gen'
   import { api, errText, qs } from './api'
   import { settingView } from './configView'
+  import Maintenance from './Maintenance.svelte'
   import SettingRow from './SettingRow.svelte'
 
   let q = $state('')
@@ -30,6 +31,7 @@
 </script>
 
 <h1>Настройки</h1>
+<Maintenance />
 <form class="row" onsubmit={(e) => { e.preventDefault(); void load() }}>
   <input placeholder="Поиск по ключу или описанию" aria-label="Поиск" bind:value={q} />
   <select aria-label="Группа" bind:value={group} onchange={load}>
