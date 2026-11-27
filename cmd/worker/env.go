@@ -43,12 +43,24 @@ var requiredKeys = []string{"BOT_TOKEN", "OWNER_TG_ID", "PUBLIC_URL", "PANEL_URL
 
 const defaultDBPath = "worker.db"
 
-// envPath это файл с настройками: WORKER_ENV_FILE (на сервере /etc/worker/env) или .env в текущей папке.
-func envPath(getenv func(string) string) string {
+// serverEnvFile это файл настроек, который создаёт install.sh.
+const serverEnvFile = "/etc/worker/env"
+
+// envPath это файл с настройками: WORKER_ENV_FILE, иначе .env в текущей папке, иначе /etc/worker/env, если он есть
+// (так команды на установленном сервере работают из любой папки).
+func envPath(getenv func(string) string, exists func(string) bool) string {
 	if p := getenv("WORKER_ENV_FILE"); p != "" {
 		return p
 	}
+	if !exists(".env") && exists(serverEnvFile) {
+		return serverEnvFile
+	}
 	return ".env"
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // loadEnv читает файл .env (если он есть) и переменные процесса. Переменная процесса важнее файла.

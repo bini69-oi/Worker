@@ -141,16 +141,28 @@ func TestPanelHTTPInside(t *testing.T) {
 }
 
 func TestEnvPath(t *testing.T) {
-	if got := envPath(func(string) string { return "" }); got != ".env" {
+	none := func(string) bool { return false }
+	if got := envPath(noEnv, none); got != ".env" {
 		t.Errorf("по умолчанию %q", got)
 	}
-	if got := envPath(func(k string) string {
+	withVar := func(k string) string {
 		if k == "WORKER_ENV_FILE" {
-			return "/etc/worker/env"
+			return "/opt/w/env"
 		}
 		return ""
-	}); got != "/etc/worker/env" {
+	}
+	if got := envPath(withVar, func(string) bool { return true }); got != "/opt/w/env" {
 		t.Errorf("с переменной %q", got)
+	}
+	// Установленный сервис: .env рядом нет, а /etc/worker/env есть, берётся он.
+	onlyEtc := func(p string) bool { return p == "/etc/worker/env" }
+	if got := envPath(noEnv, onlyEtc); got != "/etc/worker/env" {
+		t.Errorf("на сервере после установки %q", got)
+	}
+	// Свой .env в текущей папке важнее серверного.
+	both := func(p string) bool { return p == ".env" || p == "/etc/worker/env" }
+	if got := envPath(noEnv, both); got != ".env" {
+		t.Errorf("рядом лежащий .env должен быть главнее: %q", got)
 	}
 }
 
