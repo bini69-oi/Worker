@@ -108,3 +108,13 @@ func (t *tx) SetPaymentStatus(id int64, from, to core.PayStatus) (bool, error) {
 	t.st.pays[id] = p
 	return true, nil
 }
+
+func (t *tx) MarkRefunded(id int64, at time.Time) (bool, error) {
+	p, ok := t.st.pays[id]
+	if !ok || p.Status != core.PayPaid {
+		return false, nil
+	}
+	p.Status, p.RefundedAt = core.PayRefunded, at
+	t.st.pays[id] = p
+	return true, nil
+}

@@ -29,3 +29,6 @@ CREATE INDEX payments_user ON payments (user_id, id);
 -- Журнал действий: по времени и по тому, над чем действие (карточка абонента)
 CREATE INDEX audit_created ON audit_log (created_at);
 CREATE INDEX audit_target ON audit_log (target, id);
+
+-- Когда платёж возвращён: выручка дня считается за вычетом возвратов этого дня
+ALTER TABLE payments ADD COLUMN refunded_at INTEGER;

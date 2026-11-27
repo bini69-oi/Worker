@@ -2,6 +2,7 @@ package coretest
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"strings"
 	"time"
@@ -140,4 +141,89 @@ func (s *Store) GatewayStats(_ context.Context) (map[string]core.GatewayStat, er
 		out[p.Gateway] = st
 	}
 	return out, nil
+}
+
+func (s *Store) StatsData(_ context.Context, q core.StatsQuery) (core.StatsData, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d := core.StatsData{Paid: map[int64]map[string]int64{}, Refunded: map[int64]map[string]int64{}}
+	in := func(t time.Time) bool { return !t.Before(q.From) && t.Before(q.To) }
+	day := func(t time.Time) int64 { return (t.Unix() + int64(q.OffsetSec)) / 86400 }
+	add := func(m map[int64]map[string]int64, t time.Time, gw string, v int64) {
+		if m[day(t)] == nil {
+			m[day(t)] = map[string]int64{}
+		}
+		m[day(t)][gw] += v
+	}
+	firstPaid := map[int64]time.Time{}
+	for _, p := range s.st.pays {
+		if p.Status != core.PayPaid && p.Status != core.PayRefunded {
+			continue
+		}
+		if in(p.PaidAt) {
+			add(d.Paid, p.PaidAt, p.Gateway, p.Amount)
+		}
+		if first, ok := firstPaid[p.UserID]; !ok || p.PaidAt.Before(first) {
+			firstPaid[p.UserID] = p.PaidAt
+		}
+		if at := cmpTime(p.RefundedAt, p.PaidAt); p.Status == core.PayRefunded && in(at) {
+			add(d.Refunded, at, p.Gateway, p.Amount)
+		}
+	}
+	for _, t := range firstPaid {
+		if in(t) {
+			d.FirstPaid++
+		}
+	}
+	for _, u := range s.st.users {
+		if in(u.CreatedAt) {
+			d.NewUsers++
+		}
+	}
+	users := map[int64]bool{}
+	for _, sub := range s.st.subs {
+		if u := s.st.users[sub.UserID]; u.TrialUsed && in(sub.CreatedAt) {
+			d.Trials++
+		}
+		if sub.Status == core.SubActive && !sub.CreatedAt.After(q.At) && sub.ExpiresAt.After(q.At) {
+			d.ActiveSubs++
+		}
+	}
+	for _, r := range s.st.tasks {
+		if r.done || r.Kind == core.KindNotifyAdmin || r.Kind == core.KindNotifyOwner || !r.CreatedAt.Before(q.StuckBefore) {
+			continue
+		}
+		d.StuckTasks++
+		if uid := s.taskUser(r.Task); uid != 0 && !users[uid] && len(d.StuckUsers) < 20 {
+			users[uid] = true
+			d.StuckUsers = append(d.StuckUsers, uid)
+		}
+	}
+	sort.Slice(d.StuckUsers, func(i, j int) bool { return d.StuckUsers[i] < d.StuckUsers[j] })
+	return d, nil
+}
+
+// cmpTime отдаёт время возврата, а если его нет (старая запись), время оплаты.
+func cmpTime(refunded, paid time.Time) time.Time {
+	if refunded.IsZero() {
+		return paid
+	}
+	return refunded
+}
+
+// taskUser находит абонента задачи очереди: синхронизации по подписке или уведомления.
+func (s *Store) taskUser(t core.Task) int64 {
+	switch t.Kind {
+	case core.KindPanelSync:
+		var p core.PanelSyncTask
+		if json.Unmarshal(t.Payload, &p) == nil {
+			return s.st.subs[p.SubID].UserID
+		}
+	case core.KindNotifyUser:
+		var n core.NotifyTask
+		if json.Unmarshal(t.Payload, &n) == nil {
+			return n.UserID
+		}
+	}
+	return 0
 }

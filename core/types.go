@@ -168,4 +168,5 @@ type Payment struct {
 	ExternalID  string
 	CreatedAt   time.Time
 	PaidAt      time.Time
+	RefundedAt  time.Time // когда возвращён; нулевое время, если не возвращён
 }

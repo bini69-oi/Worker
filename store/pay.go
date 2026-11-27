@@ -9,15 +9,15 @@ import (
 	"github.com/bini69-oi/worker/core"
 )
 
-const payCols = `id, user_id, gateway, amount, ext_amount, ext_currency, recurring, status, external_id, created_at, paid_at`
+const payCols = `id, user_id, gateway, amount, ext_amount, ext_currency, recurring, status, external_id, created_at, paid_at, refunded_at`
 
 func scanPayment(r scanner) (core.Payment, error) {
 	var p core.Payment
 	var status string
 	var ext sql.NullString
 	var created int64
-	var paid sql.NullInt64
-	err := r.Scan(&p.ID, &p.UserID, &p.Gateway, &p.Amount, &p.ExtAmount, &p.ExtCurrency, &p.Recurring, &status, &ext, &created, &paid)
+	var paid, refunded sql.NullInt64
+	err := r.Scan(&p.ID, &p.UserID, &p.Gateway, &p.Amount, &p.ExtAmount, &p.ExtCurrency, &p.Recurring, &status, &ext, &created, &paid, &refunded)
 	if err != nil {
 		return p, err
 	}
@@ -27,6 +27,7 @@ func scanPayment(r scanner) (core.Payment, error) {
 	if paid.Valid {
 		p.PaidAt = time.Unix(paid.Int64, 0).UTC()
 	}
+	p.RefundedAt = unix(refunded)
 	return p, nil
 }
 
@@ -114,6 +115,17 @@ func (t *coreTx) MarkPaid(id int64, externalID string, at time.Time) (bool, erro
 func (t *coreTx) SetPaymentStatus(id int64, from, to core.PayStatus) (bool, error) {
 	res, err := t.q.ExecContext(t.ctx,
 		"UPDATE payments SET status = ? WHERE id = ? AND status = ?", string(to), id, string(from))
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
+}
+
+// MarkRefunded переводит оплаченный платёж в «возвращён» и запоминает когда: по этому дню сводка вычитает возврат.
+func (t *coreTx) MarkRefunded(id int64, at time.Time) (bool, error) {
+	res, err := t.q.ExecContext(t.ctx,
+		"UPDATE payments SET status = 'refunded', refunded_at = ? WHERE id = ? AND status = 'paid'", at.Unix(), id)
 	if err != nil {
 		return false, err
 	}

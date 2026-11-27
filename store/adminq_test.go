@@ -255,3 +255,50 @@ func TestGatewayStats(t *testing.T) {
 		t.Errorf("stars: %+v", st)
 	}
 }
+
+func TestStatsData(t *testing.T) {
+	s, uid := newCoreStore(t)
+	ctx := context.Background()
+	h := time.Hour
+	// tNow это 1 января 12:00. Оплаты: 1000 ₽ ручная, 200 ₽ Stars (возврат в тот же день), 300 ₽ вчера.
+	tx(t, s, func(tx core.Tx) error {
+		pay := func(gw string, amount int64, paid time.Time) int64 {
+			id, err := tx.CreatePayment(core.Payment{UserID: uid, Gateway: gw, Amount: amount, Status: core.PayPending, CreatedAt: paid})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ok, err := tx.MarkPaid(id, "", paid); err != nil || !ok {
+				t.Fatal(ok, err)
+			}
+			return id
+		}
+		pay("manual", 100000, tNow)
+		back := pay("stars", 20000, tNow.Add(h))
+		pay("manual", 30000, tNow.Add(-24*h))
+		if ok, err := tx.MarkRefunded(back, tNow.Add(2*h)); err != nil || !ok {
+			t.Fatal(ok, err)
+		}
+		if ok, _ := tx.MarkRefunded(back, tNow); ok {
+			t.Error("повторный возврат прошёл")
+		}
+		return nil
+	})
+	from, to := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	d, err := s.StatsData(ctx, core.StatsQuery{From: from, To: to, At: to, StuckBefore: tNow})
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := from.Unix() / 86400
+	if d.Paid[key]["manual"] != 100000 || d.Paid[key]["stars"] != 20000 || d.Refunded[key]["stars"] != 20000 || len(d.Paid) != 1 {
+		t.Errorf("оплаты и возвраты: %+v %+v", d.Paid, d.Refunded)
+	}
+	if d.FirstPaid != 0 || d.NewUsers != 1 || d.StuckTasks != 0 {
+		t.Errorf("прочее: %+v", d)
+	}
+	// Сдвиг часового пояса +3 часа: платёж в 22:00 UTC 31 декабря уже 1 января по местному времени.
+	off := 3 * 3600
+	d, _ = s.StatsData(ctx, core.StatsQuery{From: from.Add(-3 * h), To: to.Add(-3 * h), At: to, StuckBefore: tNow, OffsetSec: off})
+	if d.Paid[(from.Unix()+int64(off)-3*3600)/86400]["manual"] != 100000 {
+		t.Errorf("со сдвигом пояса: %+v", d.Paid)
+	}
+}

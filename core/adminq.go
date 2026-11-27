@@ -117,6 +117,8 @@ type PaymentRow struct {
 type AdminStore interface {
 	// FindUsers ищет абонентов, новые первыми. Отдаёт не больше limit строк.
 	FindUsers(ctx context.Context, q UserQuery, now time.Time, limit int) ([]UserRow, error)
+	// StatsData отдаёт цифры сводки за период.
+	StatsData(ctx context.Context, q StatsQuery) (StatsData, error)
 	// GatewayStats отдаёт по кассам время последнего оплаченного платежа и число ждущих.
 	GatewayStats(ctx context.Context) (map[string]GatewayStat, error)
 	// Broadcasts отдаёт рассылки, новые первыми.
@@ -158,10 +160,32 @@ type AdminTx interface {
 	FinishBroadcast(id int64, at time.Time) (bool, error)
 	// SegmentCount считает получателей сегмента: без забаненных и недоступных.
 	SegmentCount(segment string, now time.Time) (int, error)
+	// MarkRefunded переводит оплаченный платёж в «возвращён» с временем возврата. false значит, что он уже не оплачен.
+	MarkRefunded(id int64, at time.Time) (bool, error)
 }
 
 // GatewayStat это что хранилище знает о платежах кассы.
 type GatewayStat struct {
 	LastPaidAt time.Time // нулевое время, если оплаченных нет
 	Pending    int
+}
+
+// StatsQuery это запрос сводки. Дни считаются со сдвигом OffsetSec от UTC: полночь по часовому поясу запроса.
+type StatsQuery struct {
+	From, To    time.Time // период [From, To)
+	At          time.Time // на этот момент считаются активные подписки
+	StuckBefore time.Time // задачи очереди старше этого времени считаются зависшими
+	OffsetSec   int
+}
+
+// StatsData это то, что хранилище считает по периоду. Ключ дня это (unix + OffsetSec) / 86400.
+type StatsData struct {
+	Paid       map[int64]map[string]int64 // день, касса: сумма оплаченных (и позже возвращённых) платежей, копейки
+	Refunded   map[int64]map[string]int64 // день, касса: сумма возвратов в день возврата
+	NewUsers   int
+	Trials     int // абонентов, взявших пробный период
+	FirstPaid  int // оплативших впервые
+	ActiveSubs int // подписок, живых на момент At
+	StuckTasks int
+	StuckUsers []int64 // абоненты зависших задач, не больше 20
 }

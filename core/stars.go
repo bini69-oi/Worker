@@ -147,7 +147,7 @@ func (c *Core) RefundStars(ctx context.Context, adminID, paymentID int64) error 
 // undoPayment отменяет зачисление платежа после возврата.
 // Абонент получает сообщение «платёж возвращён» один раз: статус меняется из «оплачен» только однажды.
 func (c *Core) undoPayment(tx Tx, p Payment, now time.Time) error {
-	ok, err := tx.SetPaymentStatus(p.ID, PayPaid, PayRefunded)
+	ok, err := tx.MarkRefunded(p.ID, now)
 	if err != nil || !ok {
 		return err
 	}
