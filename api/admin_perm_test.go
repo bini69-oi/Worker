@@ -21,7 +21,7 @@ func pathOf(pattern string) (method, path string) {
 // Каждый адрес из таблицы прав отказывает помощнику без нужного права. Таблица здесь та же, что в коде.
 func TestEveryRouteDeniesWithoutPerm(t *testing.T) {
 	e := newAdminEnv(t)
-	for _, rt := range AdminRoutes() {
+	for i, rt := range AdminRoutes() {
 		if rt.Perm == "" {
 			continue
 		}
@@ -31,7 +31,7 @@ func TestEveryRouteDeniesWithoutPerm(t *testing.T) {
 			if rt.Perm == core.PermUsers {
 				other = core.PermStats
 			}
-			tg := int64(100 + len(rt.Pattern))
+			tg := int64(100 + i)
 			cookie := e.helper(tg, other)
 			method, path := pathOf(rt.Pattern)
 			rec := e.do(cookie, method, path, `{}`)

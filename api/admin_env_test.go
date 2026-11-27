@@ -43,7 +43,9 @@ func newAdminEnv(t *testing.T) *adminEnv {
 		panel: coretest.NewPanel(), notes: &coretest.Notifier{}}
 	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes, OwnerID: adminOwner})
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	e.s = New(Deps{Text: fakeTexts, Log: log, Now: e.clock.Now})
+	// Часы лимита запросов идут вперёд сами: тесты шлют много запросов подряд, а часы ядра стоят на месте.
+	var tick time.Duration
+	e.s = New(Deps{Text: fakeTexts, Log: log, Now: func() time.Time { tick += time.Second; return t0.Add(tick) }})
 	RegisterAdmin(e.s, AdminDeps{Core: e.c, Bot: func() string { return "test_bot" }})
 	if err := e.c.SetOwnerPassword(context.Background(), ownerPass); err != nil {
 		t.Fatal(err)
@@ -117,4 +119,49 @@ func (e *adminEnv) helper(tg int64, perms ...core.Perm) string {
 		e.t.Fatal(err)
 	}
 	return e.session(tg, "helper password 1")
+}
+
+// subscriber заводит абонента с платной подпиской на 30 дней и одним устройством в панели.
+func (e *adminEnv) subscriber(tg int64, name string) core.User {
+	e.t.Helper()
+	ctx := context.Background()
+	u, err := e.c.Register(ctx, tg, name, "ru")
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	tr, err := e.c.SaveTariff(ctx, adminOwner, core.Tariff{Name: "Месяц", Active: true, Squads: []string{"a"},
+		Periods: []core.Period{{Days: 30, Price: 20000}}})
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	if _, err := e.c.AdminAdjust(ctx, adminOwner, u.ID, 50000, "тест"); err != nil {
+		e.t.Fatal(err)
+	}
+	if _, err := e.c.Buy(ctx, u.ID, tr.ID, 30); err != nil {
+		e.t.Fatal(err)
+	}
+	if _, err := e.c.ProcessDue(ctx); err != nil {
+		e.t.Fatal(err)
+	}
+	sub, err := e.c.Sub(ctx, u.ID)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	e.panel.AddDevice(sub.PanelUUID, "hw-1")
+	return u
+}
+
+var contextBG = context.Background()
+
+func httpReq(e *adminEnv, method, target, body, cookie string) *http.Request {
+	req := httptest.NewRequest(method, target, strings.NewReader(body))
+	req.RemoteAddr = adminIP
+	req.Header.Set("Cookie", cookie)
+	return req
+}
+
+func serve(e *adminEnv, req *http.Request) *httptest.ResponseRecorder {
+	rec := httptest.NewRecorder()
+	e.s.ServeHTTP(rec, req)
+	return rec
 }

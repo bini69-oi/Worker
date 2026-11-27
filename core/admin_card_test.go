@@ -71,3 +71,38 @@ func TestUserCardRights(t *testing.T) {
 		t.Errorf("нет такого абонента: %v", err)
 	}
 }
+
+func TestAdminDevicesAndLink(t *testing.T) {
+	ctx := context.Background()
+	e := newEnv(t)
+	sub := e.bought(t)
+	e.panel.AddDevice(sub.PanelUUID, "hw1")
+	helperWith(t, e, 50, core.PermUsers)
+	if err := e.c.AdminResetDevices(ctx, 50, e.user.ID); !errors.Is(err, core.ErrForbidden) {
+		t.Fatalf("без права grant: %v", err)
+	}
+	if err := e.c.AdminResetDevices(ctx, owner, e.user.ID); err != nil {
+		t.Fatal(err)
+	}
+	if d, _ := e.c.Devices(ctx, e.user.ID); len(d) != 0 {
+		t.Errorf("устройства остались: %v", d)
+	}
+	before, _ := e.c.Sub(ctx, e.user.ID)
+	if err := e.c.AdminRevokeLink(ctx, owner, e.user.ID); err != nil {
+		t.Fatal(err)
+	}
+	if after, _ := e.c.Sub(ctx, e.user.ID); after.SubURL == before.SubURL {
+		t.Errorf("ссылка не сменилась")
+	}
+	log := e.st.Audit()
+	if a := log[len(log)-1]; a.Action != "link.revoke" {
+		t.Errorf("журнал: %+v", a)
+	}
+	e.panel.SetDown(true)
+	if err := e.c.AdminResetDevices(ctx, owner, e.user.ID); !errors.Is(err, core.ErrPanelDown) {
+		t.Errorf("панель лежит: %v", err)
+	}
+	if err := e.c.AdminResetDevices(ctx, owner, 9999); err == nil {
+		t.Errorf("нет такого абонента, а ошибки нет")
+	}
+}

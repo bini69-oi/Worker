@@ -26,6 +26,16 @@ func (a *adminAPI) routes() []adminRoute {
 	return []adminRoute{
 		{"GET /api/admin/me", "", a.me},
 		{"POST /api/admin/logout", "", a.logout},
+
+		{"GET /api/admin/users", core.PermUsers, a.usersList},
+		{"GET /api/admin/users/{id}", core.PermUsers, a.userCard},
+		{"POST /api/admin/users/{id}/balance", core.PermGrant, a.userBalance},
+		{"POST /api/admin/users/{id}/days", core.PermGrant, a.userDays},
+		{"POST /api/admin/users/{id}/ban", core.PermBan, a.userBan(true)},
+		{"POST /api/admin/users/{id}/unban", core.PermBan, a.userBan(false)},
+		{"POST /api/admin/users/{id}/message", core.PermSupport, a.userMessage},
+		{"POST /api/admin/users/{id}/devices/reset", core.PermGrant, a.userDevicesReset},
+		{"POST /api/admin/users/{id}/link/revoke", core.PermGrant, a.userLinkRevoke},
 	}
 }
 

@@ -10,5 +10,9 @@ func Types() []reflect.Type {
 		reflect.TypeFor[AdminLoginStarted](),
 		reflect.TypeFor[AdminLoginState](),
 		reflect.TypeFor[AdminMe](),
+		reflect.TypeFor[AdminUserList](),
+		reflect.TypeFor[AdminUserCard](),
+		reflect.TypeFor[AdminBalance](),
+		reflect.TypeFor[AdminExpires](),
 	}
 }

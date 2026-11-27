@@ -42,6 +42,8 @@ type UserQuery struct {
 
 // UserRow это строка поиска: абонент и коротко его подписка.
 type UserRow struct {
+	// Status ставит ядро: none, trial, active или expired.
+	Status    string
 	User      User
 	HasSub    bool
 	SubStatus SubStatus

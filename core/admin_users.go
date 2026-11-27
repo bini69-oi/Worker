@@ -47,6 +47,10 @@ func (c *Core) FindUsers(ctx context.Context, actorTg int64, text, filter string
 		page.Items = rows[:PageSize]
 		page.Next = page.Items[PageSize-1].User.ID
 	}
+	now := c.clock.Now()
+	for i := range page.Items {
+		page.Items[i].Status = page.Items[i].Class(now)
+	}
 	return page, nil
 }
 
@@ -65,6 +69,9 @@ type UserCard struct {
 	Payments   []Payment
 	Audit      []AuditRow
 	Devices    []PanelDevice
+	// TrafficBytes и DeviceLimit это лимиты подписки сейчас, 0 значит без лимита.
+	TrafficBytes int64
+	DeviceLimit  int
 	// DevicesOK ложно, если панель не ответила: карточка всё равно открывается.
 	DevicesOK bool
 }
@@ -113,9 +120,15 @@ func (c *Core) cardTariffs(ctx context.Context, card *UserCard, sub Subscription
 	if err != nil {
 		return err
 	}
+	if sub.Trial {
+		card.TrafficBytes, card.DeviceLimit = c.cfg.Int("trial.traffic_gb")*gib, int(c.cfg.Int("trial.devices"))
+	}
 	for _, t := range all {
 		if t.ID == sub.TariffID {
 			card.Tariff = t.Name
+			if !sub.Trial {
+				card.TrafficBytes, card.DeviceLimit = Limits(sub, t)
+			}
 		}
 		if sub.NextTariffID != 0 && t.ID == sub.NextTariffID {
 			card.NextTariff = t.Name
@@ -163,5 +176,54 @@ func (c *Core) SendToUser(ctx context.Context, actorTg, userID int64, text strin
 		}
 		short := []rune(text)
 		return itoa(userID), map[string]string{"text": string(short[:min(len(short), 200)])}, nil
+	})
+}
+
+// AdminResetDevices отвязывает все устройства абонента от имени админа. Нужно право grant.
+// Работает и во время техработ: админ как раз помогает абоненту.
+func (c *Core) AdminResetDevices(ctx context.Context, actorTg, userID int64) error {
+	return c.adminPanelOp(ctx, actorTg, userID, "devices.reset", func(ref string) error {
+		return c.panel.ResetDevices(ctx, ref)
+	})
+}
+
+// AdminRevokeLink перевыпускает ссылку подписки абонента от имени админа. Нужно право grant.
+// Новая ссылка сохраняется в базе, старая перестаёт работать.
+func (c *Core) AdminRevokeLink(ctx context.Context, actorTg, userID int64) error {
+	return c.adminPanelOp(ctx, actorTg, userID, "link.revoke", func(ref string) error {
+		res, err := c.panel.RevokeLink(ctx, ref)
+		if err != nil {
+			return err
+		}
+		return c.tx(ctx, func(tx Tx) error {
+			sub, err := tx.SubByUser(userID)
+			if err != nil {
+				return err
+			}
+			sub.SubURL = res.SubURL
+			_, err = tx.SaveSub(sub)
+			return err
+		})
+	})
+}
+
+// adminPanelOp проверяет право, делает действие в панели и пишет его в журнал. Панель внешняя и не живёт
+// в транзакции, поэтому порядок такой: право, панель, журнал. Не получилось в панели: журнала нет, ошибка ушла наверх.
+func (c *Core) adminPanelOp(ctx context.Context, actorTg, userID int64, action string, op func(ref string) error) error {
+	if _, err := c.Require(ctx, actorTg, PermGrant, action); err != nil {
+		return err
+	}
+	sub, err := c.panelSub(ctx, userID)
+	if errors.Is(err, ErrNotFound) {
+		return ErrNoSub
+	}
+	if err != nil {
+		return err
+	}
+	if err := c.panelErr(action, op(sub.PanelUUID)); err != nil {
+		return err
+	}
+	return c.asAdmin(ctx, actorTg, PermGrant, action, func(Tx, Admin, time.Time) (string, map[string]string, error) {
+		return itoa(userID), nil, nil
 	})
 }
