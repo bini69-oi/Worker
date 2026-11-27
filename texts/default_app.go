@@ -22,4 +22,15 @@ var appDefs = []Def{
 	{Key: "app.money", Params: []string{"amount"}, Default: "{amount} ₽", En: "{amount} ₽"},
 	{Key: "app.unlimited", Default: "без лимита", En: "unlimited"},
 	{Key: "app.gb", Params: []string{"n"}, Default: "{n} ГБ", En: "{n} GB"},
+
+	// Вход в браузере.
+	{Key: "app.login_title", Default: "Вход в кабинет", En: "Sign in"},
+	{Key: "app.login_step1", Default: "Откройте бота кнопкой ниже.", En: "Open the bot with the button below."},
+	{Key: "app.login_step2", Default: "Нажмите в боте тот же код, что виден здесь.", En: "Tap the same code in the bot as shown here."},
+	{Key: "app.login_code_label", Default: "Код на этом экране", En: "Code on this screen"},
+	{Key: "app.login_button", Default: "Войти через Telegram", En: "Sign in with Telegram"},
+	{Key: "app.login_waiting", Default: "Ждём подтверждения в Telegram", En: "Waiting for confirmation in Telegram"},
+	{Key: "app.login_rejected", Default: "Вход отклонён, начните заново", En: "Sign-in rejected, please start over"},
+	{Key: "app.login_expired", Default: "Время вышло, начните заново", En: "Time ran out, please start over"},
+	{Key: "app.login_restart", Default: "Начать заново", En: "Start over"},
 }

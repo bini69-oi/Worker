@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,6 +22,10 @@ func startLogin(t *testing.T, e *appEnv) (LoginStartResponse, string) {
 	if !ok || st.ID == "" || len(st.Code) != 2 {
 		t.Fatalf("ответ входа: %+v", st)
 	}
+	// Id, код и ссылка случайные: в эталоне они заменены, форма ответа остаётся.
+	fixed := LoginStartResponse{ID: "LOGIN-ID", Code: "42", Link: "https://t.me/worker_bot?start=web_NONCE", ExpiresAt: st.ExpiresAt}
+	raw, _ := json.Marshal(fixed)
+	golden(t, "login_start", raw)
 	return st, nonce
 }
 
@@ -38,6 +43,7 @@ func TestLoginBrowserFlow(t *testing.T) {
 	if rec.Code != 200 || p.State != "pending" || cookieNamed(rec, SessionCookie) != nil {
 		t.Fatalf("до нажатия: %d %+v", rec.Code, p)
 	}
+	golden(t, "login_pending", rec.Body.Bytes())
 	prompt, err := e.c.WebLoginOpen(t.Context(), nonce, u.TgID)
 	if err != nil {
 		t.Fatal(err)
@@ -50,6 +56,7 @@ func TestLoginBrowserFlow(t *testing.T) {
 	if p.State != "confirmed" {
 		t.Fatalf("после нажатия: %+v", p)
 	}
+	golden(t, "login_confirmed", rec.Body.Bytes())
 	c := cookieNamed(rec, SessionCookie)
 	if c == nil {
 		t.Fatal("cookie не поставлена")
@@ -96,12 +103,15 @@ func TestLoginRejectedAndExpired(t *testing.T) {
 	if p.State != "rejected" || cookieNamed(rec, SessionCookie) != nil {
 		t.Fatalf("«Это не я»: %+v", p)
 	}
+	golden(t, "login_rejected", rec.Body.Bytes())
 	st2, _ := startLogin(t, e)
 	e.clock.Add(6 * time.Minute)
-	decode(t, poll(e, st2.ID), &p)
+	rec = poll(e, st2.ID)
+	decode(t, rec, &p)
 	if p.State != "expired" {
 		t.Fatalf("истёкший запрос: %+v", p)
 	}
+	golden(t, "login_expired", rec.Body.Bytes())
 	if rec := poll(e, "чужой"); rec.Code != 200 {
 		t.Fatalf("неизвестный id: %d", rec.Code)
 	}
