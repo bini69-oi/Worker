@@ -1,0 +1,9 @@
+{
+  "code": "E2001",
+  "text": "ru:err.not_enough_money",
+  "money": {
+    "price": 25000,
+    "balance": 10000,
+    "missing": 15000
+  }
+}

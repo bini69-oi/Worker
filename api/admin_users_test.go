@@ -164,7 +164,7 @@ func TestAdminUserCardExtrasGolden(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.st.SetSub(core.Subscription{UserID: imp.ID, Status: core.SubActive, PeriodDays: 30, ExpiresAt: t0.AddDate(0, 1, 0), CreatedAt: t0, UpdatedAt: t0,
+	e.st.SetSub(core.Subscription{UserID: imp.ID, Status: core.SubActive, PeriodDays: 30, ExpiresAt: adminT0.AddDate(0, 1, 0), CreatedAt: adminT0, UpdatedAt: adminT0,
 		Imported: true, Own: core.PanelLimits{Username: "old_moved", TrafficBytes: 50 << 30, Devices: 3, Reset: "MONTH"}})
 	rec = e.get(e.owner, fmt.Sprintf("/api/admin/users/%d", imp.ID))
 	golden(t, "admin_user_card_imported", rec.Body.Bytes())

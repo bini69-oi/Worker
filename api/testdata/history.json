@@ -1,0 +1,19 @@
+{
+  "items": [
+    {
+      "amount": -25000,
+      "reason": "buy",
+      "created_at": "2026-03-10T13:00:00Z"
+    },
+    {
+      "amount": 100000,
+      "reason": "admin",
+      "created_at": "2026-03-10T13:00:00Z"
+    },
+    {
+      "amount": 30000,
+      "reason": "topup",
+      "created_at": "2026-03-10T12:00:00Z"
+    }
+  ]
+}

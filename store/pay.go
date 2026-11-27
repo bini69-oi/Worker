@@ -9,7 +9,7 @@ import (
 	"github.com/bini69-oi/worker/core"
 )
 
-const payCols = `id, user_id, gateway, amount, ext_amount, ext_currency, recurring, status, external_id, created_at, paid_at, refunded_at`
+const payCols = `id, user_id, gateway, amount, ext_amount, ext_currency, recurring, status, external_id, created_at, paid_at, source, refunded_at`
 
 func scanPayment(r scanner) (core.Payment, error) {
 	var p core.Payment
@@ -17,7 +17,7 @@ func scanPayment(r scanner) (core.Payment, error) {
 	var ext sql.NullString
 	var created int64
 	var paid, refunded sql.NullInt64
-	err := r.Scan(&p.ID, &p.UserID, &p.Gateway, &p.Amount, &p.ExtAmount, &p.ExtCurrency, &p.Recurring, &status, &ext, &created, &paid, &refunded)
+	err := r.Scan(&p.ID, &p.UserID, &p.Gateway, &p.Amount, &p.ExtAmount, &p.ExtCurrency, &p.Recurring, &status, &ext, &created, &paid, &p.Source, &refunded)
 	if err != nil {
 		return p, err
 	}
@@ -59,9 +59,9 @@ func (s *CoreStore) PendingPayments(ctx context.Context, before time.Time) ([]co
 
 func (t *coreTx) CreatePayment(p core.Payment) (int64, error) {
 	res, err := t.q.ExecContext(t.ctx,
-		`INSERT INTO payments (user_id, gateway, amount, ext_amount, ext_currency, recurring, status, external_id, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.UserID, p.Gateway, p.Amount, p.ExtAmount, p.ExtCurrency, p.Recurring, string(p.Status), nullText(p.ExternalID), p.CreatedAt.Unix())
+		`INSERT INTO payments (user_id, gateway, amount, ext_amount, ext_currency, recurring, status, external_id, created_at, source)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.UserID, p.Gateway, p.Amount, p.ExtAmount, p.ExtCurrency, p.Recurring, string(p.Status), nullText(p.ExternalID), p.CreatedAt.Unix(), p.Source)
 	if err != nil {
 		return 0, mapErr(err)
 	}

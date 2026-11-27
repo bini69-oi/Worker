@@ -1,0 +1,20 @@
+{
+  "tariffs": [
+    {
+      "id": 1,
+      "name": "Месяц",
+      "traffic_bytes": 107374182400,
+      "devices": 3,
+      "periods": [
+        {
+          "days": 30,
+          "price": 25000
+        },
+        {
+          "days": 90,
+          "price": 75000
+        }
+      ]
+    }
+  ]
+}

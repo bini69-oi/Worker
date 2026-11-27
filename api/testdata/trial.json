@@ -1,0 +1,15 @@
+{
+  "state": "trial",
+  "trial": true,
+  "imported": false,
+  "tariff_id": 0,
+  "tariff": "",
+  "expires_at": "2026-03-13T12:00:00Z",
+  "days_left": 3,
+  "auto_renew": false,
+  "traffic_bytes": 5368709120,
+  "devices": 1,
+  "extra_traffic_bytes": 0,
+  "extra_devices": 0,
+  "next": null
+}

@@ -41,6 +41,7 @@ func (b *Bot) register() {
 	b.acts["pcanok"] = b.onCancelPlan
 	b.acts["at"] = b.onTrafficPacks
 	b.acts["ad"] = b.onDevice
+	b.acts["wl"] = b.onWebLogin
 	b.inputs[waitPromo] = b.onPromoInput
 	b.inputs[waitAmount] = b.onAmountInput
 }
@@ -86,7 +87,7 @@ func (b *Bot) sub(ctx context.Context, r *req) (core.Subscription, bool, error) 
 
 // trialOpen говорит, показывать ли кнопку пробного периода: включён, не брали и подписки не было.
 func (b *Bot) trialOpen(r *req, hasSub bool) bool {
-	return b.cfg.Bool("trial.enabled") && b.cfg.Int("trial.days") > 0 && !r.user.TrialUsed && !hasSub
+	return b.core.TrialOpen(r.user, hasSub)
 }
 
 // status пишет строку о подписке: активна, пробная, закончилась или нет.

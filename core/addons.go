@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"time"
 )
@@ -9,14 +10,19 @@ import (
 // BuyTraffic докупает пакет трафика из настройки addons.traffic к живой платной подписке.
 // Пакет добавляется к лимиту тарифа и живёт, пока идёт подписка: при смене тарифа и окончании он сгорает.
 func (c *Core) BuyTraffic(ctx context.Context, userID, gb int64) (Subscription, error) {
+	sub, _, err := c.buyTraffic(ctx, userID, gb, "")
+	return sub, err
+}
+
+func (c *Core) buyTraffic(ctx context.Context, userID, gb int64, key string) (Subscription, bool, error) {
 	if err := c.serving(ctx, userID); err != nil {
-		return Subscription{}, err
+		return Subscription{}, false, err
 	}
 	price, ok := trafficPacks(c.cfg.String("addons.traffic"))[gb]
 	if !ok {
-		return Subscription{}, ErrAddonOff
+		return Subscription{}, false, ErrAddonOff
 	}
-	return c.addon(ctx, userID, "traffic", func(sub *Subscription, t Tariff, now time.Time) (int64, error) {
+	return c.addon(ctx, userID, "traffic", key, func(sub *Subscription, t Tariff, now time.Time) (int64, error) {
 		if t.TrafficBytes <= 0 {
 			return 0, ErrUnlimited
 		}
@@ -31,13 +37,18 @@ func (c *Core) BuyTraffic(ctx context.Context, userID, gb int64) (Subscription, 
 // BuyDevice докупает одно устройство до конца текущего периода: цена за 30 дней пропорционально оставшимся дням.
 // Устройство переходит в следующий период, продление стоит с ним дороже.
 func (c *Core) BuyDevice(ctx context.Context, userID int64) (Subscription, error) {
+	sub, _, err := c.buyDevice(ctx, userID, "")
+	return sub, err
+}
+
+func (c *Core) buyDevice(ctx context.Context, userID int64, key string) (Subscription, bool, error) {
 	if err := c.serving(ctx, userID); err != nil {
-		return Subscription{}, err
+		return Subscription{}, false, err
 	}
 	if c.cfg.Int("addons.device_month") <= 0 {
-		return Subscription{}, ErrAddonOff
+		return Subscription{}, false, ErrAddonOff
 	}
-	return c.addon(ctx, userID, "device", func(sub *Subscription, t Tariff, now time.Time) (int64, error) {
+	return c.addon(ctx, userID, "device", key, func(sub *Subscription, t Tariff, now time.Time) (int64, error) {
 		if t.Devices <= 0 {
 			return 0, ErrUnlimited
 		}
@@ -51,11 +62,14 @@ func (c *Core) BuyDevice(ctx context.Context, userID int64) (Subscription, error
 }
 
 // addon это общая часть докупки: живая платная подписка, цена списывается, панель догоняет через очередь.
-func (c *Core) addon(ctx context.Context, userID int64, kind string,
-	apply func(sub *Subscription, t Tariff, now time.Time) (int64, error)) (Subscription, error) {
+func (c *Core) addon(ctx context.Context, userID int64, kind, key string,
+	apply func(sub *Subscription, t Tariff, now time.Time) (int64, error)) (Subscription, bool, error) {
 	var out Subscription
 	err := c.tx(ctx, func(tx Tx) error {
 		now := c.clock.Now()
+		if err := seen(tx, userID, kind, key); err != nil {
+			return err
+		}
 		if _, err := activeUser(tx, userID); err != nil {
 			return err
 		}
@@ -81,9 +95,16 @@ func (c *Core) addon(ctx context.Context, userID int64, kind string,
 			return err
 		}
 		out = sub
-		return enqueueSync(tx, sub.ID, now)
+		if err := enqueueSync(tx, sub.ID, now); err != nil {
+			return err
+		}
+		return claim(tx, userID, kind, key, now)
 	})
-	return out, err
+	if errors.Is(err, errReplayed) {
+		cur, serr := c.store.SubByUser(ctx, userID)
+		return cur, true, serr
+	}
+	return out, false, err
 }
 
 // TrafficPack это пакет трафика: гигабайты и цена в копейках.

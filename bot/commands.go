@@ -39,17 +39,22 @@ func (b *Bot) onStart(ctx context.Context, r *req, arg string) error {
 	case "paid":
 		id, _ := strconv.ParseInt(val, 10, 64)
 		return b.showPaid(ctx, r, id)
+	case "web":
+		return b.showWebLogin(ctx, r, val)
 	}
 	return b.showMenu(ctx, r)
 }
 
-// startArg разбирает параметр /start: ref_<код>, promo_<код> или paid_<число>.
+// startArg разбирает параметр /start: ref_<код>, promo_<код>, paid_<число> или web_<nonce>.
 // Это чужой ввод: всё, что не подходит под эти виды, игнорируется.
 func startArg(arg string) (kind, val string) {
 	if arg == "" || len(arg) > maxStartArg {
 		return "", ""
 	}
 	kind, val, ok := strings.Cut(arg, "_")
+	if kind == "web" && ok && word(val, 1, 60, true) { // nonce входа на сайт длиннее обычных кодов
+		return kind, val
+	}
 	if !ok || !word(val, 1, 32, true) {
 		return "", ""
 	}

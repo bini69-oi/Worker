@@ -12,7 +12,15 @@ import (
 
 func TestRateLimitPerSession(t *testing.T) {
 	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
-	s := New(Deps{Text: fakeTexts, Now: func() time.Time { return now },
+	// Сессией считается токен, который узнаёт SessionID. Здесь «знакомы» только aaa и bbb.
+	known := func(r *http.Request) string {
+		tok, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if tok == "aaa" || tok == "bbb" {
+			return tok
+		}
+		return ""
+	}
+	s := New(Deps{Text: fakeTexts, Now: func() time.Time { return now }, SessionID: known,
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	s.Handle("GET /api/x", func(w http.ResponseWriter, r *http.Request) (any, error) { return nil, nil })
 
@@ -44,6 +52,45 @@ func TestRateLimitPerSession(t *testing.T) {
 	}
 }
 
+// Мусорные токены не создают себе счётчики: все они делят предел своего IP.
+func TestRateLimitJunkTokensShareIP(t *testing.T) {
+	s := newTestServer(t)
+	s.Handle("GET /api/x", func(w http.ResponseWriter, r *http.Request) (any, error) { return nil, nil })
+	limited := 0
+	for i := range 50 {
+		req := httptest.NewRequest("GET", "/api/x", nil)
+		req.RemoteAddr = "203.0.113.5:1"
+		req.Header.Set("Authorization", "Bearer junk"+strings.Repeat("x", i))
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		if rec.Code == 429 {
+			limited++
+		}
+	}
+	if limited != 40 {
+		t.Fatalf("отклонено %d из 50, ждали 40: мусорные токены обходят предел", limited)
+	}
+}
+
+// Адреса одной сети /64 считаются как один.
+func TestRateLimitIPv6Folded(t *testing.T) {
+	s := newTestServer(t)
+	s.Handle("GET /api/x", func(w http.ResponseWriter, r *http.Request) (any, error) { return nil, nil })
+	limited := 0
+	for i := range 50 {
+		req := httptest.NewRequest("GET", "/api/x", nil)
+		req.RemoteAddr = "[2001:db8:5:6::" + strings.Repeat("1", 1) + string(rune('a'+i%6)) + "]:1"
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		if rec.Code == 429 {
+			limited++
+		}
+	}
+	if limited != 40 {
+		t.Fatalf("отклонено %d из 50, ждали 40: перебор адресов в /64 обходит предел", limited)
+	}
+}
+
 func TestRateLimitBody(t *testing.T) {
 	s := newTestServer(t)
 	s.Handle("GET /api/x", func(w http.ResponseWriter, r *http.Request) (any, error) { return nil, nil })
@@ -72,7 +119,9 @@ func TestMutatingWithCookieNeedsHeader(t *testing.T) {
 		{"json с кодировкой", "POST", map[string]string{"X-Worker": "1", "Content-Type": "application/json; charset=utf-8"}, true, 200},
 		{"DELETE без заголовка", "DELETE", nil, true, 403},
 		{"токен без заголовка", "POST", map[string]string{"Authorization": "Bearer t"}, false, 200},
-		{"токен и cookie", "POST", map[string]string{"Authorization": "Bearer t"}, true, 200},
+		{"токен и cookie без X-Worker", "POST", map[string]string{"Authorization": "Bearer t"}, true, 403},
+		{"не Bearer и cookie без X-Worker", "POST", map[string]string{"Authorization": "Basic dDp0"}, true, 403},
+		{"токен, cookie и X-Worker", "POST", map[string]string{"Authorization": "Bearer t", "X-Worker": "1", "Content-Type": "application/json"}, true, 200},
 		{"без cookie и токена", "POST", nil, false, 200},
 	}
 	for _, c := range cases {

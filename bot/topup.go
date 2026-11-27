@@ -12,7 +12,7 @@ import (
 )
 
 // maxTopupRub это предел своей суммы пополнения в рублях: защита от опечатки «1000000000».
-const maxTopupRub = 1_000_000
+const maxTopupRub = core.MaxTopup / 100
 
 // onTopup показывает пополнение. Без суммы: готовые суммы и «Своя сумма». С суммой: кассы.
 func (b *Bot) onTopup(ctx context.Context, r *req, d Data) error {
@@ -21,12 +21,8 @@ func (b *Bot) onTopup(ctx context.Context, r *req, d Data) error {
 	}
 	s := Screen{Text: b.t(r, "topup.amount", nil)}
 	var presets []Button
-	for _, p := range strings.Split(b.cfg.String("pay.presets"), ",") {
-		rub, err := strconv.ParseInt(strings.TrimSpace(p), 10, 64)
-		if err != nil || rub <= 0 || rub > maxTopupRub {
-			continue
-		}
-		presets = append(presets, Button{Text: money(rub * 100), Data: data("tp", rub*100)})
+	for _, kop := range b.core.TopupPresets() {
+		presets = append(presets, Button{Text: money(kop), Data: data("tp", kop)})
 	}
 	s.Rows = slices.AppendSeq(s.Rows, slices.Chunk(presets, 2))
 	s.Rows = append(s.Rows, []Button{b.btn(r, "btn.own_amount", "tpown")}, b.back(r, "bal"))

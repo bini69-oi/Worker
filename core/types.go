@@ -169,4 +169,9 @@ type Payment struct {
 	CreatedAt   time.Time
 	PaidAt      time.Time
 	RefundedAt  time.Time // когда возвращён; нулевое время, если не возвращён
+	// Source это откуда создан платёж: пусто бот и Mini App, PaySourceWeb кабинет в браузере. От этого зависит адрес возврата из кассы.
+	Source string
 }
+
+// PaySourceWeb помечает платёж, созданный в кабинете в браузере.
+const PaySourceWeb = "web"

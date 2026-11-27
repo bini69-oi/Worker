@@ -45,6 +45,9 @@ type Store interface {
 	// Уведомления админу сюда не попадают, иначе тревога о тревоге шла бы по кругу.
 	StuckTasks(ctx context.Context, before time.Time) ([]Task, error)
 
+	// UserSession читает сессию абонента с читающего соединения: проверка токена на каждом запросе не занимает пишущее.
+	UserSession(ctx context.Context, tokenHash []byte) (UserSession, error)
+
 	// DeleteSupportBefore удаляет связи поддержки старше before.
 	DeleteSupportBefore(ctx context.Context, before time.Time) (int, error)
 
@@ -55,6 +58,7 @@ type Store interface {
 // Tx это действия внутри транзакции. Все изменения ядра идут только через Tx.
 type Tx interface {
 	AdminTx
+	CabinetTx
 	User(id int64) (User, error)
 	UserByTg(tgID int64) (User, error)
 	// CreateUser создаёт абонента. Повтор Telegram ID или реферального кода даёт ErrDuplicate.

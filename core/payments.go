@@ -85,6 +85,23 @@ const (
 
 // CreatePayment создаёт платёж «ожидает» и счёт в кассе.
 func (c *Core) CreatePayment(ctx context.Context, userID int64, gateway string, amount int64) (Payment, Invoice, error) {
+	return c.CreatePaymentFrom(ctx, userID, gateway, amount, "")
+}
+
+// PaymentSource отдаёт, откуда создан платёж (см. Payment.Source). Неизвестный платёж: пусто.
+func (c *Core) PaymentSource(ctx context.Context, id int64) string {
+	src := ""
+	_ = c.store.Tx(ctx, func(tx Tx) error {
+		if p, err := tx.Payment(id); err == nil {
+			src = p.Source
+		}
+		return nil
+	})
+	return src
+}
+
+// CreatePaymentFrom как CreatePayment, но запоминает источник платежа: по нему касса возвращает абонента туда, откуда он пришёл.
+func (c *Core) CreatePaymentFrom(ctx context.Context, userID int64, gateway string, amount int64, source string) (Payment, Invoice, error) {
 	if err := c.serving(ctx, userID); err != nil {
 		return Payment{}, Invoice{}, err
 	}
@@ -96,7 +113,7 @@ func (c *Core) CreatePayment(ctx context.Context, userID int64, gateway string, 
 	if amount <= 0 || (min > 0 && amount < min) || (max > 0 && amount > max) {
 		return Payment{}, Invoice{}, &LimitError{Min: min, Max: max}
 	}
-	p := Payment{UserID: userID, Gateway: gateway, Amount: amount, Status: PayPending, CreatedAt: c.clock.Now()}
+	p := Payment{UserID: userID, Gateway: gateway, Amount: amount, Status: PayPending, CreatedAt: c.clock.Now(), Source: source}
 	err := c.tx(ctx, func(tx Tx) error {
 		if _, err := activeUser(tx, userID); err != nil {
 			return err

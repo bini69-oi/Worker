@@ -90,4 +90,10 @@ var errDefs = []Def{
 		En: "Session is closed or has expired"},
 	{Key: "err.owner_only", Default: "Это может только владелец",
 		En: "Only the owner can do this"},
+	{Key: "err.bad_init_data", Default: "Данные входа из Telegram не прошли проверку, откройте кабинет заново",
+		En: "Telegram login data didn't pass the check, please reopen the cabinet"},
+	{Key: "err.login_expired", Default: "Ссылка устарела, начните вход заново",
+		En: "The link has expired, please start the login again"},
+	{Key: "err.login_used", Default: "Ссылка уже использована",
+		En: "The link has already been used"},
 }

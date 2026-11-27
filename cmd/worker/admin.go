@@ -18,6 +18,8 @@ func mountAdmin(mux *http.ServeMux, c *core.Core, tx *texts.Texts, t *telegram, 
 		Text: func(key, lang string) string { return tx.Render(key, lang, nil) },
 		Log:  log,
 		Now:  time.Now,
+		// Админка ходит с одного адреса и опрашивает прогресс рассылки: предел по IP выше, чем у кабинета.
+		Rate: 40,
 	})
 	api.RegisterAdmin(srv, api.AdminDeps{Core: c, Bot: t.botName})
 	// Список адресов админки (admin.allow_ips) закрывает и страницу, и API до входа и сессии: чужой адрес получает 404.

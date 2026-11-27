@@ -1,0 +1,25 @@
+{
+  "lang": "ru",
+  "username": "ivan11",
+  "balance": 0,
+  "maintenance": false,
+  "trial_available": true,
+  "sub": null,
+  "gateways": [
+    {
+      "name": "manual",
+      "title": "Перевод по реквизитам"
+    }
+  ],
+  "topup_presets": [
+    10000,
+    25000,
+    50000,
+    100000
+  ],
+  "addons": {
+    "traffic": [],
+    "device_price": 0
+  },
+  "bot_link": "https://t.me/worker_bot"
+}

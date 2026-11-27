@@ -13,6 +13,23 @@ type ErrorBody struct {
 	Text string `json:"text"`
 	// Detail это пояснение админу: какой тег не разрешён, какие подстановки допустимы. У абонента его нет.
 	Detail string `json:"detail,omitempty"`
+	// Money есть у ошибки «не хватает денег»: цена, баланс и недостача.
+	Money *MoneyDetails `json:"money,omitempty"`
+	// Limit есть у ошибки «сумма вне пределов кассы».
+	Limit *LimitDetails `json:"limit,omitempty"`
+}
+
+// MoneyDetails это цифры покупки, на которую не хватило денег. Копейки.
+type MoneyDetails struct {
+	Price   int64 `json:"price"`
+	Balance int64 `json:"balance"`
+	Missing int64 `json:"missing"`
+}
+
+// LimitDetails это пределы суммы кассы в копейках, 0 значит без предела.
+type LimitDetails struct {
+	Min int64 `json:"min"`
+	Max int64 `json:"max"`
 }
 
 // statuses это HTTP-статусы ошибок ядра. Ошибка ядра без записи здесь отвечает 409: запрос верный,
@@ -29,6 +46,7 @@ var statuses = map[*core.Error]int{
 	core.ErrBadSetting:     http.StatusBadRequest,
 	core.ErrPeriodTooLong:  http.StatusBadRequest,
 	core.ErrZeroAmount:     http.StatusBadRequest,
+	core.ErrAmountLimits:   http.StatusBadRequest,
 	core.ErrNeedComment:    http.StatusBadRequest,
 	core.ErrMaintenance:    http.StatusServiceUnavailable,
 	core.ErrPanelDown:      http.StatusServiceUnavailable,
@@ -41,6 +59,8 @@ var statuses = map[*core.Error]int{
 	core.ErrTooManyTries:   http.StatusTooManyRequests,
 	core.ErrLoginLocked:    http.StatusTooManyRequests,
 	core.ErrInternal:       http.StatusInternalServerError,
+	core.ErrBadInitData:    http.StatusUnauthorized,
+	core.ErrLoginExpired:   http.StatusGone,
 }
 
 // classify превращает любую ошибку в ошибку ядра и статус. Всё, чего ядро не знает, это внутренняя ошибка.
@@ -59,9 +79,22 @@ func classify(err error) (*core.Error, int) {
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	ce, status := classify(err)
 	if ce == core.ErrInternal {
-		s.deps.Log.Error("внутренняя ошибка API", "method", r.Method, "path", r.URL.Path, "err", err)
+		s.deps.Log.Error("внутренняя ошибка API", "method", r.Method, "route", r.Pattern, "err", err)
 	}
-	body := ErrorBody{Code: ce.Code, Text: s.deps.Text(ce.Key, langOf(r.Context()))}
+	lang := langOf(r.Context())
+	var lerr *langError
+	if errors.As(err, &lerr) {
+		lang = lerr.lang
+	}
+	body := ErrorBody{Code: ce.Code, Text: s.deps.Text(ce.Key, lang)}
+	var need *core.NeedMoney
+	if errors.As(err, &need) {
+		body.Money = &MoneyDetails{Price: need.Price, Balance: need.Balance, Missing: need.Missing}
+	}
+	var lim *core.LimitError
+	if errors.As(err, &lim) {
+		body.Limit = &LimitDetails{Min: lim.Min, Max: lim.Max}
+	}
 	var d interface{ Detail() string }
 	if errors.As(err, &d) {
 		body.Detail = d.Detail()

@@ -139,7 +139,7 @@ func TestCoreJobsList(t *testing.T) {
 	c := core.New(core.Deps{Store: coretest.NewStore(), Config: cfg, Panel: coretest.NewPanel()})
 	jobs := CoreJobs(c, cfg)
 	want := map[string]time.Duration{"queue": time.Second, "expire": time.Minute, "remind": 10 * time.Minute,
-		"autorenew": 10 * time.Minute, "broadcast": time.Second, "summary": time.Minute, "payments": time.Minute, "reconcile": 60 * time.Minute, "support": 24 * time.Hour}
+		"autorenew": 10 * time.Minute, "broadcast": time.Second, "summary": time.Minute, "cabinet": time.Hour, "payments": time.Minute, "reconcile": 60 * time.Minute, "support": 24 * time.Hour}
 	if len(jobs) != len(want) {
 		t.Fatalf("задач %d, ждали %d", len(jobs), len(want))
 	}

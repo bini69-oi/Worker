@@ -1,0 +1,18 @@
+{
+  "sub": {
+    "state": "active",
+    "trial": false,
+    "imported": false,
+    "tariff_id": 1,
+    "tariff": "Месяц",
+    "expires_at": "2026-04-09T12:00:00Z",
+    "days_left": 30,
+    "auto_renew": false,
+    "traffic_bytes": 107374182400,
+    "devices": 3,
+    "extra_traffic_bytes": 0,
+    "extra_devices": 0,
+    "next": null
+  },
+  "queued": false
+}

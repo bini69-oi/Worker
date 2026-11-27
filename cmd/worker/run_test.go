@@ -106,9 +106,13 @@ func TestServeAndStop(t *testing.T) {
 		check("POST", "/pay/"+name, 401) // касса подключена: поддельный вебхук отклонён, а не 404
 	}
 	check("POST", "/panel/webhook", 401)
-	check("GET", "/api/admin/me", 401)     // админка подключена, без сессии не пускает
-	check("GET", "/api/admin/nope", 404)   // чужого адреса нет
-	check("POST", "/api/admin/login", 401) // неверный вход без Telegram
+	check("GET", "/api/admin/me", 401)        // админка подключена, без сессии не пускает
+	check("GET", "/api/admin/nope", 404)      // чужого адреса нет
+	check("POST", "/api/admin/login", 401)    // неверный вход без Telegram
+	check("GET", "/api/app/texts", 200)       // кабинет подключён, тексты нужны странице входа
+	check("GET", "/api/app/me", 401)          // без сессии
+	check("POST", "/api/app/session/tg", 401) // без подписанных данных
+	check("GET", "/api/app/нет-такого", 404)
 	// Чужой адрес через наш прокси: уведомление ЮKassa отклоняется ещё до запроса к её API.
 	req, _ := http.NewRequest("POST", base+"/pay/yookassa", strings.NewReader(`{"event":"payment.succeeded","object":{"id":"x"}}`))
 	req.Header.Set("X-Real-IP", "203.0.113.9")

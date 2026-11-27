@@ -71,6 +71,7 @@ type state struct {
 	chat      *core.AdminChat
 	support   map[[2]int64]supportRow
 	bcs       map[int64]core.Broadcast
+	cab       cabState
 }
 
 func (s *state) clone() *state {
@@ -95,6 +96,7 @@ func (s *state) clone() *state {
 		chat:      cloneChat(s.chat),
 		support:   maps.Clone(s.support),
 		bcs:       maps.Clone(s.bcs),
+		cab:       s.cab.clone(),
 		nextID:    s.nextID,
 	}
 }

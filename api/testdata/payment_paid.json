@@ -1,0 +1,8 @@
+{
+  "id": 1,
+  "gateway": "fake",
+  "amount": 30000,
+  "status": "paid",
+  "created_at": "2026-03-10T12:00:00Z",
+  "paid_at": "2026-03-10T12:00:04Z"
+}

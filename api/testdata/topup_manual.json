@@ -1,0 +1,9 @@
+{
+  "payment_id": 1,
+  "gateway": "manual",
+  "url": "",
+  "invoice_link": "",
+  "details": "Карта 0000",
+  "ext_amount": 30000,
+  "ext_currency": "RUB"
+}

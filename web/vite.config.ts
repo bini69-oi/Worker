@@ -20,5 +20,10 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     css: { include: /.+/ }, // тест вёрстки читает style.css как текст
+    environment: 'happy-dom', // компоненты и адрес страницы тестируются без браузера
+  },
+  resolve: {
+    // В тестах Svelte берётся браузерной сборкой: в серверной нет mount.
+    conditions: process.env.VITEST ? ['browser'] : [],
   },
 })

@@ -1,0 +1,44 @@
+{
+  "lang": "ru",
+  "username": "ivan71",
+  "balance": 75000,
+  "maintenance": false,
+  "trial_available": false,
+  "sub": {
+    "state": "active",
+    "trial": false,
+    "imported": false,
+    "tariff_id": 1,
+    "tariff": "Месяц",
+    "expires_at": "2026-04-09T12:00:00Z",
+    "days_left": 30,
+    "auto_renew": false,
+    "traffic_bytes": 107374182400,
+    "devices": 3,
+    "extra_traffic_bytes": 0,
+    "extra_devices": 0,
+    "next": {
+      "tariff_id": 2,
+      "tariff": "Год",
+      "days": 30,
+      "starts_at": "2026-04-09T12:00:00Z"
+    }
+  },
+  "gateways": [
+    {
+      "name": "manual",
+      "title": "Перевод по реквизитам"
+    }
+  ],
+  "topup_presets": [
+    10000,
+    25000,
+    50000,
+    100000
+  ],
+  "addons": {
+    "traffic": [],
+    "device_price": 0
+  },
+  "bot_link": "https://t.me/worker_bot"
+}

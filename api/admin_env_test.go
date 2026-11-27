@@ -25,7 +25,7 @@ const (
 	adminIP    = "203.0.113.5:4000"
 )
 
-var t0 = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+var adminT0 = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
 // adminEnv это сервер админки на фейках: ядро, часы, хранилище, панель.
 type adminEnv struct {
@@ -44,7 +44,7 @@ type adminEnv struct {
 
 func newAdminEnv(t *testing.T) *adminEnv {
 	t.Helper()
-	e := &adminEnv{t: t, st: coretest.NewStore(), clock: coretest.NewClock(t0), cfg: coretest.NewConfig(t),
+	e := &adminEnv{t: t, st: coretest.NewStore(), clock: coretest.NewClock(adminT0), cfg: coretest.NewConfig(t),
 		panel: coretest.NewPanel(), notes: &coretest.Notifier{}}
 	for k, v := range map[string]string{"manual.enabled": "true", "manual.details": "Карта 0000", "stars.enabled": "true"} {
 		if err := e.cfg.Set(k, v); err != nil {
@@ -58,7 +58,7 @@ func newAdminEnv(t *testing.T) *adminEnv {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	// Часы лимита запросов идут вперёд сами: тесты шлют много запросов подряд, а часы ядра стоят на месте.
 	var tick atomic.Int64
-	e.s = New(Deps{Text: fakeTexts, Log: log, Now: func() time.Time { return t0.Add(time.Duration(tick.Add(1)) * time.Second) }})
+	e.s = New(Deps{Text: fakeTexts, Log: log, Now: func() time.Time { return adminT0.Add(time.Duration(tick.Add(1)) * time.Second) }})
 	RegisterAdmin(e.s, AdminDeps{Core: e.c, Bot: func() string { return "test_bot" }, Loc: time.UTC})
 	if err := e.c.SetOwnerPassword(context.Background(), ownerPass); err != nil {
 		t.Fatal(err)

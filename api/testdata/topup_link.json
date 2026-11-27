@@ -1,0 +1,9 @@
+{
+  "payment_id": 1,
+  "gateway": "fake",
+  "url": "https://pay.test/fake",
+  "invoice_link": "",
+  "details": "",
+  "ext_amount": 30000,
+  "ext_currency": "RUB"
+}

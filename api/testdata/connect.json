@@ -1,0 +1,24 @@
+{
+  "sub_url": "https://sub.test/ref-1/0",
+  "apps": [
+    {
+      "id": "happ",
+      "name": "Happ",
+      "stores": {
+        "android": "https://play.google.com/store/apps/details?id=com.happproxy",
+        "desktop": "https://github.com/Happ-proxy/happ-desktop/releases/latest",
+        "ios": "https://apps.apple.com/app/happ-proxy-utility/id6504287215"
+      },
+      "open_url": "https://w.test/dl/happ/TOKEN"
+    },
+    {
+      "id": "v2raytun",
+      "name": "v2RayTun",
+      "stores": {
+        "android": "https://play.google.com/store/apps/details?id=com.v2raytun.android",
+        "ios": "https://apps.apple.com/app/v2raytun/id6476628951"
+      },
+      "open_url": "https://w.test/dl/v2raytun/TOKEN"
+    }
+  ]
+}

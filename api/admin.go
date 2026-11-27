@@ -123,7 +123,7 @@ func (a *adminAPI) loginPoll(w http.ResponseWriter, r *http.Request) (any, error
 	if err != nil {
 		return nil, err
 	}
-	if state == core.LoginOK {
+	if state == core.AdminLoginOK {
 		http.SetCookie(w, &http.Cookie{Name: AdminCookie, Value: token, Path: adminPath, Expires: sess.ExpiresAt,
 			HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
 	}

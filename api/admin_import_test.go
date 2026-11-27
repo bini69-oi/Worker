@@ -9,14 +9,14 @@ import (
 )
 
 func (e *adminEnv) listed(ref, username string, tg int64) {
-	e.panel.AddListed(core.PanelEntry{Ref: ref, Username: username, TgID: tg, Status: "ACTIVE", ExpireAt: t0.AddDate(0, 2, 0),
-		CreatedAt: t0.Add(-100 * 24 * time.Hour), SubURL: "https://sub.example/" + ref, TrafficBytes: 50 << 30, Devices: 3, Reset: "MONTH"})
+	e.panel.AddListed(core.PanelEntry{Ref: ref, Username: username, TgID: tg, Status: "ACTIVE", ExpireAt: adminT0.AddDate(0, 2, 0),
+		CreatedAt: adminT0.Add(-100 * 24 * time.Hour), SubURL: "https://sub.example/" + ref, TrafficBytes: 50 << 30, Devices: 3, Reset: "MONTH"})
 }
 
 func TestAdminImportPreviewAndApply(t *testing.T) {
 	e := newAdminEnv(t)
 	e.listed("r1", "old_one", 2001)
-	e.panel.AddListed(core.PanelEntry{Ref: "r2", Username: "no_tg", Status: "ACTIVE", ExpireAt: t0.AddDate(0, 1, 0)})
+	e.panel.AddListed(core.PanelEntry{Ref: "r2", Username: "no_tg", Status: "ACTIVE", ExpireAt: adminT0.AddDate(0, 1, 0)})
 	rec := e.post(e.owner, "/api/admin/import/preview", `{}`)
 	if rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)

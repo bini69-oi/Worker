@@ -30,14 +30,14 @@ func TestLoginPollStates(t *testing.T) {
 		e := newEnv(t)
 		step := startLogin(t, e)
 		st, token, _, err := e.c.LoginPoll(ctx, step.ConfirmID, step.Nonce, info)
-		if err != nil || st != core.LoginPending || token != "" {
+		if err != nil || st != core.AdminLoginPending || token != "" {
 			t.Fatalf("до нажатия: %q %q %v", st, token, err)
 		}
 		if err := e.c.AnswerLogin(ctx, step.ConfirmID, owner, step.Code); err != nil {
 			t.Fatal(err)
 		}
 		st, token, sess, err := e.c.LoginPoll(ctx, step.ConfirmID, step.Nonce, info)
-		if err != nil || st != core.LoginOK || token == "" || sess.AdminTg != owner {
+		if err != nil || st != core.AdminLoginOK || token == "" || sess.AdminTg != owner {
 			t.Fatalf("после нажатия: %q %v", st, err)
 		}
 		if _, _, err := e.c.SessionAdmin(ctx, token, info); err != nil {
@@ -51,7 +51,7 @@ func TestLoginPollStates(t *testing.T) {
 			t.Fatal(err)
 		}
 		st, token, _, err := e.c.LoginPoll(ctx, step.ConfirmID, step.Nonce, info)
-		if err != nil || st != core.LoginDenied || token != "" {
+		if err != nil || st != core.AdminLoginDenied || token != "" {
 			t.Fatalf("%q %q %v", st, token, err)
 		}
 	})
@@ -68,7 +68,7 @@ func TestLoginPollStates(t *testing.T) {
 		step := startLogin(t, e)
 		e.clock.Add(3 * 60 * 1e9)
 		st, _, _, err := e.c.LoginPoll(ctx, step.ConfirmID, step.Nonce, info)
-		if err != nil || st != core.LoginExpired {
+		if err != nil || st != core.AdminLoginExpired {
 			t.Fatalf("%q %v", st, err)
 		}
 	})

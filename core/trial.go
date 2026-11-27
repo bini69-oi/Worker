@@ -77,3 +77,9 @@ func (c *Core) Trial(ctx context.Context, userID int64) (Subscription, error) {
 	}
 	return out, err
 }
+
+// TrialOpen говорит, предлагать ли абоненту пробный период: он включён, абонент его не брал и подписки не было.
+// Бот и кабинет показывают кнопку по этому правилу, а выдаёт и проверяет Trial.
+func (c *Core) TrialOpen(u User, hasSub bool) bool {
+	return c.cfg.Bool("trial.enabled") && c.cfg.Int("trial.days") > 0 && !u.TrialUsed && !hasSub
+}

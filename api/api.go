@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/bini69-oi/worker/core"
@@ -25,6 +26,11 @@ type Deps struct {
 	Log *slog.Logger
 	// Now это часы для лимита запросов. Пусто: настоящее время.
 	Now func() time.Time
+	// SessionID отдаёт номер ПРОВЕРЕННОЙ сессии запроса, пусто если сессии нет или токен неверный. По нему считается
+	// частота: неизвестный токен делит счётчик со своим IP и не создаёт новых. Пусто в Deps: всё считается по IP.
+	SessionID func(r *http.Request) string
+	// Rate это предел запросов в секунду с одного ключа (сессии или IP). Пусто: sessionRate.
+	Rate int
 }
 
 // Server это роутер API. Один на кабинет и админку: адреса заводятся через Handle.
@@ -40,7 +46,7 @@ func New(d Deps) *Server {
 		d.Log = slog.Default()
 	}
 	s := &Server{deps: d, mux: http.NewServeMux(),
-		limit: &guard.Limiter{Max: sessionRate, Window: time.Second, Now: d.Now}}
+		limit: &guard.Limiter{Max: max(d.Rate, sessionRate), Window: time.Second, Now: d.Now}}
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { s.fail(w, r, core.ErrNotFound) })
 	return s
 }
@@ -48,12 +54,13 @@ func New(d Deps) *Server {
 // Handle заводит адрес вида "GET /api/app/me".
 func (s *Server) Handle(pattern string, h Handler) {
 	s.mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+		r = r.WithContext(context.WithValue(r.Context(), memoKey{}, &reqMemo{}))
 		defer func() {
 			if v := recover(); v != nil {
 				if v == http.ErrAbortHandler {
 					panic(v)
 				}
-				s.deps.Log.Error("паника в обработчике API", "path", r.URL.Path, "panic", v)
+				s.deps.Log.Error("паника в обработчике API", "route", pattern, "panic", v)
 				s.fail(w, r, core.ErrInternal)
 			}
 		}()
@@ -75,6 +82,21 @@ func (s *Server) Handle(pattern string, h Handler) {
 
 // ServeHTTP делает Server обработчиком для http.ServeMux.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.mux.ServeHTTP(w, r) }
+
+// reqMemo хранит то, что обработчикам нужно посчитать один раз на запрос, например проверку сессии:
+// счётчик частоты и сам обработчик спрашивают о ней по очереди, а в базу идёт один запрос.
+type reqMemo struct {
+	once sync.Once
+	auth Auth
+	err  error
+}
+
+type memoKey struct{}
+
+func memoOf(ctx context.Context) *reqMemo {
+	m, _ := ctx.Value(memoKey{}).(*reqMemo)
+	return m
+}
 
 type langKey struct{}
 

@@ -40,6 +40,7 @@ func CoreJobs(c *core.Core, cfg Config) []Job {
 		{Name: "broadcast", Every: fixed(time.Second), Run: count(c.RunBroadcast)},
 		{Name: "summary", Every: fixed(time.Minute), Run: count(c.SendSummary)},
 		{Name: "payments", Every: fixed(time.Minute), Run: count(c.ReconcilePayments)},
+		{Name: "cabinet", Every: fixed(time.Hour), Run: count(c.CleanCabinet)},
 		{Name: "support", Every: fixed(24 * time.Hour), Run: count(c.CleanSupport)},
 		{Name: "reconcile", Every: minutes(cfg, "panel.reconcile_minutes"), Run: count(c.Reconcile)},
 	}

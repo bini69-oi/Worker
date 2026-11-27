@@ -9,10 +9,10 @@ import (
 
 // Состояния входа для страницы, которая опрашивает его.
 const (
-	LoginPending = "pending" // админ ещё не нажал кнопку в Telegram
-	LoginDenied  = "denied"  // нажат чужой код или «Это не я»
-	LoginExpired = "expired" // время на подтверждение вышло
-	LoginOK      = "ok"      // вход подтверждён, выдан токен
+	AdminLoginPending = "pending" // админ ещё не нажал кнопку в Telegram
+	AdminLoginDenied  = "denied"  // нажат чужой код или «Это не я»
+	AdminLoginExpired = "expired" // время на подтверждение вышло
+	AdminLoginOK      = "ok"      // вход подтверждён, выдан токен
 )
 
 // LoginPoll это опрос входа с экрана: в каком состоянии подтверждение. Подтверждён: заканчивает вход
@@ -34,24 +34,24 @@ func (c *Core) LoginPoll(ctx context.Context, confirmID int64, nonce string, inf
 		now := c.clock.Now()
 		switch {
 		case now.Sub(cf.CreatedAt) > finishTTL || !cf.UsedAt.IsZero():
-			state = LoginExpired
+			state = AdminLoginExpired
 		case cf.Answer == "no":
-			state = LoginDenied
+			state = AdminLoginDenied
 		case cf.Answer == "" && !now.Before(cf.ExpiresAt):
-			state = LoginExpired
+			state = AdminLoginExpired
 		case cf.Answer == "":
-			state = LoginPending
+			state = AdminLoginPending
 		default:
-			state = LoginOK
+			state = AdminLoginOK
 		}
 		return nil
 	})
-	if err != nil || state != LoginOK {
+	if err != nil || state != AdminLoginOK {
 		return state, "", Session{}, err
 	}
 	token, s, err := c.LoginFinish(ctx, confirmID, nonce, info)
 	if err != nil {
 		return "", "", Session{}, err
 	}
-	return LoginOK, token, s, nil
+	return AdminLoginOK, token, s, nil
 }
