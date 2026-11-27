@@ -81,7 +81,8 @@ func TestLoginBrowserFlow(t *testing.T) {
 	if again := e.req("POST", "/api/app/logout", "{}", "Cookie", SessionCookie+"="+c.Value, "X-Worker", "1"); again.Code != 401 {
 		t.Fatalf("закрытая сессия: %d", again.Code)
 	}
-	// Сессия выдаётся один раз.
+	// После окна повторной выдачи (30 секунд) сессия больше не выдаётся.
+	e.clock.Add(31 * time.Second)
 	rec = poll(e, st.ID)
 	decode(t, rec, &p)
 	if p.State != "expired" || cookieNamed(rec, SessionCookie) != nil {
@@ -152,5 +153,29 @@ func TestLoginStartLimitPerIP(t *testing.T) {
 	e.clock.Add(10 * time.Minute)
 	if rec := e.req("POST", "/api/app/login", "{}"); rec.Code != 200 {
 		t.Fatalf("после окна: %d", rec.Code)
+	}
+}
+
+// Ответ на опрос потерялся по дороге: повторный опрос ставит новую cookie, а потерянная сессия не работает.
+func TestLoginPollLostResponseReissues(t *testing.T) {
+	e := newAppEnv(t)
+	u, _ := e.c.Register(t.Context(), 55, "ivan", "ru")
+	st, nonce := startLogin(t, e)
+	prompt, _ := e.c.WebLoginOpen(t.Context(), nonce, u.TgID)
+	if _, err := e.c.WebLoginAnswer(t.Context(), prompt.ID, u.TgID, st.Code); err != nil {
+		t.Fatal(err)
+	}
+	lost := cookieNamed(poll(e, st.ID), SessionCookie)
+	e.clock.Add(5 * time.Second)
+	again := cookieNamed(poll(e, st.ID), SessionCookie)
+	if lost == nil || again == nil || lost.Value == again.Value {
+		t.Fatalf("повторной cookie нет: %v %v", lost, again)
+	}
+	if rec := e.req("GET", "/api/app/me", "", "Cookie", SessionCookie+"="+lost.Value); rec.Code != 401 {
+		t.Fatalf("потерянная сессия жива: %d", rec.Code)
+	}
+	e.clock.Add(time.Second)
+	if rec := e.req("GET", "/api/app/me", "", "Cookie", SessionCookie+"="+again.Value); rec.Code != 200 {
+		t.Fatalf("новая сессия: %d", rec.Code)
 	}
 }

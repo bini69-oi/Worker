@@ -11,18 +11,19 @@ import (
 
 // UserLogin это запрос входа в браузере через бота. В базе только хэши id и nonce.
 type UserLogin struct {
-	ID         int64
-	IDHash     []byte // хэш id, который знает только браузер
-	NonceHash  []byte // хэш nonce, который знает только ссылка на бота
-	Code       string // двузначный код, который показывает сайт
-	TgID       int64  // кто открыл ссылку; 0, пока никто
-	IP         string
-	Agent      string
-	CreatedAt  time.Time
-	ExpiresAt  time.Time
-	Answer     string // yes, no или пусто
-	AnsweredAt time.Time
-	UsedAt     time.Time // когда браузер забрал сессию
+	ID          int64
+	IDHash      []byte // хэш id, который знает только браузер
+	NonceHash   []byte // хэш nonce, который знает только ссылка на бота
+	Code        string // двузначный код, который показывает сайт
+	TgID        int64  // кто открыл ссылку; 0, пока никто
+	IP          string
+	Agent       string
+	CreatedAt   time.Time
+	ExpiresAt   time.Time
+	Answer      string // yes, no или пусто
+	AnsweredAt  time.Time
+	UsedAt      time.Time // когда браузер забрал сессию
+	SessionHash []byte    // сессия, выданная по этому входу
 }
 
 // Сроки входа в браузере.
@@ -210,8 +211,13 @@ func (c *Core) WebLoginAnswer(ctx context.Context, id, pressedBy int64, code str
 	return out, nil
 }
 
-// WebLoginPoll это опрос браузера. Подтверждённый вход один раз отдаёт токен сессии браузера на 30 дней.
-// Неизвестный id, истёкший и уже использованный запрос: LoginExpired, без подробностей.
+// reissueWindow это время после выдачи сессии, в которое тот же браузер по тому же секрету может получить её снова:
+// ответ на опрос мог оборваться по дороге, и сессия, которую браузер не увидел, пропала бы.
+const reissueWindow = 30 * time.Second
+
+// WebLoginPoll это опрос браузера. Подтверждённый вход отдаёт токен сессии браузера на 30 дней. Если ответ оборвался,
+// повторный опрос в течение 30 секунд выдаёт новую сессию, а прежняя закрывается. Неизвестный id, истёкший и уже
+// использованный запрос: LoginExpired, без подробностей.
 func (c *Core) WebLoginPoll(ctx context.Context, id string, info LoginInfo) (WebLoginResult, error) {
 	res := WebLoginResult{State: LoginExpired}
 	if id == "" || len(id) > 128 {
@@ -220,7 +226,11 @@ func (c *Core) WebLoginPoll(ctx context.Context, id string, info LoginInfo) (Web
 	err := c.tx(ctx, func(tx Tx) error {
 		now := c.clock.Now()
 		l, err := tx.UserLoginByHash(sha(id))
-		if err != nil || !l.UsedAt.IsZero() {
+		if err != nil {
+			return nil
+		}
+		reissue := !l.UsedAt.IsZero() && l.Answer == "yes" && len(l.SessionHash) > 0 && now.Before(l.UsedAt.Add(reissueWindow))
+		if !l.UsedAt.IsZero() && !reissue {
 			return nil
 		}
 		switch {
@@ -230,16 +240,24 @@ func (c *Core) WebLoginPoll(ctx context.Context, id string, info LoginInfo) (Web
 			if now.Before(l.ExpiresAt) {
 				res.State = LoginPending
 			}
-		case now.Before(l.AnsweredAt.Add(webLoginTTL)): // «да»: забрать сессию можно ещё 5 минут
+		case reissue || now.Before(l.AnsweredAt.Add(webLoginTTL)): // «да»: забрать сессию можно ещё 5 минут
 			u, err := tx.UserByTg(l.TgID)
 			if err != nil {
 				return err
+			}
+			if reissue {
+				if err := tx.CloseUserSession(l.SessionHash, now); err != nil {
+					return err
+				}
 			}
 			token, _, err := c.openSessionTx(tx, u.ID, SessionWeb, info)
 			if err != nil {
 				return err
 			}
-			l.UsedAt = now
+			if !reissue {
+				l.UsedAt = now
+			}
+			l.SessionHash = sha(token)
 			if err := tx.SaveUserLogin(l); err != nil {
 				return err
 			}

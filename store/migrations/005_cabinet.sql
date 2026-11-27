@@ -28,6 +28,7 @@ CREATE TABLE user_logins (
     expires_at  INTEGER NOT NULL,
     answer      TEXT    NOT NULL DEFAULT '',  -- yes, no или пусто
     answered_at INTEGER,
-    used_at     INTEGER                       -- когда браузер забрал сессию
+    used_at     INTEGER,                      -- когда браузер забрал сессию
+    session_hash BLOB                         -- сессия, выданная по этому входу: при повторной выдаче старая закрывается
 ) STRICT;
 CREATE INDEX user_logins_expires ON user_logins (expires_at);

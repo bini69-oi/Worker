@@ -56,13 +56,13 @@ func (t *coreTx) CloseUserSessions(userID int64, at time.Time) error {
 	return err
 }
 
-const userLoginCols = `id, id_hash, nonce_hash, code, tg_id, ip, agent, created_at, expires_at, answer, answered_at, used_at`
+const userLoginCols = `id, id_hash, nonce_hash, code, tg_id, ip, agent, created_at, expires_at, answer, answered_at, used_at, session_hash`
 
 func scanUserLogin(r scanner) (core.UserLogin, error) {
 	var l core.UserLogin
 	var created, expires int64
 	var answered, used sql.NullInt64
-	if err := r.Scan(&l.ID, &l.IDHash, &l.NonceHash, &l.Code, &l.TgID, &l.IP, &l.Agent, &created, &expires, &l.Answer, &answered, &used); err != nil {
+	if err := r.Scan(&l.ID, &l.IDHash, &l.NonceHash, &l.Code, &l.TgID, &l.IP, &l.Agent, &created, &expires, &l.Answer, &answered, &used, &l.SessionHash); err != nil {
 		return l, err
 	}
 	l.CreatedAt, l.ExpiresAt, l.AnsweredAt, l.UsedAt = time.Unix(created, 0).UTC(), time.Unix(expires, 0).UTC(), unix(answered), unix(used)
@@ -99,8 +99,8 @@ func (t *coreTx) CreateUserLogin(l core.UserLogin) (int64, error) {
 }
 
 func (t *coreTx) SaveUserLogin(l core.UserLogin) error {
-	_, err := t.q.ExecContext(t.ctx, "UPDATE user_logins SET tg_id = ?, answer = ?, answered_at = ?, used_at = ? WHERE id = ?",
-		l.TgID, l.Answer, nullTime(l.AnsweredAt), nullTime(l.UsedAt), l.ID)
+	_, err := t.q.ExecContext(t.ctx, "UPDATE user_logins SET tg_id = ?, answer = ?, answered_at = ?, used_at = ?, session_hash = ? WHERE id = ?",
+		l.TgID, l.Answer, nullTime(l.AnsweredAt), nullTime(l.UsedAt), l.SessionHash, l.ID)
 	return err
 }
 

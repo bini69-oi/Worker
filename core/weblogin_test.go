@@ -49,9 +49,10 @@ func TestWebLoginRightCode(t *testing.T) {
 	if u, s, err := e.c.SessionUser(ctx, res.Token); err != nil || u.ID != e.user.ID || s.Kind != core.SessionWeb {
 		t.Fatalf("сессия входа: %v", err)
 	}
-	// Сессия выдаётся один раз.
+	// После окна повторной выдачи сессия больше не выдаётся.
+	e.clock.Add(31 * time.Second)
 	if res, _ := e.c.WebLoginPoll(ctx, st.ID, webInfo); res.State != core.LoginExpired || res.Token != "" {
-		t.Fatalf("второй опрос: %+v", res)
+		t.Fatalf("опрос после окна: %+v", res)
 	}
 	// Второе нажатие и повторное открытие ссылки ничего не меняют.
 	if _, err := e.c.WebLoginAnswer(ctx, p.ID, e.user.TgID, st.Code); !errors.Is(err, core.ErrLoginUsed) {
@@ -273,5 +274,36 @@ func TestWebLoginFailuresExpire(t *testing.T) {
 	a, err := e.c.WebLoginAnswer(ctx, p.ID, e.user.TgID, wrongCode(p, st.Code))
 	if err != nil || a.Locked {
 		t.Fatalf("третья неудача через час после первых двух: %+v %v", a, err)
+	}
+}
+
+// Ответ на опрос оборвался: тот же браузер по тому же секрету получает сессию снова в течение 30 секунд,
+// а потерянная сессия закрывается.
+func TestWebLoginReissueAfterLostResponse(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	st, p := webLogin(t, e, e.user.TgID)
+	if _, err := e.c.WebLoginAnswer(ctx, p.ID, e.user.TgID, st.Code); err != nil {
+		t.Fatal(err)
+	}
+	first, _ := e.c.WebLoginPoll(ctx, st.ID, webInfo)
+	e.clock.Add(10 * time.Second)
+	second, err := e.c.WebLoginPoll(ctx, st.ID, webInfo)
+	if err != nil || second.State != core.LoginConfirmed || second.Token == "" || second.Token == first.Token {
+		t.Fatalf("повторная выдача: %+v %v", second, err)
+	}
+	if _, _, err := e.c.SessionUser(ctx, first.Token); !errors.Is(err, core.ErrSessionGone) {
+		t.Fatalf("потерянная сессия осталась живой: %v", err)
+	}
+	if _, _, err := e.c.SessionUser(ctx, second.Token); err != nil {
+		t.Fatalf("новая сессия: %v", err)
+	}
+	// Чужой секрет сессии не даёт.
+	if res, _ := e.c.WebLoginPoll(ctx, "не тот секрет", webInfo); res.Token != "" {
+		t.Fatalf("чужой секрет: %+v", res)
+	}
+	e.clock.Add(21 * time.Second) // с первой выдачи прошло 31 секунда
+	if res, _ := e.c.WebLoginPoll(ctx, st.ID, webInfo); res.Token != "" || res.State != core.LoginExpired {
+		t.Fatalf("после окна: %+v", res)
 	}
 }
