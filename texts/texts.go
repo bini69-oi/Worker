@@ -152,6 +152,14 @@ func (t *Texts) Reset(key, lang string) error {
 	return nil
 }
 
+// Override отдаёт правку админа для языка. Правки нет: false, и действует умолчание из кода.
+func (t *Texts) Override(key, lang string) (string, bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	v, ok := t.vals[cacheKey{key, lang}]
+	return v, ok
+}
+
 // Langs отдаёт языки, на которых есть тексты: русский и английский из кода и языки правок админа.
 func (t *Texts) Langs() []string {
 	t.mu.RLock()

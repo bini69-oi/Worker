@@ -185,6 +185,8 @@ type Deps struct {
 	Telegram TelegramAPI
 	// Sender шлёт сообщения рассылки. Может быть nil: рассылки не отправляются.
 	Sender BroadcastSender
+	// Texts это редактор текстов бота. Может быть nil: правка текстов недоступна.
+	Texts TextEditor
 	// Channels проверяет подписку на канал перед пробным периодом. Может быть nil: проверки не будет.
 	Channels Channels
 	// OwnerID это Telegram ID владельца из окружения. Изнутри системы он не меняется.
@@ -211,6 +213,7 @@ type Core struct {
 	gateways []Gateway
 	telegram TelegramAPI
 	sender   BroadcastSender
+	texts    TextEditor
 	bcNext   atomic.Value // time.Time: раньше этого момента пачка рассылки не уходит
 	channels Channels
 	owner    int64
@@ -237,7 +240,7 @@ func New(d Deps) *Core {
 		store: d.Store, clock: d.Clock, cfg: d.Config, panel: d.Panel,
 		notifier: d.Notifier, gateways: d.Gateways, telegram: d.Telegram, channels: d.Channels, owner: d.OwnerID, log: d.Log,
 		kick: make(chan struct{}, 1), actions: map[string]action{}, filter: d.Secrets,
-		sender: d.Sender,
+		sender: d.Sender, texts: d.Texts,
 	}
 	c.bcNext.Store(time.Time{})
 	return c

@@ -270,3 +270,22 @@ func TestUnknownKeyAndBadInput(t *testing.T) {
 		t.Errorf("для неизвестного ключа ждали сам ключ, получили %q", got)
 	}
 }
+
+func TestOverride(t *testing.T) {
+	tx, _ := newTexts(t, "ru")
+	if _, ok := tx.Override("buy.success", "ru"); ok {
+		t.Fatal("правки нет, а Override её нашёл")
+	}
+	if err := tx.Set("buy.success", "ru", "Осталось {days}"); err != nil {
+		t.Fatal(err)
+	}
+	if v, ok := tx.Override("buy.success", "ru"); !ok || v != "Осталось {days}" {
+		t.Errorf("%q %v", v, ok)
+	}
+	if err := tx.Reset("buy.success", "ru"); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := tx.Override("buy.success", "ru"); ok {
+		t.Error("после сброса правка осталась")
+	}
+}
