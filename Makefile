@@ -1,7 +1,7 @@
 STATICCHECK ?= $(shell go env GOPATH)/bin/staticcheck
 GOVULNCHECK ?= $(shell go env GOPATH)/bin/govulncheck
 
-.PHONY: check vuln build types web
+.PHONY: check vuln build types web web-check
 
 # Всё, что должно быть зелёным перед коммитом.
 check:
@@ -24,3 +24,7 @@ types:
 # Сборка фронта в web/build, оттуда её вшивает бинарник. Нужен Node.js, пользователю он не нужен.
 web:
 	cd web && npm ci && npm run build
+
+# Проверки фронта: типы Svelte, тесты, сборка с проверкой веса, уязвимости уровня high. Зависимости: npm ci в web/.
+web-check:
+	cd web && npm run check && npm test && npm run build && npm run size && npm run audit

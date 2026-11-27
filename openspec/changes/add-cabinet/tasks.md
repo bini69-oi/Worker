@@ -33,7 +33,7 @@
 - [x] 4.2 Проект `web/`: Vite, Svelte, TypeScript, две точки входа, `npm ci`; проверка: `npm run build`
 - [x] 4.3 `web/embed.go`, заглушка без сборки, кэш статики; проверка: тесты «без сборки», «кэш index.html»
 - [x] 4.4 Заголовки безопасности `/app/`; проверка: тест заголовков
-- [ ] 4.5 `make web-check`: svelte-check, vitest, размер, `npm audit`; проверка: команда зелёная
+- [x] 4.5 `make web-check`: svelte-check, vitest, размер, `npm audit`; проверка: команда зелёная
 - [ ] 4.6 CI: Node по хэшу действия, `make web-check`, проверка устаревших типов; проверка: CI зелёный
 
 ## 5. Общее фронта
