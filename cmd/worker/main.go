@@ -4,6 +4,7 @@
 //
 //	worker rotate            сменить мастер-ключ и перешифровать секреты
 //	worker admin password    задать пароль владельца
+//	worker backup            зашифрованный бэкап базы в папку backups рядом с базой
 //	worker sign keygen       создать пару ключей подписи релизов (без .env)
 package main
 
