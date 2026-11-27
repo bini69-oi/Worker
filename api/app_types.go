@@ -35,6 +35,9 @@ func appTypes() []reflect.Type {
 		reflect.TypeFor[BuyResponse](),
 		reflect.TypeFor[TopupResponse](),
 		reflect.TypeFor[PaymentResponse](),
+		reflect.TypeFor[HistoryResponse](),
+		reflect.TypeFor[RefResponse](),
+		reflect.TypeFor[PromoResponse](),
 	}
 }
 
@@ -153,4 +156,40 @@ type PaymentResponse struct {
 	Status    string     `json:"status"`
 	CreatedAt time.Time  `json:"created_at"`
 	PaidAt    *time.Time `json:"paid_at"`
+}
+
+// HistoryResponse это движения баланса, новые первыми.
+type HistoryResponse struct {
+	Items []HistoryItem `json:"items"`
+}
+
+// HistoryItem это одно движение: сумма со знаком в копейках и причина (topup, buy, promo, referral, admin, refund).
+type HistoryItem struct {
+	Amount    int64     `json:"amount"`
+	Reason    string    `json:"reason"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// RefResponse это реферальная ссылка и цифры приглашений. Earned в копейках.
+type RefResponse struct {
+	Link    string `json:"link"`
+	Invited int    `json:"invited"`
+	Bought  int    `json:"bought"`
+	Earned  int64  `json:"earned"`
+}
+
+// PromoRequest это введённый промокод.
+type PromoRequest struct {
+	Code string `json:"code"`
+}
+
+// PromoResponse это то, что дал промокод: money (Value в копейках) или days (Value в днях).
+type PromoResponse struct {
+	Kind  string `json:"kind"`
+	Value int64  `json:"value"`
+}
+
+// AutoRenewRequest включает или выключает автопродление. Поле on обязательно.
+type AutoRenewRequest struct {
+	On *bool `json:"on"`
 }

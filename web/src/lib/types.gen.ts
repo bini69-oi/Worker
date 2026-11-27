@@ -17,6 +17,16 @@ export interface GatewayView {
   title: string;
 }
 
+export interface HistoryItem {
+  amount: number;
+  reason: string;
+  created_at: string;
+}
+
+export interface HistoryResponse {
+  items: HistoryItem[];
+}
+
 export interface LimitDetails {
   min: number;
   max: number;
@@ -71,12 +81,24 @@ export interface PeriodView {
   price: number;
 }
 
+export interface PromoResponse {
+  kind: string;
+  value: number;
+}
+
 export interface QuoteResponse {
   price: number;
   balance: number;
   missing: number;
   queued: boolean;
   starts_at: string | null;
+}
+
+export interface RefResponse {
+  link: string;
+  invited: number;
+  bought: number;
+  earned: number;
 }
 
 export interface SessionResponse {
