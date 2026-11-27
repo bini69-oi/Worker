@@ -61,6 +61,8 @@ func (a *adminAPI) routes() []adminRoute {
 		{"POST /api/admin/settings/set", core.PermOwner, a.settingSet},
 		{"POST /api/admin/settings/reset", core.PermOwner, a.settingReset},
 		{"GET /api/admin/gateways", core.PermOwner, a.gatewaysList},
+		{"GET /api/admin/notifications", core.PermOwner, a.notifyGet},
+		{"POST /api/admin/notifications/code", core.PermOwner, a.notifyCode},
 
 		{"GET /api/admin/payments", core.PermStats, a.paymentsList},
 		{"POST /api/admin/payments/{id}/confirm", core.PermGrant, a.paymentConfirm},

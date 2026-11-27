@@ -35,6 +35,10 @@ export interface AdminBroadcastList {
   next: number;
 }
 
+export interface AdminChatCode {
+  code: string;
+}
+
 export interface AdminDevice {
   hwid: string;
   platform: string;
@@ -81,6 +85,11 @@ export interface AdminMe {
   tg_id: number;
   owner: boolean;
   perms: string[];
+}
+
+export interface AdminNotify {
+  bound: boolean;
+  topics: AdminTopic[];
 }
 
 export interface AdminPayment {
@@ -197,6 +206,13 @@ export interface AdminText {
 
 export interface AdminTextList {
   items: AdminText[];
+}
+
+export interface AdminTopic {
+  id: string;
+  title: string;
+  enabled: boolean;
+  locked: boolean;
 }
 
 export interface AdminUserCard {

@@ -1,0 +1,47 @@
+{
+  "bound": true,
+  "topics": [
+    {
+      "id": "payments",
+      "title": "ru:topic.payments",
+      "enabled": true,
+      "locked": false
+    },
+    {
+      "id": "trials",
+      "title": "ru:topic.trials",
+      "enabled": true,
+      "locked": false
+    },
+    {
+      "id": "new",
+      "title": "ru:topic.new",
+      "enabled": true,
+      "locked": false
+    },
+    {
+      "id": "support",
+      "title": "ru:topic.support",
+      "enabled": true,
+      "locked": false
+    },
+    {
+      "id": "errors",
+      "title": "ru:topic.errors",
+      "enabled": true,
+      "locked": false
+    },
+    {
+      "id": "security",
+      "title": "ru:topic.security",
+      "enabled": true,
+      "locked": true
+    },
+    {
+      "id": "summary",
+      "title": "ru:topic.summary",
+      "enabled": true,
+      "locked": false
+    }
+  ]
+}

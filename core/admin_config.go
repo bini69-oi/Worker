@@ -210,6 +210,10 @@ func (c *Core) changeSetting(ctx context.Context, actorTg int64, p settingPayloa
 	if err := c.checkGatewayKeys(p); err != nil {
 		return res, err
 	}
+	// Тему «Безопасность» выключить нельзя ни здесь, ни в чужой проверке: о входах и смене ключей владелец знает всегда.
+	if p.Key == "notify.security" && !p.Reset && p.Value != "true" {
+		return res, WithDetail(ErrBadSetting, "тему безопасности выключить нельзя")
+	}
 	switch {
 	case def.Secret && !p.Reset:
 		res.ConfirmID, err = c.RequestSecret(ctx, actorTg, p.Key, p.Value)

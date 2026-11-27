@@ -1,6 +1,7 @@
 import type { Component } from 'svelte'
 import Broadcasts from './Broadcasts.svelte'
 import Gateways from './Gateways.svelte'
+import Notify from './Notify.svelte'
 import Payments from './Payments.svelte'
 import Promos from './Promos.svelte'
 import Settings from './Settings.svelte'
@@ -23,4 +24,5 @@ export const screens: Record<string, Screen> = {
   texts: plain(Texts),
   settings: plain(Settings),
   gateways: plain(Gateways),
+  notifications: plain(Notify),
 }

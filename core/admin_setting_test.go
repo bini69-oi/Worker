@@ -206,3 +206,19 @@ func TestSettingListShowsChanged(t *testing.T) {
 		t.Errorf("не нашли настройки в списке")
 	}
 }
+
+func TestSecurityTopicCannotBeOff(t *testing.T) {
+	ctx := context.Background()
+	e := newCfgEnv(t)
+	for _, v := range []string{"false", "0", ""} {
+		if _, err := e.c.SetSetting(ctx, owner, "notify.security", v); !errors.Is(err, core.ErrBadSetting) {
+			t.Errorf("значение %q: %v", v, err)
+		}
+	}
+	if _, err := e.c.SetSetting(ctx, owner, "notify.security", "true"); err != nil {
+		t.Errorf("включить можно: %v", err)
+	}
+	if _, err := e.c.SetSetting(ctx, owner, "notify.payments", "false"); err != nil {
+		t.Errorf("обычную тему выключить можно: %v", err)
+	}
+}
