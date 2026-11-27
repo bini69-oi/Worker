@@ -281,3 +281,60 @@ func dbFile(t *testing.T, db *store.DB) string {
 	}
 	return path
 }
+
+// Оборванный бэкап оставляет во временной папке открытую копию базы: следующий запуск её удаляет.
+func TestStaleTempRemoved(t *testing.T) {
+	now := t0
+	s, _ := newService(t, &now)
+	_ = os.MkdirAll(s.Dir, 0o700)
+	old := now.Add(-time.Hour)
+	stale := filepath.Join(s.Dir, ".tmp-123")
+	_ = os.MkdirAll(stale, 0o700)
+	_ = os.WriteFile(filepath.Join(stale, "copy.db"), []byte(marker), 0o600)
+	part := filepath.Join(s.Dir, "worker-20261031-030000.db.enc.part")
+	_ = os.WriteFile(part, []byte("половина"), 0o600)
+	fresh := filepath.Join(s.Dir, ".tmp-live")
+	_ = os.MkdirAll(fresh, 0o700) // идёт параллельный бэкап: не трогать
+	for _, p := range []string{stale, part} {
+		if err := os.Chtimes(p, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = os.Chtimes(fresh, now, now)
+	keep := filepath.Join(s.Dir, "заметка.txt")
+	_ = os.WriteFile(keep, []byte("x"), 0o600)
+	_ = os.Chtimes(keep, old, old)
+
+	if _, err := s.Create(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{stale, part} {
+		if _, err := os.Stat(p); err == nil {
+			t.Errorf("не удалён %s", filepath.Base(p))
+		}
+	}
+	for _, p := range []string{fresh, keep} {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("удалено лишнее %s", filepath.Base(p))
+		}
+	}
+}
+
+// RunDue чистит остатки и тогда, когда новый бэкап ещё не нужен.
+func TestRunDueSweepsWhenNotDue(t *testing.T) {
+	now := t0
+	s, _ := newService(t, &now)
+	if err := s.RunDue(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	stale := filepath.Join(s.Dir, ".tmp-999")
+	_ = os.MkdirAll(stale, 0o700)
+	_ = os.Chtimes(stale, now.Add(-time.Hour), now.Add(-time.Hour))
+	now = now.Add(time.Hour)
+	if err := s.RunDue(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(stale); err == nil {
+		t.Error("остаток не удалён")
+	}
+}

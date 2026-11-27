@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/bini69-oi/worker/store"
@@ -94,6 +95,7 @@ func (s *Service) Create(ctx context.Context) (string, error) {
 	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
 		return "", err
 	}
+	s.sweep()
 	tmp, err := os.MkdirTemp(s.Dir, ".tmp-")
 	if err != nil {
 		return "", err
@@ -116,6 +118,29 @@ func (s *Service) Create(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+// staleAfter это возраст, после которого временный файл считается остатком оборванного бэкапа. Моложе не трогаем:
+// рядом может идти другой бэкап (задача по расписанию и ручной worker backup).
+const staleAfter = 10 * time.Minute
+
+// sweep удаляет остатки оборванных бэкапов: временные папки .tmp-* (в них копия базы без шифрования) и недописанные
+// файлы *.part. Ошибки не мешают бэкапу: остаток уберёт следующий запуск.
+func (s *Service) sweep() {
+	entries, err := os.ReadDir(s.Dir)
+	if err != nil {
+		return
+	}
+	cutoff := s.Now().Add(-staleAfter)
+	for _, e := range entries {
+		name := e.Name()
+		if !(strings.HasPrefix(name, ".tmp-") || strings.HasSuffix(name, ".part")) {
+			continue
+		}
+		if info, err := e.Info(); err == nil && info.ModTime().Before(cutoff) {
+			_ = os.RemoveAll(filepath.Join(s.Dir, name))
+		}
+	}
 }
 
 // writeNew пишет файл целиком или не пишет вовсе: сначала рядом, потом переименование. Существующий файл не затирает.
@@ -174,6 +199,7 @@ func (s *Service) Prune() error {
 
 // RunDue делает бэкап, если последнему больше суток или его нет, и чистит старые. Звать можно часто.
 func (s *Service) RunDue(ctx context.Context) error {
+	s.sweep()
 	all, err := names(s.Dir)
 	if err != nil {
 		return err
