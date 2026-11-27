@@ -1,0 +1,50 @@
+[Unit]
+Description=Worker: бот продажи VPN поверх Remnawave
+Documentation=https://github.com/bini69-oi/worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=worker
+Group=worker
+WorkingDirectory=/var/lib/worker
+# Токены и ключи лежат в /etc/worker/env (права 600). Читает их systemd, процессу файл не открыт.
+EnvironmentFile=/etc/worker/env
+ExecStart=/usr/local/bin/worker
+Restart=on-failure
+RestartSec=3
+
+# Песочница: если в боте найдут дыру, процесс не сможет писать вне своей папки, ставить программы и подняться до root.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/worker
+StateDirectory=worker
+StateDirectoryMode=0700
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RemoveIPC=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
