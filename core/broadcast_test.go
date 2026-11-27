@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bini69-oi/worker/core"
 	"github.com/bini69-oi/worker/core/coretest"
@@ -140,20 +141,67 @@ func TestOneBroadcastAtATime(t *testing.T) {
 		t.Fatal(err)
 	}
 	a, b := e.draft(t, core.SegAll), e.draft(t, core.SegAll)
-	started, err := e.c.StartBroadcast(ctx, owner, a.ID)
+	started, err := e.start(owner, a.ID)
 	if err != nil || started.Status != core.BcRunning || started.Total != 2 {
 		t.Fatalf("%+v %v", started, err)
 	}
-	if _, err := e.c.StartBroadcast(ctx, owner, b.ID); !errors.Is(err, core.ErrBroadcastBusy) {
+	if _, err := e.start(owner, b.ID); !errors.Is(err, core.ErrBroadcastBusy) {
 		t.Fatalf("вторая рассылка: %v", err)
 	}
 	if err := e.c.CancelBroadcast(ctx, owner, a.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.c.StartBroadcast(ctx, owner, b.ID); err != nil {
+	if _, err := e.start(owner, b.ID); err != nil {
 		t.Errorf("после отмены первой: %v", err)
 	}
-	if _, err := e.c.StartBroadcast(ctx, owner, a.ID); !errors.Is(err, core.ErrInvalid) {
+	if _, err := e.start(owner, a.ID); !errors.Is(err, core.ErrInvalid) {
 		t.Errorf("отменённую не запустить: %v", err)
+	}
+}
+
+// Рассылка всем идёт только после «Да» владельца, даже если запустил помощник или сам владелец.
+func TestBroadcastStartNeedsYes(t *testing.T) {
+	ctx := context.Background()
+	e := newBcEnv(t)
+	for tg := int64(2001); tg <= 2005; tg++ {
+		if _, err := e.c.Register(ctx, tg, "u", "ru"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	helperWith(t, e.env, 50, core.PermBroadcast)
+	b := e.draft(t, core.SegAll)
+	cid, err := e.c.StartBroadcast(ctx, 50, b.ID)
+	if err != nil || cid == 0 {
+		t.Fatalf("помощник просит запуск: %v", err)
+	}
+	if st, _ := e.c.BroadcastByID(ctx, owner, b.ID); st.Status != core.BcDraft {
+		t.Fatalf("рассылка пошла без «Да»: %+v", st)
+	}
+	for range 3 {
+		e.clock.Add(time.Second)
+		if n, _ := e.c.RunBroadcast(ctx); n != 0 {
+			t.Fatalf("без «Да» ушло %d сообщений", n)
+		}
+	}
+	if err := e.c.AnswerConfirm(ctx, cid, owner, false); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := e.c.BroadcastByID(ctx, owner, b.ID); st.Status != core.BcDraft {
+		t.Fatalf("после «Нет» рассылка пошла: %+v", st)
+	}
+	// Владелец просит сам: тоже нужен «Да».
+	cid, err = e.c.StartBroadcast(ctx, owner, b.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := e.c.BroadcastByID(ctx, owner, b.ID); st.Status != core.BcDraft {
+		t.Fatalf("владелец без «Да»: %+v", st)
+	}
+	if err := e.c.AnswerConfirm(ctx, cid, owner, true); err != nil {
+		t.Fatal(err)
+	}
+	e.clock.Add(time.Second)
+	if n, _ := e.c.RunBroadcast(ctx); n == 0 {
+		t.Errorf("после «Да» ничего не ушло")
 	}
 }

@@ -2,6 +2,8 @@ package core
 
 import (
 	"context"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -158,16 +160,61 @@ func (c *Core) TestBroadcast(ctx context.Context, actorTg, id int64) error {
 	}
 }
 
-// StartBroadcast запускает черновик. Нужно право broadcast. Пока идёт другая рассылка: ErrBroadcastBusy.
-// На старте считается число получателей.
-func (c *Core) StartBroadcast(ctx context.Context, actorTg, id int64) (Broadcast, error) {
-	var out Broadcast
-	err := c.asAdmin(ctx, actorTg, PermBroadcast, "broadcast.start", func(tx Tx, _ Admin, now time.Time) (string, map[string]string, error) {
-		b, err := tx.Broadcast(id)
+// broadcastStartPayload это то, что владелец видит и подтверждает перед запуском рассылки: кому, сколько и что.
+type broadcastStartPayload struct {
+	ID      int64  `json:"id"`
+	By      int64  `json:"by"`
+	Segment string `json:"segment"`
+	Total   int    `json:"total"`
+	Preview string `json:"preview"`
+	Hash    string `json:"hash"`
+}
+
+func broadcastHash(b Broadcast) string {
+	return hex.EncodeToString(sha(b.Segment + "\x00" + b.Text + "\x00" + b.ButtonText + "\x00" + b.ButtonURL))
+}
+
+// StartBroadcast просит запустить черновик. Нужно право broadcast. Рассылка уходит всем абонентам сегмента,
+// поэтому запуск ждёт «Да» владельца в Telegram, даже если просит сам владелец (угнанная сессия не разошлёт текст).
+// Владелец видит сегмент, число получателей и начало текста. Отдаёт номер подтверждения.
+// Пока идёт другая рассылка: ErrBroadcastBusy сразу.
+func (c *Core) StartBroadcast(ctx context.Context, actorTg, id int64) (int64, error) {
+	if _, err := c.Require(ctx, actorTg, PermBroadcast, "broadcast.start"); err != nil {
+		return 0, err
+	}
+	b, err := c.store.BroadcastByID(ctx, id)
+	if err != nil {
+		return 0, err
+	}
+	if b.Status != BcDraft {
+		return 0, ErrInvalid
+	}
+	if cur, err := c.runningBroadcast(ctx); err != nil {
+		return 0, err
+	} else if cur.ID != 0 {
+		return 0, ErrBroadcastBusy
+	}
+	total, err := c.store.SegmentCount(ctx, b.Segment, c.clock.Now())
+	if err != nil {
+		return 0, err
+	}
+	preview := []rune(b.Text)
+	return c.RequestAction(ctx, actorTg, "broadcast_start", broadcastStartPayload{ID: id, By: actorTg, Segment: b.Segment,
+		Total: total, Preview: string(preview[:min(len(preview), 200)]), Hash: broadcastHash(b)})
+}
+
+// onBroadcastApproved запускает рассылку после «Да» владельца. Текст должен остаться тем, что владелец видел.
+func (c *Core) onBroadcastApproved(ctx context.Context, payload []byte) error {
+	var p broadcastStartPayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return err
+	}
+	return c.asAdmin(ctx, p.By, PermBroadcast, "broadcast.start", func(tx Tx, _ Admin, now time.Time) (string, map[string]string, error) {
+		b, err := tx.Broadcast(p.ID)
 		if err != nil {
 			return "", nil, err
 		}
-		if b.Status != BcDraft {
+		if b.Status != BcDraft || broadcastHash(b) != p.Hash {
 			return "", nil, ErrInvalid
 		}
 		if _, err := tx.RunningBroadcast(); err == nil {
@@ -179,7 +226,7 @@ func (c *Core) StartBroadcast(ctx context.Context, actorTg, id int64) (Broadcast
 		if err != nil {
 			return "", nil, err
 		}
-		if ok, err := tx.StartBroadcast(id, total, now); err != nil || !ok {
+		if ok, err := tx.StartBroadcast(p.ID, total, now); err != nil || !ok {
 			if errors.Is(err, ErrDuplicate) {
 				err = ErrBroadcastBusy
 			}
@@ -188,11 +235,8 @@ func (c *Core) StartBroadcast(ctx context.Context, actorTg, id int64) (Broadcast
 			}
 			return "", nil, err
 		}
-		b.Status, b.Total, b.StartedAt = BcRunning, total, now
-		out = b
-		return itoa(id), map[string]string{"segment": b.Segment, "total": itoa(int64(total))}, nil
+		return itoa(p.ID), map[string]string{"segment": b.Segment, "total": itoa(int64(total))}, nil
 	})
-	return out, err
 }
 
 // CancelBroadcast отменяет черновик или идущую рассылку. Нужно право broadcast. Идущая останавливается

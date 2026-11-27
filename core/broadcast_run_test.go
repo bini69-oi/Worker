@@ -9,6 +9,19 @@ import (
 	"github.com/bini69-oi/worker/core"
 )
 
+// start просит запуск и отвечает «Да» владельца: без него рассылка не идёт.
+func (e *bcEnv) start(actor, id int64) (core.Broadcast, error) {
+	ctx := context.Background()
+	cid, err := e.c.StartBroadcast(ctx, actor, id)
+	if err != nil {
+		return core.Broadcast{}, err
+	}
+	if err := e.c.AnswerConfirm(ctx, cid, owner, true); err != nil {
+		return core.Broadcast{}, err
+	}
+	return e.c.BroadcastByID(ctx, owner, id)
+}
+
 // bigEnv заводит n абонентов (с Telegram ID 10000+i), запускает рассылку всем и отдаёт её.
 func (e *bcEnv) running(t *testing.T, n int) core.Broadcast {
 	t.Helper()
@@ -18,7 +31,7 @@ func (e *bcEnv) running(t *testing.T, n int) core.Broadcast {
 			t.Fatal(err)
 		}
 	}
-	b, err := e.c.StartBroadcast(ctx, owner, e.draft(t, core.SegAll).ID)
+	b, err := e.start(owner, e.draft(t, core.SegAll).ID)
 	if err != nil {
 		t.Fatal(err)
 	}

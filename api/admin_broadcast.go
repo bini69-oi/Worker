@@ -102,8 +102,8 @@ func (a *adminAPI) broadcastStart(_ http.ResponseWriter, r *http.Request, ad adm
 	if err != nil {
 		return nil, err
 	}
-	b, err := a.d.Core.StartBroadcast(r.Context(), ad.Admin.TgID, id)
-	return broadcastDTO(b), err
+	cid, err := a.d.Core.StartBroadcast(r.Context(), ad.Admin.TgID, id)
+	return AdminSettingResult{Pending: true, ConfirmID: cid}, err
 }
 
 func (a *adminAPI) broadcastCancel(_ http.ResponseWriter, r *http.Request, ad adminCtx) (any, error) {

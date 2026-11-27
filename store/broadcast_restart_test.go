@@ -39,7 +39,14 @@ func TestBroadcastSurvivesRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if b, err = c.StartBroadcast(ctx, 1, b.ID); err != nil || b.Total != 1000 {
+	cid, err := c.StartBroadcast(ctx, 1, b.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.AnswerConfirm(ctx, cid, 1, true); err != nil {
+		t.Fatal(err)
+	}
+	if b, err = c.BroadcastByID(ctx, 1, b.ID); err != nil || b.Total != 1000 {
 		t.Fatalf("старт: %+v %v", b, err)
 	}
 

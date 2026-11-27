@@ -49,9 +49,13 @@ func TestAdminBroadcastFlow(t *testing.T) {
 	}
 	golden(t, "admin_broadcast_draft", e.get(e.owner, base).Body.Bytes())
 
-	if rec = e.post(e.owner, base+"/start", `{}`); rec.Code != 200 {
+	if rec = e.post(e.owner, base+"/start", `{}`); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"pending":true`) {
 		t.Fatalf("старт: %d %s", rec.Code, rec.Body)
 	}
+	if _, err := e.c.RunBroadcast(contextBG); err != nil || len(e.sender.Messages()) != 1 {
+		t.Fatalf("без «Да» рассылка пошла: %v %d", err, len(e.sender.Messages()))
+	}
+	e.confirmLast(true)
 	// Вторая рассылка, пока идёт первая.
 	rec = e.post(e.owner, "/api/admin/broadcasts", `{"segment":"all","text":"Вторая"}`)
 	var second AdminBroadcast

@@ -106,7 +106,7 @@
         </td>
         <td>
           {#if r.canTest}<button onclick={() => act(r.id, 'test', 'Отправлено вам в Telegram')}>Отправить себе</button>{/if}
-          {#if r.canStart}<button class="primary" onclick={() => act(r.id, 'start', 'Рассылка запущена')}>Запустить</button>{/if}
+          {#if r.canStart}<button class="primary" onclick={() => act(r.id, 'start', 'Подтвердите запуск в Telegram: рассылка пойдёт после «Да»')}>Запустить</button>{/if}
           {#if r.canCancel}<button class="danger" onclick={() => act(r.id, 'cancel', 'Рассылка отменена')}>Отменить</button>{/if}
         </td>
       </tr>
