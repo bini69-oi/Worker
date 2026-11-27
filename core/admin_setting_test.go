@@ -222,3 +222,74 @@ func TestSecurityTopicCannotBeOff(t *testing.T) {
 		t.Errorf("обычную тему выключить можно: %v", err)
 	}
 }
+
+// Пакет докупки с опечаткой: настройка не сохранена, владелец видит пример. Подтверждения «Да» нет: плохое значение
+// отклоняется до запроса.
+func TestAddonsSettingFormat(t *testing.T) {
+	ctx := context.Background()
+	e := newCfgEnv(t)
+	before := len(e.st.Tasks())
+	_, err := e.c.SetSetting(ctx, owner, "addons.traffic", "10ГБ:150")
+	var d interface{ Detail() string }
+	if !errors.Is(err, core.ErrBadSetting) || !errors.As(err, &d) || !strings.Contains(d.Detail(), "10:15000") {
+		t.Fatalf("неверный пакет: %v", err)
+	}
+	if e.cfg.String("addons.traffic") != "" || len(e.st.Tasks()) != before {
+		t.Errorf("плохое значение сохранилось или ушло на «Да»")
+	}
+	// Верный формат: пакеты денежные, меняются через «Да».
+	res, err := e.c.SetSetting(ctx, owner, "addons.traffic", "10:15000,50:50000")
+	if err != nil || !res.Pending || e.cfg.String("addons.traffic") != "" {
+		t.Fatalf("%+v %v", res, err)
+	}
+	confirmLast(t, e, true)
+	if e.cfg.String("addons.traffic") != "10:15000,50:50000" {
+		t.Errorf("после «Да»: %q", e.cfg.String("addons.traffic"))
+	}
+	// Цена устройства это деньги: тоже после «Да», неверный тип отклоняется сразу.
+	if _, err := e.c.SetSetting(ctx, owner, "addons.device_month", "дорого"); !errors.Is(err, core.ErrBadSetting) {
+		t.Errorf("тип цены устройства: %v", err)
+	}
+	if res, err := e.c.SetSetting(ctx, owner, "addons.device_month", "10000"); err != nil || !res.Pending {
+		t.Errorf("цена устройства: %+v %v", res, err)
+	}
+}
+
+func TestAllowIPsNeedsYes(t *testing.T) {
+	ctx := context.Background()
+	e := newCfgEnv(t)
+	if _, err := e.c.SetSetting(ctx, owner, "admin.allow_ips", "не адрес"); !errors.Is(err, core.ErrBadSetting) {
+		t.Fatalf("плохой адрес: %v", err)
+	}
+	res, err := e.c.SetSetting(ctx, owner, "admin.allow_ips", "203.0.113.5, 10.0.0.0/8")
+	if err != nil || !res.Pending {
+		t.Fatalf("%+v %v", res, err)
+	}
+	if e.cfg.String("admin.allow_ips") != "" {
+		t.Fatal("список адресов сменился до «Да»")
+	}
+	confirmLast(t, e, false)
+	if e.cfg.String("admin.allow_ips") != "" {
+		t.Fatal("список сменился после «Нет»")
+	}
+	if _, err := e.c.SetSetting(ctx, owner, "admin.allow_ips", "203.0.113.5"); err != nil {
+		t.Fatal(err)
+	}
+	confirmLast(t, e, true)
+	if e.cfg.String("admin.allow_ips") != "203.0.113.5" {
+		t.Fatalf("после «Да»: %q", e.cfg.String("admin.allow_ips"))
+	}
+	// Сброс списка тоже ждёт «Да»: угнанная сессия не откроет админку всем.
+	res, err = e.c.ResetSetting(ctx, owner, "admin.allow_ips")
+	if err != nil || !res.Pending || e.cfg.String("admin.allow_ips") != "203.0.113.5" {
+		t.Fatalf("сброс: %+v %v", res, err)
+	}
+	confirmLast(t, e, true)
+	if e.cfg.String("admin.allow_ips") != "" {
+		t.Errorf("после «Да» на сброс: %q", e.cfg.String("admin.allow_ips"))
+	}
+	helperWith(t, e.env, 50, core.PermUsers, core.PermGrant)
+	if _, err := e.c.SetSetting(ctx, 50, "admin.allow_ips", "1.1.1.1"); !errors.Is(err, core.ErrOwnerOnly) {
+		t.Errorf("помощник: %v", err)
+	}
+}

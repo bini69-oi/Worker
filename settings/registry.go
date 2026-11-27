@@ -154,6 +154,8 @@ var base = []Def{
 		Desc: "Техработы: абоненты видят текст о работах, админы пользуются ботом. Оплаты и панель работают"},
 	{Key: "lang.default", Kind: KindString, Default: "ru", Group: "texts",
 		Desc: "Язык текстов, если нужного перевода нет"},
+	{Key: "admin.allow_ips", Kind: KindString, Default: "", Group: "http",
+		Desc: "С каких адресов можно открывать админку: IP и сети через запятую, например 203.0.113.5, 10.0.0.0/8. Пусто: с любых. Меняется только через «Да» владельца"},
 	{Key: "http.addr", Kind: KindString, Default: ":8080", Group: "http",
 		Desc: "Адрес, на котором Worker принимает вебхуки (за обратным прокси с https)"},
 	{Key: "bot.token", Kind: KindString, Default: "", Group: "bot", Secret: true,
