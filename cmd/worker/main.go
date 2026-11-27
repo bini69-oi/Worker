@@ -7,6 +7,8 @@
 //	worker backup            зашифрованный бэкап базы в папку backups рядом с базой
 //	worker backup --check F  проверить бэкап: открывается ключом, база целая
 //	worker restore F         восстановить базу из бэкапа (служба остановлена)
+//	worker update [--version v1.2.3]  обновить бинарник из подписанного релиза (от root)
+//	worker version           версия сборки (без .env)
 //	worker sign keygen       создать пару ключей подписи релизов (без .env)
 package main
 
@@ -28,6 +30,10 @@ func main() {
 	base := slog.NewJSONHandler(os.Stdout, nil)
 	log := slog.New(base)
 
+	if len(os.Args) == 2 && os.Args[1] == "version" {
+		fmt.Println(version)
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "sign" {
 		if err := signCommand(os.Args[2:], os.Stdout); err != nil {
 			fmt.Fprintln(os.Stderr, "ошибка:", err)
@@ -36,7 +42,7 @@ func main() {
 		return
 	}
 
-	env, warns, err := loadEnv(".env", os.Getenv)
+	env, warns, err := loadEnv(envPath(os.Getenv), os.Getenv)
 	for _, w := range warns {
 		log.Warn(w)
 	}

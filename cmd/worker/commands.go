@@ -23,6 +23,9 @@ func command(env Env, args []string, in io.Reader, out io.Writer) error {
 	if len(args) > 0 && args[0] == "backup" {
 		return backupCommand(env, args[1:], out)
 	}
+	if len(args) > 0 && args[0] == "update" {
+		return updateCommand(env, args[1:], out)
+	}
 	if len(args) > 0 && args[0] == "restore" {
 		return restoreCommand(env, args[1:], out)
 	}
@@ -36,7 +39,7 @@ func command(env Env, args []string, in io.Reader, out io.Writer) error {
 	case "import panel --apply":
 		return importPanel(env, true, out)
 	}
-	return errors.New("неизвестная команда, есть: rotate, admin password, import panel [--apply], backup [--check файл], restore файл")
+	return errors.New("неизвестная команда, есть: rotate, admin password, import panel [--apply], backup [--check файл], restore файл, update [--version v1.2.3]")
 }
 
 // ownerPassword задаёт пароль владельца. Пароль просится дважды; в терминале ввод не виден.

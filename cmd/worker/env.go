@@ -32,6 +32,14 @@ var requiredKeys = []string{"BOT_TOKEN", "OWNER_TG_ID", "PUBLIC_URL", "PANEL_URL
 
 const defaultDBPath = "worker.db"
 
+// envPath это файл с настройками: WORKER_ENV_FILE (на сервере /etc/worker/env) или .env в текущей папке.
+func envPath(getenv func(string) string) string {
+	if p := getenv("WORKER_ENV_FILE"); p != "" {
+		return p
+	}
+	return ".env"
+}
+
 // loadEnv читает файл .env (если он есть) и переменные процесса. Переменная процесса важнее файла.
 // Возвращает предупреждения, которые стоит записать в журнал. Ни ошибки, ни предупреждения не содержат значений.
 func loadEnv(path string, getenv func(string) string) (Env, []string, error) {

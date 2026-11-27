@@ -139,3 +139,17 @@ func TestPanelHTTPInside(t *testing.T) {
 		}
 	}
 }
+
+func TestEnvPath(t *testing.T) {
+	if got := envPath(func(string) string { return "" }); got != ".env" {
+		t.Errorf("по умолчанию %q", got)
+	}
+	if got := envPath(func(k string) string {
+		if k == "WORKER_ENV_FILE" {
+			return "/etc/worker/env"
+		}
+		return ""
+	}); got != "/etc/worker/env" {
+		t.Errorf("с переменной %q", got)
+	}
+}
