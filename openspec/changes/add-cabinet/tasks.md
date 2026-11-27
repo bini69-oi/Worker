@@ -30,7 +30,7 @@
 ## 4. Типы и сборка
 
 - [x] 4.1 `cmd/gen-types` и `make types`; проверка: тест генерации на примере структур
-- [ ] 4.2 Проект `web/`: Vite, Svelte, TypeScript, две точки входа, `npm ci`; проверка: `npm run build`
+- [x] 4.2 Проект `web/`: Vite, Svelte, TypeScript, две точки входа, `npm ci`; проверка: `npm run build`
 - [ ] 4.3 `web/embed.go`, заглушка без сборки, кэш статики; проверка: тесты «без сборки», «кэш index.html»
 - [ ] 4.4 Заголовки безопасности `/app/`; проверка: тест заголовков
 - [ ] 4.5 `make web-check`: svelte-check, vitest, размер, `npm audit`; проверка: команда зелёная

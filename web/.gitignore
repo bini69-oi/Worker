@@ -1,0 +1,4 @@
+node_modules/
+# сборка не хранится в git, кроме заглушки, без которой go:embed не соберётся
+build/*
+!build/README.txt
