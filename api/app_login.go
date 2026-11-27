@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/bini69-oi/worker/core"
+	"github.com/bini69-oi/worker/guard"
 )
 
 // webSessionLife это срок cookie сессии браузера, он равен сроку сессии в ядре.
@@ -20,6 +21,9 @@ func (a *App) loginStart(w http.ResponseWriter, r *http.Request) (any, error) {
 	var in EmptyRequest
 	if err := Decode(w, r, &in); err != nil {
 		return nil, err
+	}
+	if !a.loginRate.Allow(guard.Host(r.RemoteAddr)) {
+		return nil, core.ErrTooManyTries
 	}
 	st, err := a.Core.WebLoginStart(r.Context(), info(r))
 	if err != nil {

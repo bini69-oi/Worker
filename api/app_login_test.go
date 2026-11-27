@@ -113,3 +113,34 @@ func TestLoginStartBody(t *testing.T) {
 		t.Fatalf("лишнее поле: %d", rec.Code)
 	}
 }
+
+func TestLoginStartLimitPerIP(t *testing.T) {
+	e := newAppEnv(t)
+	ok, limited := 0, 0
+	for range 15 { // секунда между запросами: общий предел в секунду не мешает, проверяется именно предел входа
+		switch rec := e.req("POST", "/api/app/login", "{}"); rec.Code {
+		case 200:
+			ok++
+		case 429:
+			limited++
+		default:
+			t.Fatalf("статус %d", rec.Code)
+		}
+		e.clock.Add(time.Second)
+	}
+	if ok != 10 || limited != 5 {
+		t.Fatalf("принято %d, отклонено %d, ждали 10 и 5", ok, limited)
+	}
+	// С другого адреса вход открыт, через 10 минут с первого тоже.
+	r := httptest.NewRequest("POST", "/api/app/login", strings.NewReader("{}"))
+	r.RemoteAddr = "10.0.0.2:1"
+	rec := httptest.NewRecorder()
+	e.s.ServeHTTP(rec, r)
+	if rec.Code != 200 {
+		t.Fatalf("другой адрес: %d", rec.Code)
+	}
+	e.clock.Add(10 * time.Minute)
+	if rec := e.req("POST", "/api/app/login", "{}"); rec.Code != 200 {
+		t.Fatalf("после окна: %d", rec.Code)
+	}
+}
