@@ -187,4 +187,5 @@ export interface TopupResponse {
 
 export interface TrafficRequest {
   gb: number;
+  key: string;
 }

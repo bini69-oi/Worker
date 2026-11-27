@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -106,6 +108,7 @@ func signInitData(fields map[string]string, token string) string {
 // req это запрос к API. Заголовки задаются парами «имя, значение».
 func (e *appEnv) req(method, target, body string, headers ...string) *httptest.ResponseRecorder {
 	e.t.Helper()
+	body = e.withKey(target, body)
 	r := httptest.NewRequest(method, target, strings.NewReader(body))
 	r.RemoteAddr = "10.0.0.1:5555"
 	r.Header.Set("User-Agent", "TestBrowser")
@@ -185,4 +188,24 @@ func (e *appEnv) enable(names ...string) {
 			e.t.Fatal(err)
 		}
 	}
+}
+
+var keyCounter atomic.Int64
+
+// withKey добавляет ключ повтора в тело запросов, которым он обязателен, если тест своего не задал:
+// каждый такой запрос это отдельное действие человека. Тесты повтора задают ключ сами.
+func (e *appEnv) withKey(target, body string) string {
+	needs := false
+	for _, p := range []string{"/api/app/buy", "/api/app/addons/", "/api/app/plan/cancel"} {
+		needs = needs || strings.HasPrefix(target, p)
+	}
+	if !needs || strings.Contains(body, `"key"`) || !strings.HasPrefix(strings.TrimSpace(body), "{") {
+		return body
+	}
+	key := fmt.Sprintf(`"key":"auto-%016d"`, keyCounter.Add(1))
+	trimmed := strings.TrimSpace(body)
+	if trimmed == "{}" {
+		return "{" + key + "}"
+	}
+	return "{" + key + "," + trimmed[1:]
 }

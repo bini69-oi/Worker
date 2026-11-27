@@ -95,10 +95,23 @@ type TextsResponse struct {
 	Texts map[string]string `json:"texts"`
 }
 
-// BuyRequest это выбор тарифа и срока для расчёта и покупки.
-type BuyRequest struct {
+// QuoteRequest это выбор тарифа и срока для расчёта цены.
+type QuoteRequest struct {
 	TariffID int64 `json:"tariff_id"`
 	Days     int   `json:"days"`
+}
+
+// BuyRequest это покупка. Key это ключ повтора: страница создаёт случайный на одно действие человека
+// (16-64 знака из латиницы, цифр, `_` и `-`) и шлёт тот же при повторе.
+type BuyRequest struct {
+	TariffID int64  `json:"tariff_id"`
+	Days     int    `json:"days"`
+	Key      string `json:"key"`
+}
+
+// KeyRequest это действие без параметров, кроме ключа повтора: отмена смены тарифа, докупка устройства.
+type KeyRequest struct {
+	Key string `json:"key"`
 }
 
 // TariffsResponse это тарифы, которые продаются.
@@ -240,5 +253,6 @@ type PackView struct {
 
 // TrafficRequest это выбранный пакет трафика.
 type TrafficRequest struct {
-	GB int64 `json:"gb"`
+	GB  int64  `json:"gb"`
+	Key string `json:"key"`
 }

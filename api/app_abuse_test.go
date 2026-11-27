@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -164,5 +165,98 @@ func TestLogHasRouteNotPath(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "/api/app/login/{id}") {
 		t.Fatalf("в журнале нет шаблона маршрута: %s", buf.String())
+	}
+}
+
+// Двойной клик и повтор после потерянного ответа с тем же ключом списывают один раз.
+func TestBuySameKeyChargedOnce(t *testing.T) {
+	e := newAppEnv(t)
+	tok := e.login(21)
+	tr := e.tariff("Месяц", 25000, 3, 100)
+	u, _ := e.c.UserByTg(t.Context(), 21)
+	if _, err := e.c.AdminAdjust(t.Context(), testOwner, u.ID, 50000, "x"); err != nil {
+		t.Fatal(err)
+	}
+	body := fmt.Sprintf(`{"tariff_id":%d,"days":30,"key":"click-0123456789abc"}`, tr.ID)
+	codes := make(chan int, 2)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Go(func() { codes <- e.as(tok, "POST", "/api/app/buy", body).Code })
+	}
+	wg.Wait()
+	close(codes)
+	for c := range codes {
+		if c != 200 {
+			t.Errorf("статус %d", c)
+		}
+	}
+	end, _ := e.c.UserByTg(t.Context(), 21)
+	sub, _ := e.c.Sub(t.Context(), u.ID)
+	if end.Balance != 25000 || !sub.ExpiresAt.Equal(t0.Add(30*24*time.Hour)) {
+		t.Fatalf("баланс %d (ждали 25000), подписка до %s (ждали +30 дней)", end.Balance, sub.ExpiresAt)
+	}
+	// Повтор позже тем же ключом: тот же ответ, ничего не списано.
+	e.clock.Add(time.Second)
+	rec := e.as(tok, "POST", "/api/app/buy", body)
+	var out BuyResponse
+	decode(t, rec, &out)
+	if rec.Code != 200 || !out.Sub.ExpiresAt.Equal(sub.ExpiresAt) {
+		t.Fatalf("повтор: %d %s", rec.Code, rec.Body)
+	}
+	if again, _ := e.c.UserByTg(t.Context(), 21); again.Balance != 25000 {
+		t.Fatalf("повтор списал: %d", again.Balance)
+	}
+}
+
+func TestKeyRequiredAndChecked(t *testing.T) {
+	e := newAppEnv(t)
+	tok := e.login(21)
+	for name, c := range map[string][2]string{
+		"покупка без ключа":   {"/api/app/buy", `{"tariff_id":1,"days":30,"key":""}`},
+		"покупка с коротким":  {"/api/app/buy", `{"tariff_id":1,"days":30,"key":"abc"}`},
+		"трафик с пробелом":   {"/api/app/addons/traffic", `{"gb":10,"key":"has space 0123456789"}`},
+		"устройство длинный":  {"/api/app/addons/device", `{"key":"` + strings.Repeat("a", 65) + `"}`},
+		"отмена с кириллицей": {"/api/app/plan/cancel", `{"key":"ключключключключключключ"}`},
+	} {
+		e.clock.Add(200 * time.Millisecond)
+		if rec := e.as(tok, "POST", c[0], c[1]); rec.Code != 400 {
+			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
+		}
+	}
+}
+
+// Докупка и отмена смены с одним ключом тоже срабатывают один раз.
+func TestAddonsAndCancelSameKeyOnce(t *testing.T) {
+	e := newAppEnv(t)
+	if err := e.cfg.Set("addons.device_month", "10000"); err != nil {
+		t.Fatal(err)
+	}
+	tok := e.login(22)
+	month := e.tariff("Месяц", 25000, 3, 100)
+	year := e.tariff("Год", 100000, 5, 0)
+	e.bought(22, month)
+	u, _ := e.c.UserByTg(t.Context(), 22)
+	for range 3 {
+		e.clock.Add(300 * time.Millisecond)
+		if rec := e.as(tok, "POST", "/api/app/addons/device", `{"key":"dev-0123456789abcdef"}`); rec.Code != 200 {
+			t.Fatalf("докупка: %d %s", rec.Code, rec.Body)
+		}
+	}
+	sub, _ := e.c.Sub(t.Context(), u.ID)
+	if sub.ExtraDevices != 1 {
+		t.Fatalf("устройств докуплено %d", sub.ExtraDevices)
+	}
+	e.topup(22, 200000)
+	e.as(tok, "POST", "/api/app/buy", fmt.Sprintf(`{"tariff_id":%d,"days":30}`, year.ID))
+	before, _ := e.c.UserByTg(t.Context(), 22)
+	for range 3 {
+		e.clock.Add(300 * time.Millisecond)
+		if rec := e.as(tok, "POST", "/api/app/plan/cancel", `{"key":"cancel-0123456789abc"}`); rec.Code != 200 {
+			t.Fatalf("отмена: %d %s", rec.Code, rec.Body)
+		}
+	}
+	after, _ := e.c.UserByTg(t.Context(), 22)
+	if after.Balance != before.Balance+100000 {
+		t.Fatalf("возврат %d, ждали 100000 один раз", after.Balance-before.Balance)
 	}
 }

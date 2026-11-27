@@ -3,6 +3,7 @@ package coretest
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"maps"
 	"time"
 
@@ -124,4 +125,8 @@ func (s *Store) UserSession(_ context.Context, hash []byte) (core.UserSession, e
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return (&tx{st: s.st}).UserSession(hash)
+}
+
+func (t *tx) HasNotice(userID int64, kind, ref string) (bool, error) {
+	return t.st.notices[fmt.Sprintf("%d|%s|%s", userID, kind, ref)], nil
 }

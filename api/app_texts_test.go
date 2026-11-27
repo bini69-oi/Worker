@@ -88,7 +88,7 @@ func TestEnglishCabinet(t *testing.T) {
 	golden(t, "texts_ru_app", ru.Body.Bytes())
 
 	// Ошибки тоже на языке абонента.
-	rec = do("POST", "/api/app/buy", `{"tariff_id":999,"days":30}`, append(auth, "Content-Type", "application/json")...)
+	rec = do("POST", "/api/app/buy", `{"tariff_id":999,"days":30,"key":"abcdefabcdefabcdef"}`, append(auth, "Content-Type", "application/json")...)
 	var bad ErrorBody
 	decode(t, rec, &bad)
 	if bad.Code != "E1001" || bad.Text != "Not found" {

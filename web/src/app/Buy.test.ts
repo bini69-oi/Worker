@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError } from '../lib/api'
+import { ApiError, NetworkError } from '../lib/api'
 import { golden } from '../lib/testing/golden'
 import { fakeApp, flushSync, render } from '../lib/testing/mountTexts'
 import type { BuyResponse, ErrorBody, MeResponse, QuoteResponse, TariffsResponse } from '../lib/types.gen'
@@ -72,7 +72,7 @@ describe('Buy', () => {
     expect(root.textContent).not.toContain('Не хватает')
     click(root, 'Оплатить с баланса')
     await vi.waitFor(() => expect(window.location.hash).toBe('#/connect'))
-    expect(buy).toHaveBeenCalledWith(1, 30)
+    expect(buy).toHaveBeenCalledWith(1, 30, expect.stringMatching(/^[A-Za-z0-9_-]{16,64}$/))
   })
 
   it('не хватает: недостача и «Пополнить на разницу», выбор запоминается покупкой, переход на пополнение с суммой', async () => {
@@ -110,5 +110,21 @@ describe('Buy', () => {
     click(root, 'Оплатить с баланса')
     expect(buy).toHaveBeenCalledTimes(1)
     resolve(golden<BuyResponse>('buy'))
+  })
+})
+
+describe('Buy: ключ повтора', () => {
+  it('после обрыва связи повтор шлёт тот же ключ, после ответа сервера новое действие новый', async () => {
+    const buy = vi
+      .fn()
+      .mockRejectedValueOnce(new NetworkError())
+      .mockResolvedValue(golden<BuyResponse>('buy'))
+    const { root } = await show({ tariff: '1', days: '30' }, { quote: vi.fn(async () => golden<QuoteResponse>('quote_enough')), buy })
+    click(root, 'Оплатить с баланса')
+    await vi.waitFor(() => expect(buy).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect((root.querySelector('button.btn') as HTMLButtonElement).disabled).toBe(false))
+    click(root, 'Оплатить с баланса')
+    await vi.waitFor(() => expect(buy).toHaveBeenCalledTimes(2))
+    expect(buy.mock.calls[1]?.[2]).toBe(buy.mock.calls[0]?.[2])
   })
 })

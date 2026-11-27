@@ -30,12 +30,6 @@ type LimitDetails struct {
 	Max int64 `json:"max"`
 }
 
-// moneyError это core.ErrNotEnoughMoney с цифрами покупки для ответа.
-type moneyError struct{ MoneyDetails }
-
-func (e *moneyError) Error() string { return core.ErrNotEnoughMoney.Error() }
-func (e *moneyError) Unwrap() error { return core.ErrNotEnoughMoney }
-
 // statuses это HTTP-статусы ошибок ядра. Ошибка ядра без записи здесь отвечает 409: запрос верный,
 // но состояние абонента его не допускает (пробный уже был, смена тарифа уже ждёт).
 var statuses = map[*core.Error]int{
@@ -86,9 +80,9 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		lang = lerr.lang
 	}
 	body := ErrorBody{Code: ce.Code, Text: s.deps.Text(ce.Key, lang)}
-	var me *moneyError
-	if errors.As(err, &me) {
-		body.Money = &me.MoneyDetails
+	var need *core.NeedMoney
+	if errors.As(err, &need) {
+		body.Money = &MoneyDetails{Price: need.Price, Balance: need.Balance, Missing: need.Missing}
 	}
 	var lim *core.LimitError
 	if errors.As(err, &lim) {

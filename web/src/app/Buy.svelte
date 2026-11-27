@@ -1,6 +1,7 @@
 <script lang="ts">
   // Покупка: тариф, срок, итог с ценой и балансом. Не хватает денег: недостача и «Пополнить на разницу».
   import Async from '../lib/Async.svelte'
+  import { actionKey, withKey } from '../lib/actionKey'
   import { ApiError } from '../lib/api'
   import { useT } from '../lib/context'
   import { date, devices, money, traffic } from '../lib/texts'
@@ -24,6 +25,7 @@
   const lang = $derived($me.status === 'ready' ? $me.data.lang : 'ru')
 
   let quote = $state<{ view: 'loading' } | { view: 'ready'; q: QuoteResponse } | { view: 'error'; text: string }>({ view: 'loading' })
+  const key = actionKey()
   let busy = $state(false)
   let failure = $state('')
 
@@ -46,7 +48,7 @@
     busy = true
     failure = ''
     try {
-      const r = await ep.buy(tariffId, days)
+      const r = await withKey(key, (k) => ep.buy(tariffId, days, k))
       await me.refresh()
       router.go(r.queued ? '/sub' : '/connect')
     } catch (e) {

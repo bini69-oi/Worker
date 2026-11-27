@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/bini69-oi/worker/core"
@@ -45,9 +44,9 @@ func (a *App) tariffs(_ http.ResponseWriter, r *http.Request, _ Auth) (any, erro
 	return out, nil
 }
 
-// choice разбирает тело «тариф и срок». Нулевые и отрицательные значения это неверные данные.
-func choice(w http.ResponseWriter, r *http.Request) (BuyRequest, error) {
-	var in BuyRequest
+// choice разбирает тело «тариф и срок» для расчёта. Нулевые и отрицательные значения это неверные данные.
+func choice(w http.ResponseWriter, r *http.Request) (QuoteRequest, error) {
+	var in QuoteRequest
 	if err := Decode(w, r, &in); err != nil {
 		return in, err
 	}
@@ -73,31 +72,26 @@ func (a *App) quote(w http.ResponseWriter, r *http.Request, au Auth) (any, error
 	return out, nil
 }
 
-// buy покупает тариф. Не хватает денег: ядро запоминает выбор (после пополнения подписка выдастся сама),
-// ответ несёт цену, баланс и недостачу.
+// buy покупает тариф. Ключ повтора обязателен: двойной клик и повтор после «Нет связи» не спишут второй раз.
+// Не хватает денег: ядро запоминает выбор (после пополнения подписка выдастся сама), ответ несёт цену, баланс и недостачу.
 func (a *App) buy(w http.ResponseWriter, r *http.Request, au Auth) (any, error) {
-	in, err := choice(w, r)
+	var in BuyRequest
+	if err := Decode(w, r, &in); err != nil {
+		return nil, err
+	}
+	if in.TariffID <= 0 || in.Days <= 0 || in.Days > 3650 {
+		return nil, core.ErrInvalid
+	}
+	o, err := a.Core.BuyOrRemember(r.Context(), au.User.ID, in.TariffID, in.Days, in.Key)
 	if err != nil {
 		return nil, err
 	}
-	ctx := r.Context()
-	sub, err := a.Core.Buy(ctx, au.User.ID, in.TariffID, in.Days)
-	if errors.Is(err, core.ErrNotEnoughMoney) {
-		q, qerr := a.Core.Quote(ctx, au.User.ID, in.TariffID, in.Days)
-		if qerr != nil {
-			return nil, qerr
-		}
-		if rerr := a.Core.RememberBuy(ctx, au.User.ID, in.TariffID, in.Days); rerr != nil {
-			return nil, rerr
-		}
-		return nil, &moneyError{MoneyDetails{Price: q.Price, Balance: q.Balance, Missing: q.Missing}}
+	if o.Short != nil {
+		return nil, &core.NeedMoney{Price: o.Short.Price, Balance: o.Short.Balance, Missing: o.Short.Missing}
 	}
+	v, err := a.subView(r, o.Sub)
 	if err != nil {
 		return nil, err
 	}
-	v, err := a.subView(r, sub)
-	if err != nil {
-		return nil, err
-	}
-	return BuyResponse{Sub: *v, Queued: sub.NextTariffID != 0}, nil
+	return BuyResponse{Sub: *v, Queued: o.Queued}, nil
 }

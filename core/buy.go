@@ -132,5 +132,5 @@ func needMoney(tx Tx, userID, price int64, err error) error {
 	if uerr != nil {
 		return err
 	}
-	return &NeedMoney{Missing: price - u.Balance}
+	return &NeedMoney{Missing: price - u.Balance, Price: price, Balance: u.Balance}
 }

@@ -43,6 +43,8 @@ var (
 // NeedMoney это «не хватает денег» с суммой, которой не хватает. errors.Is(err, ErrNotEnoughMoney) для неё истинно.
 type NeedMoney struct {
 	Missing int64 // копейки
+	Price   int64 // цена покупки
+	Balance int64 // баланс абонента
 }
 
 func (e *NeedMoney) Error() string { return ErrNotEnoughMoney.Error() }

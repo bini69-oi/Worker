@@ -109,11 +109,24 @@ func (t *coreTx) PruneCabinet(before time.Time) error {
 		"DELETE FROM user_sessions WHERE expires_at < ? OR closed_at < ?", before.Unix(), before.Unix()); err != nil {
 		return err
 	}
-	_, err := t.q.ExecContext(t.ctx, "DELETE FROM user_logins WHERE expires_at < ?", before.Unix())
+	if _, err := t.q.ExecContext(t.ctx, "DELETE FROM user_logins WHERE expires_at < ?", before.Unix()); err != nil {
+		return err
+	}
+	// Отметки ключей повтора покупок нужны на время, пока страница может повторить запрос.
+	_, err := t.q.ExecContext(t.ctx, `DELETE FROM notices WHERE kind LIKE 'req\_%' ESCAPE '\' AND sent_at < ?`, before.Unix())
 	return err
 }
 
 // UserSession читает сессию с читающего соединения.
 func (s *CoreStore) UserSession(ctx context.Context, hash []byte) (core.UserSession, error) {
 	return (&coreTx{ctx: ctx, q: s.db.R}).UserSession(hash)
+}
+
+func (t *coreTx) HasNotice(userID int64, kind, ref string) (bool, error) {
+	var one int
+	err := t.q.QueryRowContext(t.ctx, "SELECT 1 FROM notices WHERE user_id = ? AND kind = ? AND ref = ?", userID, kind, ref).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
 }

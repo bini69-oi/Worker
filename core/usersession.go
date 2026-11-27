@@ -52,6 +52,8 @@ type CabinetTx interface {
 	UserLoginByHash(idHash []byte) (UserLogin, error)
 	UserLoginByNonce(nonceHash []byte) (UserLogin, error)
 	SaveUserLogin(l UserLogin) error
+	// HasNotice говорит, была ли такая отметка. Ключи повтора проверяются до действия и записываются после него.
+	HasNotice(userID int64, kind, ref string) (bool, error)
 	// PruneCabinet стирает закрытые и истёкшие сессии и старые запросы входа, которым срок вышел до before.
 	PruneCabinet(before time.Time) error
 }

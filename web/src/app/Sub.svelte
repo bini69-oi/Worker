@@ -1,6 +1,7 @@
 <script lang="ts">
   // Подписка: тариф, срок, лимиты, автопродление, ждущая смена тарифа с отменой, докупка трафика и устройства.
   import Async from '../lib/Async.svelte'
+  import { actionKey, withKey } from '../lib/actionKey'
   import { ApiError } from '../lib/api'
   import { useT } from '../lib/context'
   import { date, devices, money, traffic } from '../lib/texts'
@@ -13,6 +14,9 @@
   const me = app.me
 
   /** Что ждёт второго нажатия: 'cancel' (отмена смены), 'revoke' (новая ссылка), 'all' (выйти везде). */
+  // Ключ повтора на каждое действие: при обрыве связи нажатие повторяется с тем же ключом.
+  const keys: Record<string, ReturnType<typeof actionKey>> = {}
+  const keyFor = (name: string) => (keys[name] ??= actionKey())
   let asking = $state('')
   let busy = $state(false)
   let failure = $state('')
@@ -71,7 +75,7 @@
           <div class="card stack next">
             <p>{$t('app.sub_next', { date: date(s.next.starts_at, m.lang), tariff: s.next.tariff })}</p>
             {#if asking === 'cancel'}
-              <button class="btn danger wide" type="button" disabled={busy} onclick={() => run(() => ep.cancelPlan())}>{$t('app.sub_cancel_confirm')}</button>
+              <button class="btn danger wide" type="button" disabled={busy} onclick={() => run(() => withKey(keyFor('cancel'), (k) => ep.cancelPlan(k)))}>{$t('app.sub_cancel_confirm')}</button>
             {:else}
               <button class="btn line wide" type="button" onclick={() => (asking = 'cancel')}>{$t('app.sub_cancel')}</button>
             {/if}
@@ -82,12 +86,12 @@
           <div class="card stack">
             <h2>{$t('app.sub_addons')}</h2>
             {#each m.addons.traffic as p (p.gb)}
-              <button class="addon" type="button" disabled={busy} onclick={() => run(() => ep.buyTraffic(p.gb))}>
+              <button class="addon" type="button" disabled={busy} onclick={() => run(() => withKey(keyFor('traffic' + p.gb), (k) => ep.buyTraffic(p.gb, k)))}>
                 <span>{$t('app.sub_add_traffic', { gb: p.gb })}</span><b class="num">{money($t, p.price, m.lang)}</b>
               </button>
             {/each}
             {#if m.addons.device_price > 0}
-              <button class="addon" type="button" disabled={busy} onclick={() => run(() => ep.buyDevice())}>
+              <button class="addon" type="button" disabled={busy} onclick={() => run(() => withKey(keyFor('device'), (k) => ep.buyDevice(k)))}>
                 <span>{$t('app.sub_add_device')}</span><b class="num">{money($t, m.addons.device_price, m.lang)}</b>
               </button>
             {/if}

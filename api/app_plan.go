@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/bini69-oi/worker/core"
@@ -26,13 +25,14 @@ func (a *App) addonsView(r *http.Request, userID int64) (AddonsView, error) {
 	return out, nil
 }
 
-// cancelPlan отменяет оплаченную смену тарифа, деньги возвращаются на баланс. Двойной клик возвращает их один раз.
+// cancelPlan отменяет оплаченную смену тарифа, деньги возвращаются на баланс. Ключ повтора обязателен: двойной клик
+// возвращает деньги один раз.
 func (a *App) cancelPlan(w http.ResponseWriter, r *http.Request, au Auth) (any, error) {
-	var in EmptyRequest
+	var in KeyRequest
 	if err := Decode(w, r, &in); err != nil {
 		return nil, err
 	}
-	if err := a.Core.CancelPlan(r.Context(), au.User.ID); err != nil {
+	if _, err := a.Core.CancelPlanOnce(r.Context(), au.User.ID, in.Key); err != nil {
 		return nil, err
 	}
 	return a.currentSub(r, au)
@@ -46,47 +46,23 @@ func (a *App) buyTraffic(w http.ResponseWriter, r *http.Request, au Auth) (any, 
 	if in.GB <= 0 || in.GB > 10000 {
 		return nil, core.ErrInvalid
 	}
-	sub, err := a.Core.BuyTraffic(r.Context(), au.User.ID, in.GB)
+	sub, _, err := a.Core.BuyTrafficOnce(r.Context(), au.User.ID, in.GB, in.Key)
 	if err != nil {
-		return nil, a.addonMoney(r, au, err, func(o AddonsView) int64 {
-			for _, p := range o.Traffic {
-				if p.GB == in.GB {
-					return p.Price
-				}
-			}
-			return 0
-		})
+		return nil, err
 	}
 	return a.subView(r, sub)
 }
 
 func (a *App) buyDevice(w http.ResponseWriter, r *http.Request, au Auth) (any, error) {
-	var in EmptyRequest
+	var in KeyRequest
 	if err := Decode(w, r, &in); err != nil {
 		return nil, err
 	}
-	sub, err := a.Core.BuyDevice(r.Context(), au.User.ID)
+	sub, _, err := a.Core.BuyDeviceOnce(r.Context(), au.User.ID, in.Key)
 	if err != nil {
-		return nil, a.addonMoney(r, au, err, func(o AddonsView) int64 { return o.DevicePrice })
+		return nil, err
 	}
 	return a.subView(r, sub)
-}
-
-// addonMoney дополняет «не хватает денег» ценой докупки, чтобы страница показала недостачу и кнопку пополнения.
-func (a *App) addonMoney(r *http.Request, au Auth, err error, price func(AddonsView) int64) error {
-	if !errors.Is(err, core.ErrNotEnoughMoney) {
-		return err
-	}
-	var need *core.NeedMoney
-	if !errors.As(err, &need) {
-		return err
-	}
-	offer, oerr := a.addonsView(r, au.User.ID)
-	if oerr != nil {
-		return err
-	}
-	p := price(offer)
-	return &moneyError{MoneyDetails{Price: p, Balance: max(p-need.Missing, 0), Missing: need.Missing}}
 }
 
 // currentSub отдаёт подписку абонента в том виде, в каком её показывает главная.

@@ -89,7 +89,7 @@ describe('Sub: докупка', () => {
     const buyDevice = vi.fn(async () => golden<SubView>('trial'))
     const { root } = await show(offer, { buyTraffic, buyDevice })
     click(root, '+50 ГБ')
-    await vi.waitFor(() => expect(buyTraffic).toHaveBeenCalledWith(50))
+    await vi.waitFor(() => expect(buyTraffic).toHaveBeenCalledWith(50, expect.stringMatching(/^[A-Za-z0-9_-]{16,64}$/)))
     await new Promise((r) => setTimeout(r, 10))
     click(root, '+1 устройство')
     await vi.waitFor(() => expect(buyDevice).toHaveBeenCalledTimes(1))

@@ -31,7 +31,7 @@ export function endpoints(api: Api) {
     trial: () => api.post<SubView>('/trial'),
     tariffs: () => api.get<TariffsResponse>('/tariffs'),
     quote: (tariffId: number, days: number) => api.post<QuoteResponse>('/quote', { tariff_id: tariffId, days }),
-    buy: (tariffId: number, days: number) => api.post<BuyResponse>('/buy', { tariff_id: tariffId, days }),
+    buy: (tariffId: number, days: number, key: string) => api.post<BuyResponse>('/buy', { tariff_id: tariffId, days, key }),
     topup: (gateway: string, amount: number) => api.post<TopupResponse>('/topup', { gateway, amount }),
     payment: (id: number) => api.get<PaymentResponse>(`/payments/${id}`),
     history: () => api.get<HistoryResponse>('/history'),
@@ -43,9 +43,9 @@ export function endpoints(api: Api) {
     deleteDevice: (hwid: string) => api.del<Record<string, never>>(`/devices/${encodeURIComponent(hwid)}`),
     resetDevices: () => api.post<Record<string, never>>('/devices/reset'),
     revokeLink: () => api.post<ConnectResponse>('/link/revoke'),
-    cancelPlan: () => api.post<SubView>('/plan/cancel'),
-    buyTraffic: (gb: number) => api.post<SubView>('/addons/traffic', { gb }),
-    buyDevice: () => api.post<SubView>('/addons/device'),
+    cancelPlan: (key: string) => api.post<SubView>('/plan/cancel', { key }),
+    buyTraffic: (gb: number, key: string) => api.post<SubView>('/addons/traffic', { gb, key }),
+    buyDevice: (key: string) => api.post<SubView>('/addons/device', { key }),
   }
 }
 

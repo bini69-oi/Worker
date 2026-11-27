@@ -115,3 +115,40 @@ func TestCleanCabinetOnSQLite(t *testing.T) {
 		t.Fatalf("чистка без индекса: %s", plan)
 	}
 }
+
+// Отметки ключей повтора стираются через сутки, остальные уведомления остаются.
+func TestCleanCabinetKeepsOtherNotices(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "w.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s := NewCoreStore(db)
+	clock := coretest.NewClock(tNow)
+	c := core.New(core.Deps{Store: s, Clock: clock, Config: coretest.NewConfig(t), OwnerID: 1})
+	ctx := context.Background()
+	if err := s.Tx(ctx, func(tx core.Tx) error {
+		if _, err := tx.AddNotice(1, "req_buy", "key-aaaaaaaaaaaaaaaa", tNow); err != nil {
+			return err
+		}
+		_, err := tx.AddNotice(1, "remind", "1:2:3", tNow)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	clock.Add(25 * time.Hour)
+	if _, err := c.CleanCabinet(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var kinds string
+	rows, _ := db.W.Query("SELECT kind FROM notices ORDER BY kind")
+	defer rows.Close()
+	for rows.Next() {
+		var k string
+		_ = rows.Scan(&k)
+		kinds += k + ","
+	}
+	if kinds != "remind," {
+		t.Fatalf("остались отметки: %q", kinds)
+	}
+}
