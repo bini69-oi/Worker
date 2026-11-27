@@ -1,0 +1,7 @@
+{
+  "lang": "en",
+  "texts": {
+    "app.hello": "en:app.hello",
+    "err.x": "en:err.x"
+  }
+}

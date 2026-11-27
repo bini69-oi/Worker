@@ -116,6 +116,7 @@ func TestTextsOpenAndPerLang(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("тексты без сессии: %d", rec.Code)
 	}
+	golden(t, "texts_en", rec.Body.Bytes())
 	decode(t, rec, &out)
 	if out.Lang != "en" || out.Texts["app.hello"] != "en:app.hello" || out.Texts["err.x"] != "en:err.x" {
 		t.Fatalf("ответ: %+v", out)

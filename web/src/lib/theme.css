@@ -1,0 +1,57 @@
+/* Цвета и размеры страницы. Светлая тема по умолчанию. Тёмная включается тремя способами:
+   data-theme="dark" (его ставит Telegram или настройка системы через theme.ts), а до загрузки скрипта
+   prefers-color-scheme. В Telegram поверх этого ложатся цвета его темы (--bg, --text и другие). */
+:root {
+  color-scheme: light;
+  --bg: #f3f0ea;
+  --surface: #fffdf8;
+  --surface-2: #ebe7de;
+  --text: #1d1c1a;
+  --hint: #6f6b61;
+  --line: #ddd8cb;
+  --accent: #1f6f5c;
+  --accent-text: #ffffff;
+  --link: #1f6f5c;
+  --danger: #b3382c;
+  --ok: #2b7a4b;
+  --warn: #a8691a;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --gap: 16px;
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #121413;
+  --surface: #1b1e1c;
+  --surface-2: #262a27;
+  --text: #ece9e1;
+  --hint: #959a91;
+  --line: #2c312d;
+  --accent: #5fd1a7;
+  --accent-text: #0b1f17;
+  --link: #5fd1a7;
+  --danger: #ff8a7a;
+  --ok: #6fd391;
+  --warn: #e0a85a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --bg: #121413;
+    --surface: #1b1e1c;
+    --surface-2: #262a27;
+    --text: #ece9e1;
+    --hint: #959a91;
+    --line: #2c312d;
+    --accent: #5fd1a7;
+    --accent-text: #0b1f17;
+    --link: #5fd1a7;
+    --danger: #ff8a7a;
+    --ok: #6fd391;
+    --warn: #e0a85a;
+  }
+}
