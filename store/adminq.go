@@ -255,3 +255,23 @@ func (s *CoreStore) PromoByID(ctx context.Context, id int64) (core.Promo, error)
 	}
 	return p, err
 }
+
+func (s *CoreStore) GatewayStats(ctx context.Context) (map[string]core.GatewayStat, error) {
+	rows, err := s.db.R.QueryContext(ctx,
+		`SELECT gateway, MAX(CASE WHEN status = 'paid' THEN paid_at END), SUM(status = 'pending') FROM payments GROUP BY gateway`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]core.GatewayStat{}
+	for rows.Next() {
+		var name string
+		var paid sql.NullInt64
+		var pending sql.NullInt64
+		if err := rows.Scan(&name, &paid, &pending); err != nil {
+			return nil, err
+		}
+		out[name] = core.GatewayStat{LastPaidAt: unix(paid), Pending: int(pending.Int64)}
+	}
+	return out, rows.Err()
+}

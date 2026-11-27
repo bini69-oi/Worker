@@ -227,3 +227,31 @@ func TestPromoList(t *testing.T) {
 		t.Errorf("%v", err)
 	}
 }
+
+func TestGatewayStats(t *testing.T) {
+	s, uid := newCoreStore(t)
+	tx(t, s, func(tx core.Tx) error {
+		for i, g := range []string{"manual", "manual", "stars"} {
+			id, err := tx.CreatePayment(core.Payment{UserID: uid, Gateway: g, Amount: 100, Status: core.PayPending, CreatedAt: tNow})
+			if err != nil {
+				return err
+			}
+			if i == 1 {
+				if _, err := tx.MarkPaid(id, "", tNow.Add(time.Hour)); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	got, err := s.GatewayStats(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m := got["manual"]; m.Pending != 1 || !m.LastPaidAt.Equal(tNow.Add(time.Hour)) {
+		t.Errorf("manual: %+v", m)
+	}
+	if st := got["stars"]; st.Pending != 1 || !st.LastPaidAt.IsZero() {
+		t.Errorf("stars: %+v", st)
+	}
+}

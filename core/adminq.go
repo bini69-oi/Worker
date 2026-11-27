@@ -117,6 +117,8 @@ type PaymentRow struct {
 type AdminStore interface {
 	// FindUsers ищет абонентов, новые первыми. Отдаёт не больше limit строк.
 	FindUsers(ctx context.Context, q UserQuery, now time.Time, limit int) ([]UserRow, error)
+	// GatewayStats отдаёт по кассам время последнего оплаченного платежа и число ждущих.
+	GatewayStats(ctx context.Context) (map[string]GatewayStat, error)
 	// Broadcasts отдаёт рассылки, новые первыми.
 	Broadcasts(ctx context.Context, after int64, limit int) ([]Broadcast, error)
 	BroadcastByID(ctx context.Context, id int64) (Broadcast, error)
@@ -156,4 +158,10 @@ type AdminTx interface {
 	FinishBroadcast(id int64, at time.Time) (bool, error)
 	// SegmentCount считает получателей сегмента: без забаненных и недоступных.
 	SegmentCount(segment string, now time.Time) (int, error)
+}
+
+// GatewayStat это что хранилище знает о платежах кассы.
+type GatewayStat struct {
+	LastPaidAt time.Time // нулевое время, если оплаченных нет
+	Pending    int
 }

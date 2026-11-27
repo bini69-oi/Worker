@@ -122,3 +122,22 @@ func (s *Store) PromoByID(_ context.Context, id int64) (core.Promo, error) {
 	}
 	return p, nil
 }
+
+func (s *Store) GatewayStats(_ context.Context) (map[string]core.GatewayStat, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[string]core.GatewayStat{}
+	for _, p := range s.st.pays {
+		st := out[p.Gateway]
+		switch p.Status {
+		case core.PayPaid:
+			if p.PaidAt.After(st.LastPaidAt) {
+				st.LastPaidAt = p.PaidAt
+			}
+		case core.PayPending:
+			st.Pending++
+		}
+		out[p.Gateway] = st
+	}
+	return out, nil
+}
