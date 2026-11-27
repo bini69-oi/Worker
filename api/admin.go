@@ -28,12 +28,14 @@ type adminAPI struct {
 	d AdminDeps
 }
 
-// RegisterAdmin заводит адреса /api/admin/* на сервере.
+// RegisterAdmin заводит адреса /api/admin/*: вход без сессии и таблицу прав со всем остальным.
 func RegisterAdmin(s *Server, d AdminDeps) {
 	a := &adminAPI{s: s, d: d}
 	s.Handle("POST /api/admin/login", a.login)
 	s.Handle("GET /api/admin/login/{id}", a.loginPoll)
-	s.Handle("GET /api/admin/me", a.auth(a.me))
+	for _, rt := range a.routes() {
+		s.Handle(rt.Pattern, a.guarded(rt))
+	}
 }
 
 // adminCtx это то, что обработчик получает про вошедшего админа.

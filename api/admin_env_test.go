@@ -104,3 +104,17 @@ func errCode(t *testing.T, rec *httptest.ResponseRecorder) string {
 	}
 	return b.Code
 }
+
+// helper заводит помощника с правами (через «Да» владельца) и отдаёт его cookie.
+func (e *adminEnv) helper(tg int64, perms ...core.Perm) string {
+	e.t.Helper()
+	ctx := context.Background()
+	id, err := e.c.RequestAddHelper(ctx, adminOwner, tg, perms, "helper password 1")
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	if err := e.c.AnswerConfirm(ctx, id, adminOwner, true); err != nil {
+		e.t.Fatal(err)
+	}
+	return e.session(tg, "helper password 1")
+}
