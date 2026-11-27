@@ -7,9 +7,6 @@ import (
 	"github.com/bini69-oi/worker/core"
 )
 
-// maxTopup это предел суммы пополнения в копейках: защита от опечатки. Тот же, что в боте.
-const maxTopup = 1_000_000 * 100
-
 func (a *App) payRoutes() {
 	a.handle("POST /api/app/topup", a.topup)
 	// Статус платежа виден и во время техработ: оплата зачисляется всегда, абонент ждёт её результата.
@@ -23,7 +20,7 @@ func (a *App) topup(w http.ResponseWriter, r *http.Request, au Auth) (any, error
 	if err := Decode(w, r, &in); err != nil {
 		return nil, err
 	}
-	if in.Amount <= 0 || in.Amount > maxTopup {
+	if in.Amount <= 0 || in.Amount > core.MaxTopup {
 		return nil, core.ErrInvalid
 	}
 	if in.Gateway == "stars" && a.StarsInvoice == nil {

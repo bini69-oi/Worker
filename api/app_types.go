@@ -53,6 +53,7 @@ type MeResponse struct {
 	TrialAvailable bool          `json:"trial_available"`
 	Sub            *SubView      `json:"sub"`
 	Gateways       []GatewayView `json:"gateways"`
+	TopupPresets   []int64       `json:"topup_presets"` // готовые суммы пополнения, копейки
 	Addons         AddonsView    `json:"addons"`
 	BotLink        string        `json:"bot_link"` // чат бота: поддержка и вход
 }

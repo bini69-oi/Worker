@@ -21,7 +21,7 @@ const gib = 1 << 30
 func (a *App) me(w http.ResponseWriter, r *http.Request, au Auth) (any, error) {
 	ctx := r.Context()
 	out := MeResponse{Lang: au.User.Lang, Username: au.User.Username, Balance: au.User.Balance,
-		Gateways: []GatewayView{}, BotLink: a.botLink()}
+		Gateways: []GatewayView{}, BotLink: a.botLink(), TopupPresets: append([]int64{}, a.Core.TopupPresets()...)}
 	out.Maintenance = errors.Is(a.Core.Serving(ctx, au.User.ID), core.ErrMaintenance)
 	for _, g := range a.Core.Gateways() {
 		out.Gateways = append(out.Gateways, GatewayView{Name: g.Name, Title: g.Title})

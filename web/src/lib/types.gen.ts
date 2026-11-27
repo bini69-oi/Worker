@@ -79,6 +79,7 @@ export interface MeResponse {
   trial_available: boolean;
   sub: SubView | null;
   gateways: GatewayView[];
+  topup_presets: number[];
   addons: AddonsView;
   bot_link: string;
 }

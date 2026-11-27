@@ -8,12 +8,17 @@
   import Connect from './Connect.svelte'
   import Home from './Home.svelte'
   import Notice from './Notice.svelte'
+  import Pay from './Pay.svelte'
+  import Topup from './Topup.svelte'
 
   type Screen = Component<{ params: Record<string, string> }>
   // Образец маршрута и экран. Экраны добавляются сюда по одной строке.
   const routes: [string, Screen][] = [
     ['/', Home as unknown as Screen],
     ['/connect', Connect as unknown as Screen],
+    ['/topup', Topup as unknown as Screen],
+    ['/topup/:amount', Topup as unknown as Screen],
+    ['/pay/:id', Pay as unknown as Screen],
     ['/buy', Buy as unknown as Screen],
     ['/buy/:tariff', Buy as unknown as Screen],
     ['/buy/:tariff/:days', Buy as unknown as Screen],
