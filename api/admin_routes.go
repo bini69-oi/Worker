@@ -37,6 +37,8 @@ func (a *adminAPI) routes() []adminRoute {
 		{"POST /api/admin/users/{id}/devices/reset", core.PermGrant, a.userDevicesReset},
 		{"POST /api/admin/users/{id}/link/revoke", core.PermGrant, a.userLinkRevoke},
 
+		{"GET /api/admin/stats", core.PermStats, a.statsGet},
+
 		{"GET /api/admin/tariffs", core.PermTariffs, a.tariffsList},
 		{"POST /api/admin/tariffs", core.PermTariffs, a.tariffSave},
 		{"POST /api/admin/tariffs/{id}", core.PermTariffs, a.tariffSave},

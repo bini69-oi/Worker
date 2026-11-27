@@ -59,7 +59,7 @@ func newAdminEnv(t *testing.T) *adminEnv {
 	// Часы лимита запросов идут вперёд сами: тесты шлют много запросов подряд, а часы ядра стоят на месте.
 	var tick atomic.Int64
 	e.s = New(Deps{Text: fakeTexts, Log: log, Now: func() time.Time { return t0.Add(time.Duration(tick.Add(1)) * time.Second) }})
-	RegisterAdmin(e.s, AdminDeps{Core: e.c, Bot: func() string { return "test_bot" }})
+	RegisterAdmin(e.s, AdminDeps{Core: e.c, Bot: func() string { return "test_bot" }, Loc: time.UTC})
 	if err := e.c.SetOwnerPassword(context.Background(), ownerPass); err != nil {
 		t.Fatal(err)
 	}

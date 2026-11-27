@@ -44,6 +44,13 @@ export interface AdminChatCode {
   code: string;
 }
 
+export interface AdminDay {
+  day: string;
+  gross: number;
+  refunded: number;
+  revenue: number;
+}
+
 export interface AdminDevice {
   hwid: string;
   platform: string;
@@ -67,6 +74,11 @@ export interface AdminGateway {
 
 export interface AdminGatewayList {
   items: AdminGateway[];
+}
+
+export interface AdminGatewayRevenue {
+  gateway: string;
+  revenue: number;
 }
 
 export interface AdminLedger {
@@ -192,6 +204,20 @@ export interface AdminSquad {
   uuid: string;
   name: string;
   members: number;
+}
+
+export interface AdminStats {
+  from: string;
+  to: string;
+  days: AdminDay[];
+  gateways: AdminGatewayRevenue[];
+  revenue: number;
+  new_users: number;
+  trials: number;
+  first_paid: number;
+  active_subs: number;
+  stuck_tasks: number;
+  stuck_users: number[];
 }
 
 export interface AdminSub {

@@ -3,6 +3,7 @@ import Audit from './Audit.svelte'
 import Broadcasts from './Broadcasts.svelte'
 import Gateways from './Gateways.svelte'
 import Notify from './Notify.svelte'
+import Overview from './Overview.svelte'
 import Payments from './Payments.svelte'
 import Promos from './Promos.svelte'
 import Settings from './Settings.svelte'
@@ -18,6 +19,7 @@ const plain = (c: unknown) => c as Screen
 
 // Экран раздела по его номеру в меню. arg это вторая часть адреса: #/users/<arg>.
 export const screens: Record<string, Screen> = {
+  overview: plain(Overview),
   users: Users,
   payments: plain(Payments),
   tariffs: plain(Tariffs),

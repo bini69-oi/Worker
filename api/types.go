@@ -30,6 +30,7 @@ func Types() []reflect.Type {
 		reflect.TypeFor[AdminTeam](),
 		reflect.TypeFor[AdminSessionList](),
 		reflect.TypeFor[AdminAuditList](),
+		reflect.TypeFor[AdminStats](),
 		reflect.TypeFor[AdminBalance](),
 		reflect.TypeFor[AdminExpires](),
 	}

@@ -1,0 +1,25 @@
+{
+  "from": "2026-01-01",
+  "to": "2026-01-01",
+  "days": [
+    {
+      "day": "2026-01-01",
+      "gross": 100000,
+      "refunded": 0,
+      "revenue": 100000
+    }
+  ],
+  "gateways": [
+    {
+      "gateway": "manual",
+      "revenue": 100000
+    }
+  ],
+  "revenue": 100000,
+  "new_users": 2,
+  "trials": 1,
+  "first_paid": 1,
+  "active_subs": 2,
+  "stuck_tasks": 0,
+  "stuck_users": []
+}
