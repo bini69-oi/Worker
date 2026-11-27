@@ -1,0 +1,62 @@
+name: release
+
+# Релиз по тегу vX.Y.Z: два бинарника, SHA256SUMS и подпись SHA256SUMS.sig.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # Писать в релизы может только эта задача.
+    permissions:
+      contents: write
+    steps:
+      # Действия закреплены по хэшу коммита: подмена тега у автора действия не попадёт в сборку.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+
+      - name: Открытый ключ на месте
+        run: grep -q 'BEGIN PUBLIC KEY' install/release.pub || { echo "в install/release.pub заглушка, ключ не создан (docs/release.md)"; exit 1; }
+
+      - run: go install honnef.co/go/tools/cmd/staticcheck@2026.2.2
+      - run: make check
+
+      - name: Фронт
+        run: |
+          if [ -f web/package.json ]; then
+            (cd web && npm ci && npm run build)
+          fi
+
+      - name: Сборка
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir dist
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
+              -ldflags "-s -w -X main.version=$TAG" -o "dist/worker-linux-$arch" ./cmd/worker
+          done
+          (cd dist && sha256sum worker-linux-amd64 worker-linux-arm64 > SHA256SUMS)
+
+      - name: Подпись
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: go run ./cmd/sign dist/SHA256SUMS dist/SHA256SUMS.sig
+
+      - name: Подпись сходится с ключом в репозитории
+        run: openssl pkeyutl -verify -pubin -inkey install/release.pub -rawin -in dist/SHA256SUMS -sigfile dist/SHA256SUMS.sig
+
+      - name: Публикация
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" dist/worker-linux-amd64 dist/worker-linux-arm64 dist/SHA256SUMS dist/SHA256SUMS.sig --title "$TAG" --generate-notes
