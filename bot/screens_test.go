@@ -15,6 +15,7 @@ import (
 
 	"github.com/bini69-oi/worker/core"
 	"github.com/bini69-oi/worker/texts"
+	"github.com/bini69-oi/worker/tg"
 )
 
 func TestStartMenu(t *testing.T) {
@@ -33,19 +34,78 @@ func TestStartMenu(t *testing.T) {
 	golden(t, "menu_trial_taken", e.api.take())
 }
 
-func TestLangButtonOnlyWithTwoLangs(t *testing.T) {
-	e := newEnv(t)
-	e.start(t)
-	if err := e.tx.Set("bot.menu", "en", "Menu {status} {balance}"); err != nil {
+// startAs шлёт /start от абонента с кодом языка Telegram code.
+func (e *env) startAs(t *testing.T, code string) core.User {
+	t.Helper()
+	m := &tg.Message{MessageID: int(e.next()), From: &tg.User{ID: userTg, FirstName: "John", Username: "john", LanguageCode: code},
+		Chat: tg.Chat{ID: userTg, Type: "private"}, Text: "/start"}
+	if err := e.b.handle(context.Background(), tg.Update{UpdateID: e.upd, Message: m}); err != nil {
 		t.Fatal(err)
 	}
+	u, err := e.c.UserByTg(context.Background(), userTg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u
+}
+
+func TestLangFromTelegramCode(t *testing.T) {
+	for code, want := range map[string]string{
+		"ru": "ru", "uk": "ru", "be": "ru", "kk": "ru", "RU": "ru", "kk-KZ": "ru",
+		"de": "en", "en": "en", "en-US": "en", "pt-BR": "en",
+	} {
+		e := newEnv(t)
+		if u := e.startAs(t, code); u.Lang != want {
+			t.Errorf("код %q: язык %q, ждали %q", code, u.Lang, want)
+		}
+	}
+}
+
+func TestLangEmptyCode(t *testing.T) {
+	e := newEnv(t)
+	if got := e.b.lang(""); got != "ru" {
+		t.Fatalf("без настройки ждали ru, получили %q", got)
+	}
+	e.set(t, "lang.default", "en")
+	if got := e.b.lang(""); got != "en" {
+		t.Fatalf("ждали язык из настройки, получили %q", got)
+	}
+	if got := e.b.lang("kk"); got != "ru" {
+		t.Fatalf("код kk должен давать ru, получили %q", got)
+	}
+}
+
+func TestEnglishScreens(t *testing.T) {
+	e := newEnv(t)
+	e.set(t, "trial.enabled", "true", "trial.days", "3")
+	u := e.startAs(t, "de")
+	golden(t, "menu_new_en", e.api.take())
+
+	tr := e.tariff(t, "Month", core.Period{Days: 30, Price: 25000})
+	e.topup(t, u.ID, 30000)
+	if _, err := e.c.Buy(context.Background(), u.ID, tr.ID, 30); err != nil {
+		t.Fatal(err)
+	}
+	e.sync(t)
+	e.press(t, userTg, 101, "sub")
+	golden(t, "sub_active_en", e.api.take())
+}
+
+func TestLangButtonAlwaysVisible(t *testing.T) {
+	e := newEnv(t)
+	e.start(t)
 	e.press(t, userTg, 5, "m")
 	if !strings.Contains(render(e.api.take()), "→ lang]") {
-		t.Fatal("при двух языках нет кнопки языка")
+		t.Fatal("кнопки языка нет: языков два, она видна всегда")
 	}
 	e.press(t, userTg, 5, "ln:en")
-	if got := render(e.api.take()); !strings.Contains(got, "Menu ") {
-		t.Fatalf("меню не на новом языке: %s", got)
+	got := render(e.api.take())
+	if !strings.Contains(got, "Main menu") {
+		t.Fatalf("меню не на английском: %s", got)
+	}
+	e.press(t, userTg, 5, "ln:ru")
+	if got := render(e.api.take()); !strings.Contains(got, "Главное меню") {
+		t.Fatalf("меню не вернулось на русский: %s", got)
 	}
 }
 
@@ -166,10 +226,18 @@ func TestBuyOtherTariff(t *testing.T) {
 	if _, err := e.c.Buy(context.Background(), u.ID, a.ID, 30); err != nil {
 		t.Fatal(err)
 	}
-	e.press(t, userTg, 5, "bp:"+strconv.FormatInt(b.ID, 10)+":365")
-	got := render(e.api.take())
-	if !strings.Contains(got, "Смена тарифа пока недоступна") || !strings.Contains(got, "bt:"+strconv.FormatInt(a.ID, 10)) {
-		t.Fatalf("другой тариф: %s", got)
+	id := strconv.FormatInt(b.ID, 10)
+	e.press(t, userTg, 5, "bp:"+id+":365")
+	golden(t, "plan_queue_confirm", e.api.take())
+	e.press(t, userTg, 5, "bok:"+id+":365")
+	if got := render(e.api.take()); !strings.Contains(got, "Тариф Год начнётся") {
+		t.Fatalf("после оплаты смены: %s", got)
+	}
+	e.press(t, userTg, 5, "sub")
+	golden(t, "sub_plan_queued", e.api.take())
+	e.press(t, userTg, 5, "pcanok")
+	if got, _ := e.c.UserByTg(context.Background(), userTg); got.Balance != 10000-100 {
+		t.Fatalf("после отмены баланс %d", got.Balance)
 	}
 }
 

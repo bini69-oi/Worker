@@ -97,3 +97,23 @@ func TestPendingBuyReplace(t *testing.T) {
 		t.Fatalf("после удаления ждали ErrNotFound, получили %v", err)
 	}
 }
+
+func TestSubPlanFields(t *testing.T) {
+	s, uid := newCoreStore(t)
+	ctx := context.Background()
+	err := s.Tx(ctx, func(tx core.Tx) error {
+		id, err := tx.SaveSub(core.Subscription{UserID: uid, PeriodDays: 30, Status: core.SubActive, ExpiresAt: tNow, CreatedAt: tNow, UpdatedAt: tNow,
+			NextTariffID: 7, NextDays: 365, NextPrice: 1000, ExtraTrafficBytes: 10 << 30, ExtraDevices: 2})
+		if err != nil {
+			return err
+		}
+		got, err := tx.Sub(id)
+		if got.NextTariffID != 7 || got.NextDays != 365 || got.NextPrice != 1000 || got.ExtraTrafficBytes != 10<<30 || got.ExtraDevices != 2 {
+			t.Fatalf("поля смены и докупки: %+v", got)
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

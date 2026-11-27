@@ -10,7 +10,8 @@ import (
 )
 
 const subCols = `id, user_id, tariff_id, period_days, price, trial, panel_uuid, sub_url,
-	expires_at, auto_renew, status, created_at, updated_at`
+	expires_at, auto_renew, status, created_at, updated_at,
+	next_tariff_id, next_days, next_price, extra_traffic_bytes, extra_devices`
 
 func (s *CoreStore) SubByUser(ctx context.Context, userID int64) (core.Subscription, error) {
 	return (&coreTx{ctx: ctx, q: s.db.R}).SubByUser(userID)
@@ -37,10 +38,12 @@ func (t *coreTx) SaveSub(s core.Subscription) (int64, error) {
 	if s.ID == 0 {
 		res, err := t.q.ExecContext(t.ctx,
 			`INSERT INTO subscriptions (user_id, tariff_id, period_days, price, trial, panel_uuid, sub_url,
-				expires_at, auto_renew, status, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				expires_at, auto_renew, status, created_at, updated_at,
+				next_tariff_id, next_days, next_price, extra_traffic_bytes, extra_devices)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			s.UserID, nullID(s.TariffID), s.PeriodDays, s.Price, s.Trial, s.PanelUUID, s.SubURL,
-			s.ExpiresAt.Unix(), s.AutoRenew, string(s.Status), s.CreatedAt.Unix(), s.UpdatedAt.Unix())
+			s.ExpiresAt.Unix(), s.AutoRenew, string(s.Status), s.CreatedAt.Unix(), s.UpdatedAt.Unix(),
+			s.NextTariffID, s.NextDays, s.NextPrice, s.ExtraTrafficBytes, s.ExtraDevices)
 		if err != nil {
 			return 0, mapErr(err)
 		}
@@ -48,10 +51,12 @@ func (t *coreTx) SaveSub(s core.Subscription) (int64, error) {
 	}
 	res, err := t.q.ExecContext(t.ctx,
 		`UPDATE subscriptions SET tariff_id = ?, period_days = ?, price = ?, trial = ?, panel_uuid = ?, sub_url = ?,
-			expires_at = ?, auto_renew = ?, status = ?, updated_at = ?
+			expires_at = ?, auto_renew = ?, status = ?, updated_at = ?,
+			next_tariff_id = ?, next_days = ?, next_price = ?, extra_traffic_bytes = ?, extra_devices = ?
 		 WHERE id = ?`,
 		nullID(s.TariffID), s.PeriodDays, s.Price, s.Trial, s.PanelUUID, s.SubURL,
-		s.ExpiresAt.Unix(), s.AutoRenew, string(s.Status), s.UpdatedAt.Unix(), s.ID)
+		s.ExpiresAt.Unix(), s.AutoRenew, string(s.Status), s.UpdatedAt.Unix(),
+		s.NextTariffID, s.NextDays, s.NextPrice, s.ExtraTrafficBytes, s.ExtraDevices, s.ID)
 	if err != nil {
 		return 0, mapErr(err)
 	}
@@ -96,7 +101,8 @@ func scanSub(r scanner) (core.Subscription, error) {
 	var status string
 	var expires, created, updated int64
 	err := r.Scan(&s.ID, &s.UserID, &tariff, &s.PeriodDays, &s.Price, &s.Trial, &s.PanelUUID, &s.SubURL,
-		&expires, &s.AutoRenew, &status, &created, &updated)
+		&expires, &s.AutoRenew, &status, &created, &updated,
+		&s.NextTariffID, &s.NextDays, &s.NextPrice, &s.ExtraTrafficBytes, &s.ExtraDevices)
 	if err != nil {
 		return s, err
 	}

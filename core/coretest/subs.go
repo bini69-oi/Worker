@@ -173,3 +173,10 @@ func (t *tx) AddNotice(userID int64, kind, ref string, _ time.Time) (bool, error
 	t.st.notices[key] = true
 	return true, nil
 }
+
+// DeleteTariff удаляет тариф, как будто админ удалил его в базе.
+func (s *Store) DeleteTariff(id int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.st.tariffs, id)
+}

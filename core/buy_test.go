@@ -128,23 +128,6 @@ func TestHiddenTariff(t *testing.T) {
 	}
 }
 
-func TestBuyOtherTariffWhileLive(t *testing.T) {
-	e := newEnv(t)
-	ctx := context.Background()
-	a := e.tariff(t, "A", core.Period{Days: 30, Price: 100})
-	b := e.tariff(t, "B", core.Period{Days: 30, Price: 100})
-	e.topup(t, 1000)
-	if _, err := e.c.Buy(ctx, e.user.ID, a.ID, 30); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := e.c.Buy(ctx, e.user.ID, b.ID, 30); !errors.Is(err, core.ErrOtherTariff) {
-		t.Fatalf("ждали ErrOtherTariff, получили %v", err)
-	}
-	if b := balance(t, e.st, e.user.ID); b != 900 {
-		t.Fatalf("деньги списались за отказ: %d", b)
-	}
-}
-
 func TestBuyReplacesTrialKeepsDays(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()

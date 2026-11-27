@@ -22,6 +22,19 @@ func (c *Core) ExpireDue(ctx context.Context) (int, error) {
 			return err
 		}
 		for _, s := range subs {
+			if s.NextTariffID != 0 {
+				switched, err := c.startPlan(tx, s, now)
+				if err != nil {
+					return err
+				}
+				if switched {
+					continue
+				}
+				if s, err = tx.Sub(s.ID); err != nil { // смена отменена: истекает уже без неё
+					return err
+				}
+			}
+			s.ExtraTrafficBytes, s.ExtraDevices = 0, 0 // докупленное живёт, пока идёт подписка
 			s.Status, s.UpdatedAt = SubExpired, now
 			if _, err := tx.SaveSub(s); err != nil {
 				return err

@@ -71,6 +71,13 @@ func (c *Core) panelUser(s Subscription, u User, t Tariff, now time.Time) PanelU
 		return p
 	}
 	p.TrafficBytes, p.Devices, p.Reset, p.Squads = t.TrafficBytes, t.Devices, t.Reset, t.Squads
+	// Докупленное добавляется к лимиту тарифа. К безлимиту добавлять нечего: 0 так и остаётся «без лимита».
+	if p.TrafficBytes > 0 {
+		p.TrafficBytes += s.ExtraTrafficBytes
+	}
+	if p.Devices > 0 {
+		p.Devices += s.ExtraDevices
+	}
 	return p
 }
 

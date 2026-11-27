@@ -96,16 +96,17 @@ func (b *Bot) onPeriod(ctx context.Context, r *req, d Data) error {
 		return err
 	}
 	q, err := b.core.Quote(ctx, r.user.ID, id, int(days))
-	if errors.Is(err, core.ErrOtherTariff) {
-		return b.otherTariff(ctx, r)
-	}
 	if err != nil {
 		return err
 	}
 	vars := map[string]string{"tariff": t.Name, "days": strconv.FormatInt(days, 10), "price": money(q.Price),
-		"balance": money(q.Balance), "missing": money(q.Missing)}
+		"balance": money(q.Balance), "missing": money(q.Missing), "starts": date(q.StartsAt)}
+	confirm := "buy.confirm"
+	if q.Queued {
+		confirm = "buy.queue_confirm" // другой тариф при живой подписке: начнётся, когда закончится текущий
+	}
 	if q.Missing == 0 {
-		return b.show(ctx, r, Screen{Text: b.t(r, "buy.confirm", vars), Rows: [][]Button{
+		return b.show(ctx, r, Screen{Text: b.t(r, confirm, vars), Rows: [][]Button{
 			{b.btn(r, "btn.pay_balance", data("bok", id, days))}, b.back(r, data("bt", id))}})
 	}
 	if err := b.core.RememberBuy(ctx, r.user.ID, id, int(days)); err != nil {
@@ -113,16 +114,6 @@ func (b *Bot) onPeriod(ctx context.Context, r *req, d Data) error {
 	}
 	return b.show(ctx, r, Screen{Text: b.t(r, "buy.need", vars), Rows: [][]Button{
 		{{Text: b.t(r, "btn.topup_missing", vars), Data: data("tp", q.Missing)}}, b.back(r, data("bt", id))}})
-}
-
-// otherTariff объясняет, что смена тарифа пока недоступна, и предлагает продлить текущий.
-func (b *Bot) otherTariff(ctx context.Context, r *req) error {
-	sub, _, err := b.sub(ctx, r)
-	if err != nil {
-		return err
-	}
-	return b.show(ctx, r, Screen{Text: b.t(r, core.ErrOtherTariff.Key, nil), Rows: [][]Button{
-		{b.btn(r, "btn.extend", data("bt", sub.TariffID))}, b.back(r, "buy")}})
 }
 
 // onBuy покупает с баланса. Повторный клик по той же кнопке получает «уже обрабатываем».
@@ -144,6 +135,14 @@ func (b *Bot) onBuy(ctx context.Context, r *req, d Data) error {
 	}
 	if err != nil {
 		return err
+	}
+	if sub.NextTariffID != 0 {
+		t, err := b.core.Tariff(ctx, sub.NextTariffID)
+		if err != nil {
+			return err
+		}
+		return b.show(ctx, r, Screen{Text: b.t(r, "buy.queued", map[string]string{"tariff": t.Name, "date": date(sub.ExpiresAt)}),
+			Rows: [][]Button{{b.btn(r, "btn.sub", "sub")}, b.back(r, "m")}})
 	}
 	return b.show(ctx, r, Screen{Text: b.t(r, "buy.done", map[string]string{"date": date(sub.ExpiresAt)}),
 		Rows: [][]Button{{b.btn(r, "btn.connect", "con")}, b.back(r, "m")}})

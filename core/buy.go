@@ -34,12 +34,14 @@ type buyPlan struct {
 	tariff Tariff
 	period Period
 	sub    Subscription
-	exists bool // у абонента есть подписка
-	live   bool // и она ещё идёт
+	exists bool  // у абонента есть подписка
+	live   bool  // и она ещё идёт
+	queue  bool  // другой тариф при живой платной подписке: включится со следующего периода
+	cost   int64 // к списанию: цена срока и докупленные устройства за этот срок
 }
 
 // planBuy проверяет покупку без списания. Её зовут покупка и расчёт цены, поэтому правила одни.
-func planBuy(tx Tx, userID, tariffID int64, days int, now time.Time) (buyPlan, error) {
+func planBuy(c *Core, tx Tx, userID, tariffID int64, days int, now time.Time) (buyPlan, error) {
 	var b buyPlan
 	var err error
 	if b.buyer, err = activeUser(tx, userID); err != nil {
@@ -64,28 +66,40 @@ func planBuy(tx Tx, userID, tariffID int64, days int, now time.Time) (buyPlan, e
 	if !b.tariff.Active && !same {
 		return b, ErrTariffHidden
 	}
-	if b.live && !b.sub.Trial && !same {
-		return b, ErrOtherTariff
+	// Ждущая смена одна: пока она не включилась или не отменена, ничего больше не покупается.
+	if b.exists && b.sub.NextTariffID != 0 {
+		return b, ErrPlanQueued
+	}
+	b.queue = b.live && !b.sub.Trial && !same
+	b.cost = b.period.Price
+	if same {
+		b.cost += devicesCost(c, b.sub.ExtraDevices, days)
 	}
 	return b, nil
 }
 
 // buyTx это покупка внутри уже открытой транзакции. Её зовут Buy и списание автоподписки Stars.
 func (c *Core) buyTx(tx Tx, userID, tariffID int64, days int, now time.Time) (Subscription, error) {
-	b, err := planBuy(tx, userID, tariffID, days, now)
+	b, err := planBuy(c, tx, userID, tariffID, days, now)
 	if err != nil {
 		return Subscription{}, err
 	}
-	buyer, t, p, sub, exists, live := b.buyer, b.tariff, b.period, b.sub, b.exists, b.live
+	buyer, t, sub, exists, live := b.buyer, b.tariff, b.sub, b.exists, b.live
 
-	if p.Price > 0 {
-		buy, err := move(tx, now, LedgerEntry{UserID: userID, Amount: -p.Price, Reason: ReasonBuy, RefType: "tariff", Comment: t.Name})
+	if b.cost > 0 {
+		buy, err := move(tx, now, LedgerEntry{UserID: userID, Amount: -b.cost, Reason: ReasonBuy, RefType: "tariff", Comment: t.Name})
 		if err != nil {
-			return Subscription{}, needMoney(tx, userID, p.Price, err)
+			return Subscription{}, needMoney(tx, userID, b.cost, err)
 		}
-		if err := c.referralBonus(tx, buyer, buy, p.Price, now); err != nil {
+		if err := c.referralBonus(tx, buyer, buy, b.cost, now); err != nil {
 			return Subscription{}, err
 		}
+	}
+	if b.queue {
+		// Текущий тариф доживает срок, новый ждёт. Панель не меняется до дня смены.
+		sub.NextTariffID, sub.NextDays, sub.NextPrice, sub.UpdatedAt = tariffID, days, b.cost, now
+		_, err := tx.SaveSub(sub)
+		return sub, err
 	}
 
 	base := now
@@ -95,7 +109,7 @@ func (c *Core) buyTx(tx Tx, userID, tariffID int64, days int, now time.Time) (Su
 	if !exists {
 		sub = Subscription{UserID: userID, CreatedAt: now}
 	}
-	sub.TariffID, sub.PeriodDays, sub.Price, sub.Trial = tariffID, days, p.Price, false
+	sub.TariffID, sub.PeriodDays, sub.Price, sub.Trial = tariffID, days, b.period.Price, false
 	sub.ExpiresAt = base.Add(time.Duration(days) * day)
 	sub.Status, sub.UpdatedAt = SubActive, now
 	if sub.ID, err = tx.SaveSub(sub); err != nil {

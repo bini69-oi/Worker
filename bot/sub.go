@@ -31,6 +31,12 @@ func (b *Bot) showSub(ctx context.Context, r *req) error {
 			return err
 		}
 		name, traffic, devices = t.Name, b.gb(r, t.TrafficBytes), b.count(r, t.Devices)
+		if t.TrafficBytes > 0 { // с докупленным
+			traffic = b.gb(r, t.TrafficBytes+sub.ExtraTrafficBytes)
+		}
+		if t.Devices > 0 {
+			devices = b.count(r, t.Devices+sub.ExtraDevices)
+		}
 	}
 	auto := b.t(r, "sub.off", nil)
 	if sub.AutoRenew {
@@ -43,7 +49,25 @@ func (b *Bot) showSub(ctx context.Context, r *req) error {
 	} else {
 		s.Rows = append(s.Rows, []Button{{Text: b.t(r, "btn.copy", nil), Copy: sub.SubURL}})
 	}
+	if sub.NextTariffID != 0 {
+		if t, err := b.core.Tariff(ctx, sub.NextTariffID); err == nil {
+			s.Text += "\n\n" + b.t(r, "sub.next", map[string]string{"tariff": t.Name, "date": date(sub.ExpiresAt)})
+		}
+		s.Rows = append(s.Rows, []Button{b.btn(r, "btn.cancel_plan", "pcan")})
+	}
 	s.Rows = append(s.Rows, []Button{b.btn(r, "btn.connect", "con"), b.btn(r, "btn.extend", "buy")})
+	if offer, err := b.core.Addons(ctx, r.user.ID); err == nil {
+		var row []Button
+		if len(offer.Traffic) > 0 {
+			row = append(row, b.btn(r, "btn.buy_traffic", "at"))
+		}
+		if offer.DevicePrice > 0 {
+			row = append(row, b.btn(r, "btn.buy_device", "ad"))
+		}
+		if len(row) > 0 {
+			s.Rows = append(s.Rows, row)
+		}
+	}
 	if !sub.Trial {
 		if sub.AutoRenew {
 			s.Rows = append(s.Rows, []Button{b.btn(r, "btn.autorenew_off", "ar:0")})

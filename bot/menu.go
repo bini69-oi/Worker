@@ -37,6 +37,10 @@ func (b *Bot) register() {
 	b.acts["tpown"] = b.onOwnAmount
 	b.acts["tpg"] = b.onGateway
 	b.acts["ss"] = b.onStarsSub
+	b.acts["pcan"] = b.onCancelPlanAsk
+	b.acts["pcanok"] = b.onCancelPlan
+	b.acts["at"] = b.onTrafficPacks
+	b.acts["ad"] = b.onDevice
 	b.inputs[waitPromo] = b.onPromoInput
 	b.inputs[waitAmount] = b.onAmountInput
 }

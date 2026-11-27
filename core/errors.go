@@ -51,7 +51,6 @@ func (e *NeedMoney) Unwrap() error { return ErrNotEnoughMoney }
 var (
 	ErrNoPeriod      = newErr("E3001", "err.no_period", "у тарифа нет такого срока")
 	ErrTariffHidden  = newErr("E3002", "err.tariff_hidden", "тариф не продаётся")
-	ErrOtherTariff   = newErr("E3003", "err.other_tariff", "у абонента живая подписка на другой тариф")
 	ErrTrialOff      = newErr("E3004", "err.trial_off", "пробный период выключен")
 	ErrTrialUsed     = newErr("E3005", "err.trial_used", "пробный период уже был")
 	ErrTrialBusy     = newErr("E3009", "err.trial_busy", "пробные периоды на этот час закончились, попробуйте позже")
@@ -60,6 +59,9 @@ var (
 	ErrPanelDown     = newErr("E3008", "err.panel_down", "сервис временно недоступен")
 	ErrNoSub         = newErr("E3010", "err.no_sub", "у абонента нет подписки")
 	ErrNotSubscribed = newErr("E3011", "err.not_subscribed", "сначала подпишитесь на канал")
+	ErrPlanQueued    = newErr("E3012", "err.plan_queued", "уже ждёт смена тарифа: отмените её или дождитесь начала")
+	ErrUnlimited     = newErr("E3013", "err.unlimited", "в тарифе и так без лимита")
+	ErrAddonOff      = newErr("E3014", "err.addon_off", "докупка выключена")
 )
 
 // Кассы

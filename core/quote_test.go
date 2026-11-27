@@ -34,8 +34,8 @@ func TestQuote(t *testing.T) {
 	if _, err := e.c.Buy(ctx, e.user.ID, month.ID, 30); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.c.Quote(ctx, e.user.ID, other.ID, 30); !errors.Is(err, core.ErrOtherTariff) {
-		t.Fatalf("другой тариф: ждали ErrOtherTariff, получили %v", err)
+	if q, err := e.c.Quote(ctx, e.user.ID, other.ID, 30); err != nil || !q.Queued || q.StartsAt.IsZero() {
+		t.Fatalf("другой тариф ставится в очередь: %+v %v", q, err)
 	}
 
 	other.Active = false

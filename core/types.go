@@ -93,6 +93,14 @@ type Subscription struct {
 	Status     SubStatus
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+
+	// Ждущая смена тарифа: включится, когда закончится текущий период. NextTariffID 0 значит смены нет.
+	NextTariffID int64
+	NextDays     int
+	NextPrice    int64 // копейки, уже списаны с баланса
+	// Докупленное: трафик действует до конца периода, устройства переходят в следующий.
+	ExtraTrafficBytes int64
+	ExtraDevices      int
 }
 
 // Reason это причина движения денег.

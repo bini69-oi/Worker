@@ -102,7 +102,7 @@ func (c *Core) SetAutoRenew(ctx context.Context, userID int64, on bool) error {
 
 // permanent говорит, что ошибка покупки не пройдёт сама: тариф удалён или скрыт, срока нет, бан, другой тариф.
 func permanent(err error) bool {
-	for _, e := range []error{ErrNoPeriod, ErrNotFound, ErrTariffHidden, ErrOtherTariff} {
+	for _, e := range []error{ErrNoPeriod, ErrNotFound, ErrTariffHidden} {
 		if errors.Is(err, e) {
 			return true
 		}
@@ -154,7 +154,8 @@ func (c *Core) renewOne(ctx context.Context, s Subscription, window time.Duratio
 		if err != nil {
 			return err
 		}
-		if !cur.AutoRenew || cur.Status != SubActive || cur.ExpiresAt.Sub(now) > window {
+		// Ждущая смена тарифа уже оплатила следующий период: продлевать текущий не нужно.
+		if !cur.AutoRenew || cur.Status != SubActive || cur.ExpiresAt.Sub(now) > window || cur.NextTariffID != 0 {
 			skipped = true
 			return nil
 		}
