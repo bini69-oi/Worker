@@ -1,0 +1,14 @@
+{
+  "tg_id": 1,
+  "owner": true,
+  "perms": [
+    "users",
+    "grant",
+    "ban",
+    "promo",
+    "tariffs",
+    "broadcast",
+    "stats",
+    "support"
+  ]
+}

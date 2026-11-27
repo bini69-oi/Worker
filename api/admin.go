@@ -126,3 +126,13 @@ func (a *adminAPI) loginPoll(w http.ResponseWriter, r *http.Request) (any, error
 	}
 	return AdminLoginState{Status: state}, nil
 }
+
+// logout закрывает текущую сессию и сбрасывает cookie.
+func (a *adminAPI) logout(w http.ResponseWriter, r *http.Request, ad adminCtx) (any, error) {
+	if err := a.d.Core.CloseSession(r.Context(), ad.Admin.TgID, ad.Session.ID); err != nil {
+		return nil, err
+	}
+	http.SetCookie(w, &http.Cookie{Name: AdminCookie, Path: adminPath, MaxAge: -1,
+		HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
+	return nil, nil
+}

@@ -25,6 +25,7 @@ type AdminRoute struct {
 func (a *adminAPI) routes() []adminRoute {
 	return []adminRoute{
 		{"GET /api/admin/me", "", a.me},
+		{"POST /api/admin/logout", "", a.logout},
 	}
 }
 
