@@ -1,9 +1,10 @@
-// Считает вес JS и CSS кабинета в gzip по манифесту сборки и падает, если больше бюджета.
-// Админка в бюджет не входит, её вес только печатается.
+// Считает вес JS и CSS кабинета и админки в gzip по манифесту сборки и падает, если больше бюджета:
+// кабинет 80 КБ, админка 200 КБ.
 import { readFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 
 const BUDGET = 80 * 1024
+const ADMIN_BUDGET = 200 * 1024
 const dir = new URL('../build/', import.meta.url)
 const manifest = JSON.parse(readFileSync(new URL('.vite/manifest.json', dir), 'utf8'))
 
@@ -32,8 +33,12 @@ function weigh(entry) {
 const kb = (n) => `${(n / 1024).toFixed(1)} КБ`
 const app = weigh('app/index.html')
 const admin = weigh('admin/index.html')
-console.log(`кабинет: ${kb(app)} из ${kb(BUDGET)} (gzip), админка: ${kb(admin)}`)
+console.log(`кабинет: ${kb(app)} из ${kb(BUDGET)} (gzip), админка: ${kb(admin)} из ${kb(ADMIN_BUDGET)}`)
 if (app > BUDGET) {
   console.error(`кабинет тяжелее бюджета: ${kb(app)} > ${kb(BUDGET)}`)
+  process.exit(1)
+}
+if (admin > ADMIN_BUDGET) {
+  console.error(`админка тяжелее бюджета: ${kb(admin)} > ${kb(ADMIN_BUDGET)}`)
   process.exit(1)
 }
