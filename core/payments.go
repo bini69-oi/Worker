@@ -338,6 +338,16 @@ func (c *Core) CheckPayment(ctx context.Context, userID int64, gateway string, p
 // Работает только для ручной кассы, платежи настоящих касс зачисляет сама касса.
 // Право проверяется в той же транзакции, что и зачисление: отключённый помощник не успеет зачислить.
 func (c *Core) ConfirmManual(ctx context.Context, adminID, paymentID int64) error {
+	err := c.ConfirmPayment(ctx, adminID, paymentID)
+	if errors.Is(err, ErrAlreadyPaid) {
+		return nil
+	}
+	return err
+}
+
+// ConfirmPayment как ConfirmManual, но на повторное нажатие отвечает ErrAlreadyPaid: админка так говорит
+// «уже зачислен». Деньги зачисляются ровно один раз, повтор ничего не меняет и в журнал не пишется.
+func (c *Core) ConfirmPayment(ctx context.Context, adminID, paymentID int64) error {
 	var credited Payment
 	err := c.asAdmin(ctx, adminID, PermGrant, "payment.confirm", func(tx Tx, a Admin, now time.Time) (string, map[string]string, error) {
 		p, err := tx.Payment(paymentID)
@@ -350,17 +360,18 @@ func (c *Core) ConfirmManual(ctx context.Context, adminID, paymentID int64) erro
 		if credited, _, err = c.creditTx(tx, "manual", GatewayEvent{PaymentID: p.ID, ExtAmount: p.ExtAmount, Status: PayPaid}, now); err != nil {
 			return "", nil, err
 		}
-		if credited.ID != 0 {
-			if err := c.helperMoney(tx, a, "payment.confirm", p.UserID, p.Amount, now); err != nil {
-				return "", nil, err
-			}
+		if credited.ID == 0 {
+			return "", nil, ErrAlreadyPaid
+		}
+		if err := c.helperMoney(tx, a, "payment.confirm", p.UserID, p.Amount, now); err != nil {
+			return "", nil, err
 		}
 		return itoa(p.ID), map[string]string{"amount": itoa(p.Amount)}, nil
 	})
 	if errors.Is(err, ErrDuplicate) {
-		return nil
+		return ErrAlreadyPaid
 	}
-	if err == nil && credited.ID != 0 {
+	if err == nil {
 		c.buyFromCart(ctx, credited.UserID)
 	}
 	return err

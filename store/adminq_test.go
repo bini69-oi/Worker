@@ -174,3 +174,28 @@ func TestUserPayments(t *testing.T) {
 		t.Fatalf("%+v %v", got, err)
 	}
 }
+
+func TestPaymentsList(t *testing.T) {
+	s, uid := newCoreStore(t)
+	ctx := context.Background()
+	tx(t, s, func(tx core.Tx) error {
+		for i, g := range []string{"manual", "stars", "manual"} {
+			if _, err := tx.CreatePayment(core.Payment{UserID: uid, Gateway: g, Amount: int64(100 + i), Status: core.PayPending,
+				CreatedAt: tNow.Add(time.Duration(i) * time.Hour)}); err != nil {
+				return err
+			}
+		}
+		_, err := tx.SetPaymentStatus(3, core.PayPending, core.PayFailed)
+		return err
+	})
+	rows, err := s.Payments(ctx, core.PaymentFilter{Gateway: "manual", Status: core.PayPending}, 50)
+	if err != nil || len(rows) != 1 || rows[0].Payment.Amount != 100 || rows[0].Username != "ivan" || rows[0].TgID != 1001 {
+		t.Fatalf("%+v %v", rows, err)
+	}
+	if rows, _ = s.Payments(ctx, core.PaymentFilter{From: tNow.Add(time.Hour), To: tNow.Add(2 * time.Hour)}, 50); len(rows) != 1 || rows[0].Payment.Gateway != "stars" {
+		t.Errorf("по датам: %+v", rows)
+	}
+	if rows, _ = s.Payments(ctx, core.PaymentFilter{After: 2}, 50); len(rows) != 1 || rows[0].Payment.ID != 1 {
+		t.Errorf("курсор: %+v", rows)
+	}
+}

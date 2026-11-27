@@ -97,10 +97,28 @@ type AuditFilter struct {
 	After   int64     // курсор: только записи с id меньше
 }
 
+// PaymentFilter это фильтр списка платежей. Нулевые поля не фильтруют.
+type PaymentFilter struct {
+	Status  PayStatus
+	Gateway string
+	From    time.Time // создан не раньше
+	To      time.Time // создан раньше
+	After   int64     // курсор: только платежи с id меньше
+}
+
+// PaymentRow это платёж с абонентом для списка.
+type PaymentRow struct {
+	Payment  Payment
+	Username string
+	TgID     int64
+}
+
 // AdminStore это чтение для админки: списки, поиск, журнал. Пишет админка только через Tx, как всё ядро.
 type AdminStore interface {
 	// FindUsers ищет абонентов, новые первыми. Отдаёт не больше limit строк.
 	FindUsers(ctx context.Context, q UserQuery, now time.Time, limit int) ([]UserRow, error)
+	// Payments отдаёт платежи всех касс с абонентами, новые первыми.
+	Payments(ctx context.Context, f PaymentFilter, limit int) ([]PaymentRow, error)
 	// UserPayments отдаёт платежи абонента, новые первыми.
 	UserPayments(ctx context.Context, userID int64, limit int) ([]Payment, error)
 	// AuditLog отдаёт записи журнала, новые первыми.

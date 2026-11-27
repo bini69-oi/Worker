@@ -169,3 +169,47 @@ func (s *CoreStore) UserPayments(ctx context.Context, userID int64, limit int) (
 	}
 	return out, rows.Err()
 }
+
+func (s *CoreStore) Payments(ctx context.Context, f core.PaymentFilter, limit int) ([]core.PaymentRow, error) {
+	where, args := []string{"1 = 1"}, []any{}
+	add := func(cond string, v any) { where, args = append(where, cond), append(args, v) }
+	if f.After > 0 {
+		add("p.id < ?", f.After)
+	}
+	if f.Status != "" {
+		add("p.status = ?", string(f.Status))
+	}
+	if f.Gateway != "" {
+		add("p.gateway = ?", f.Gateway)
+	}
+	if !f.From.IsZero() {
+		add("p.created_at >= ?", f.From.Unix())
+	}
+	if !f.To.IsZero() {
+		add("p.created_at < ?", f.To.Unix())
+	}
+	rows, err := s.db.R.QueryContext(ctx,
+		"SELECT p.id, p.user_id, p.gateway, p.amount, p.ext_amount, p.ext_currency, p.recurring, p.status, p.external_id, p.created_at, p.paid_at, u.username, u.tg_id "+
+			"FROM payments p JOIN users u ON u.id = p.user_id WHERE "+strings.Join(where, " AND ")+" ORDER BY p.id DESC LIMIT ?",
+		append(args, limit)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []core.PaymentRow
+	for rows.Next() {
+		var r core.PaymentRow
+		var status string
+		var ext sql.NullString
+		var created int64
+		var paid sql.NullInt64
+		p := &r.Payment
+		if err := rows.Scan(&p.ID, &p.UserID, &p.Gateway, &p.Amount, &p.ExtAmount, &p.ExtCurrency, &p.Recurring, &status, &ext,
+			&created, &paid, &r.Username, &r.TgID); err != nil {
+			return nil, err
+		}
+		p.Status, p.ExternalID, p.CreatedAt, p.PaidAt = core.PayStatus(status), ext.String, time.Unix(created, 0).UTC(), unix(paid)
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}

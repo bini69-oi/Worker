@@ -77,3 +77,25 @@ func (s *Store) UserPayments(_ context.Context, userID int64, limit int) ([]core
 	sort.Slice(out, func(i, j int) bool { return out[i].ID > out[j].ID })
 	return out[:min(len(out), limit)], nil
 }
+
+func (s *Store) Payments(_ context.Context, f core.PaymentFilter, limit int) ([]core.PaymentRow, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var all []core.Payment
+	for _, p := range s.st.pays {
+		all = append(all, p)
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].ID > all[j].ID })
+	var out []core.PaymentRow
+	for _, p := range all {
+		switch {
+		case len(out) >= limit, f.After > 0 && p.ID >= f.After, f.Status != "" && p.Status != f.Status,
+			f.Gateway != "" && p.Gateway != f.Gateway, !f.From.IsZero() && p.CreatedAt.Before(f.From),
+			!f.To.IsZero() && !p.CreatedAt.Before(f.To):
+			continue
+		}
+		u := s.st.users[p.UserID]
+		out = append(out, core.PaymentRow{Payment: p, Username: u.Username, TgID: u.TgID})
+	}
+	return out, nil
+}
