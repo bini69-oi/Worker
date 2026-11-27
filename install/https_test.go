@@ -95,3 +95,12 @@ func TestSetupHTTPSInstallsCaddy(t *testing.T) {
 		t.Errorf("Caddyfile: %q", b)
 	}
 }
+
+func TestSetupHTTPSAlreadyConfigured(t *testing.T) {
+	caddyfile := filepath.Join(t.TempDir(), "Caddyfile")
+	out, err := bash(t, nil, stubs+`CADDYFILE=`+caddyfile+`; port_busy() { return 0; }; caddy_present() { return 0; }
+		caddy_config > $CADDYFILE; setup_https; echo "DONE=$HTTPS_DONE"`)
+	if err != nil || !strings.Contains(out, "DONE=1") || strings.Contains(out, "server_name") || strings.Contains(out, "CADDY-INSTALLED") {
+		t.Fatalf("повторный запуск должен узнать свою настройку: %v\n%s", err, out)
+	}
+}

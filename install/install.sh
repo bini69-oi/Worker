@@ -17,6 +17,8 @@ OS_RELEASE="${WORKER_OS_RELEASE:-/etc/os-release}"
 BIN=/usr/local/bin/worker
 ETC_DIR=/etc/worker
 ENV_FILE=/etc/worker/env
+# DONE_FILE появляется, когда установка дошла до конца. Есть env, но нет этого файла: прошлый запуск оборвался.
+DONE_FILE=/etc/worker/.install-done
 DATA_DIR=/var/lib/worker
 UNIT_FILE=/etc/systemd/system/worker.service
 HTTP_ADDR=127.0.0.1:8080
@@ -566,6 +568,12 @@ print_proxy_hint() {
 # Результат в HTTPS_DONE (1: Caddy настроен).
 setup_https() {
   HTTPS_DONE=0
+  # Прошлый запуск уже настроил Caddy для этого домена: не ставим второй раз и не печатаем подсказку про чужой Caddy.
+  if [ -r "$CADDYFILE" ] && grep -Fxq "$DOMAIN {" "$CADDYFILE" && grep -Fq "reverse_proxy $HTTP_ADDR" "$CADDYFILE"; then
+    HTTPS_DONE=1
+    say "Caddy уже настроен для $DOMAIN."
+    return 0
+  fi
   if port_busy 80 || port_busy 443; then
     print_proxy_hint "Порт 80 или 443 на этом сервере уже занят (скорее всего, панелью или nginx)."
     return 0
@@ -596,7 +604,7 @@ usage() {
 }
 
 main() {
-  local version="" update_only=0 allow_downgrade=0 arch
+  local version="" update_only=0 allow_downgrade=0 resume=0 arch
   # tmp не local: ловушка EXIT срабатывает уже после выхода из main
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -631,9 +639,13 @@ main() {
   arch=$(detect_arch)
 
   if [ -e "$ENV_FILE" ] && [ "$update_only" -eq 0 ]; then
-    say "Worker уже установлен. Обновить с бэкапом и откатом: worker update"
-    say "Заменить только бинарник этим установщиком: install.sh --update-binary"
-    exit 0
+    if [ -e "$DONE_FILE" ]; then
+      say "Worker уже установлен. Обновить с бэкапом и откатом: worker update"
+      say "Заменить только бинарник этим установщиком: install.sh --update-binary"
+      exit 0
+    fi
+    resume=1
+    say "Прошлая установка не закончена. Продолжаю с места сбоя: вопросы заново не задаются, SECRET_KEY не меняется."
   fi
 
   tmp=$(mktemp -d)
@@ -652,23 +664,51 @@ main() {
     return 0
   fi
 
-  # Вопросы идут до установки: оборвали на любом, на сервере ничего не изменено.
-  open_input
-  ask_all
-  show_key
+  run_install "$resume" "$tmp/worker-linux-$arch"
+}
 
-  install_binary "$tmp/worker-linux-$arch"
+# env_value КЛЮЧ: значение из /etc/worker/env (файл не подключается как скрипт).
+env_value() {
+  sed -n "s/^$1=//p" "$ENV_FILE" | head -n1
+}
+
+# run_install RESUME БИНАРНИК: вопросы, установка, запуск, https. RESUME=1: настройки уже записаны прошлым запуском,
+# вопросы не задаются и SECRET_KEY не трогается, остальные шаги выполняются заново (все они повторяемы).
+run_install() {
+  local resume="$1" binary="$2" url
+  open_input
+  if [ "$resume" -eq 1 ]; then
+    url=$(env_value PUBLIC_URL)
+    DOMAIN="${url#https://}"
+    BOT_USERNAME=$(tg_get_me "$(env_value BOT_TOKEN)" 2>/dev/null || true)
+  else
+    # Вопросы идут до установки: оборвали на любом, на сервере ничего не изменено.
+    ask_all
+    show_key
+  fi
+
+  install_binary "$binary"
   setup_user_dirs
   install_unit
-  write_env
-  systemctl enable --now worker >/dev/null 2>&1 || die "служба не запустилась: journalctl -u worker -n 50"
+  [ "$resume" -eq 1 ] || write_env
+  systemctl enable --now worker >/dev/null 2>&1 || die "служба не запустилась: journalctl -u worker -n 50. Запустите установщик снова, он продолжит с этого места"
   say "Жду ответа службы..."
-  wait_health || die "служба не ответила за 60 секунд: journalctl -u worker -n 50"
+  wait_health || die "служба не ответила за 60 секунд: journalctl -u worker -n 50. Исправьте причину и запустите установщик снова, он продолжит с этого места"
   say "Служба работает."
   setup_https
-  set_owner_password
+  if [ "$resume" -eq 1 ]; then
+    read_answer "Задать пароль владельца для админки сейчас? [y/N]: "
+    case "$ANSWER" in [yYдД]*) set_owner_password ;; esac
+  else
+    set_owner_password
+  fi
+  : >"$DONE_FILE"
   say ""
-  say "Готово. Бот: https://t.me/$BOT_USERNAME"
+  if [ -n "${BOT_USERNAME:-}" ]; then
+    say "Готово. Бот: https://t.me/$BOT_USERNAME"
+  else
+    say "Готово."
+  fi
   [ "$HTTPS_DONE" -eq 1 ] || say "Не забудьте настроить https для $DOMAIN по подсказке выше."
 }
 
