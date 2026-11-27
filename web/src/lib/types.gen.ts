@@ -4,3 +4,9 @@ export interface ErrorBody {
   code: string;
   text: string;
 }
+
+export interface SessionResponse {
+  token: string;
+  lang: string;
+  expires_at: string;
+}

@@ -111,3 +111,34 @@ func TestUserSessionUnknownAndBan(t *testing.T) {
 		t.Fatalf("забаненному выдана сессия: %v", err)
 	}
 }
+
+func TestTgLogin(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	tok, u, err := e.c.TgLogin(ctx, 4242, "new", "en-US", "ref_"+e.user.RefCode, webInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.TgID != 4242 || u.Lang != "en" || u.ReferrerID != e.user.ID {
+		t.Fatalf("новый абонент: %+v", u)
+	}
+	if got, _, err := e.c.SessionUser(ctx, tok); err != nil || got.ID != u.ID {
+		t.Fatalf("сессия нового абонента: %v", err)
+	}
+	// Повторный вход находит того же абонента и язык не меняет.
+	_, again, err := e.c.TgLogin(ctx, 4242, "new", "ru", "", webInfo)
+	if err != nil || again.ID != u.ID || again.Lang != "en" {
+		t.Fatalf("повторный вход: %+v %v", again, err)
+	}
+	// Мусор в start_param реферала не создаёт.
+	_, junk, err := e.c.TgLogin(ctx, 4243, "", "ru", "ref_'; drop", webInfo)
+	if err != nil || junk.ReferrerID != 0 {
+		t.Fatalf("мусорный start_param: %+v %v", junk, err)
+	}
+	if err := e.c.Ban(ctx, owner, u.ID, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.c.TgLogin(ctx, 4242, "new", "ru", "", webInfo); !errors.Is(err, core.ErrBanned) {
+		t.Fatalf("забаненный вошёл: %v", err)
+	}
+}

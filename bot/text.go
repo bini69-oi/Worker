@@ -3,7 +3,6 @@ package bot
 import (
 	"html"
 	"strconv"
-	"strings"
 )
 
 // rawVars это подстановки, которые уже собраны из текстов по ключу и экранированы: их не трогаем.
@@ -24,22 +23,7 @@ func (b *Bot) t(r *req, key string, vars map[string]string) string {
 
 // lang выбирает язык абонента по коду Telegram: ru, uk, be и kk дают русский, любой другой код
 // английский, пустой код язык по умолчанию из настройки lang.default (или русский).
-func (b *Bot) lang(code string) string {
-	code = strings.ToLower(code)
-	if i := strings.IndexByte(code, '-'); i > 0 {
-		code = code[:i]
-	}
-	switch code {
-	case "":
-		if def := b.cfg.String("lang.default"); def != "" {
-			return def
-		}
-		return "ru"
-	case "ru", "uk", "be", "kk":
-		return "ru"
-	}
-	return "en"
-}
+func (b *Bot) lang(code string) string { return b.core.Lang(code) }
 
 // money пишет копейки рублями: 25000 → «250 ₽», 25050 → «250,50 ₽».
 func money(kop int64) string {

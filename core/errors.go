@@ -105,3 +105,10 @@ var ErrDuplicate = errors.New("событие уже проведено")
 
 // Errors отдаёт все ошибки ядра. Тесты проверяют по нему, что у каждой есть текст.
 func Errors() []*Error { return append([]*Error(nil), allErrors...) }
+
+// Кабинет. Номера внутри группы 6xxx взяты с 40, чтобы не пересекаться с соседними изменениями.
+var (
+	ErrBadInitData  = newErr("E6040", "err.bad_init_data", "данные входа из Telegram не прошли проверку")
+	ErrLoginExpired = newErr("E6041", "err.login_expired", "ссылка входа устарела")
+	ErrLoginUsed    = newErr("E6042", "err.login_used", "ссылка входа уже использована")
+)

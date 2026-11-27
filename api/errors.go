@@ -34,6 +34,8 @@ var statuses = map[*core.Error]int{
 	core.ErrTooManyTries:   http.StatusTooManyRequests,
 	core.ErrLoginLocked:    http.StatusTooManyRequests,
 	core.ErrInternal:       http.StatusInternalServerError,
+	core.ErrBadInitData:    http.StatusUnauthorized,
+	core.ErrLoginExpired:   http.StatusGone,
 }
 
 // classify превращает любую ошибку в ошибку ядра и статус. Всё, чего ядро не знает, это внутренняя ошибка.
@@ -54,5 +56,10 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	if ce == core.ErrInternal {
 		s.deps.Log.Error("внутренняя ошибка API", "method", r.Method, "path", r.URL.Path, "err", err)
 	}
-	s.write(w, status, ErrorBody{Code: ce.Code, Text: s.deps.Text(ce.Key, langOf(r.Context()))})
+	lang := langOf(r.Context())
+	var le *langError
+	if errors.As(err, &le) {
+		lang = le.lang
+	}
+	s.write(w, status, ErrorBody{Code: ce.Code, Text: s.deps.Text(ce.Key, lang)})
 }
