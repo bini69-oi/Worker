@@ -140,3 +140,9 @@ func cookieNamed(rec *httptest.ResponseRecorder, name string) *http.Cookie {
 }
 
 func strReplace(s, old, repl string) string { return strings.Replace(s, old, repl, 1) }
+
+// as делает запрос с токеном сессии в заголовке.
+func (e *appEnv) as(token, method, target, body string) *httptest.ResponseRecorder {
+	e.t.Helper()
+	return e.req(method, target, body, "Authorization", "Bearer "+token)
+}
