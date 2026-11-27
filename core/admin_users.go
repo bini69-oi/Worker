@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"errors"
-	"html"
 	"slices"
 	"strconv"
 	"strings"
@@ -157,7 +156,7 @@ func (c *Core) cardDevices(ctx context.Context, userID int64) ([]PanelDevice, bo
 const maxMessage = 4096
 
 // SendToUser отправляет абоненту сообщение от бота через очередь. Нужно право support. Текст админа
-// показывается как есть: разметка в нём экранируется. Абонент, заблокировавший бота, даёт ErrUnreachable.
+// показывается как есть: экранирует его бот при подстановке. Абонент, заблокировавший бота, даёт ErrUnreachable.
 func (c *Core) SendToUser(ctx context.Context, actorTg, userID int64, text string) error {
 	text = strings.TrimSpace(text)
 	if text == "" {
@@ -174,7 +173,7 @@ func (c *Core) SendToUser(ctx context.Context, actorTg, userID int64, text strin
 		if !u.UnreachableAt.IsZero() {
 			return "", nil, ErrUnreachable
 		}
-		task := NotifyTask{UserID: userID, Key: "notify.support_reply", Vars: map[string]string{"text": html.EscapeString(text)}}
+		task := NotifyTask{UserID: userID, Key: "notify.support_reply", Vars: map[string]string{"text": text}}
 		if err := enqueueNotify(tx, task, now); err != nil {
 			return "", nil, err
 		}

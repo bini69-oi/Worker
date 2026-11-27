@@ -37,8 +37,8 @@ func TestSendToUser(t *testing.T) {
 	if len(got) != 1 || got[0].UserID != e.user.ID || got[0].Key != "notify.support_reply" {
 		t.Fatalf("очередь: %+v", got)
 	}
-	if strings.Contains(got[0].Vars["text"], "<b>") || !strings.Contains(got[0].Vars["text"], "&lt;b&gt;") {
-		t.Errorf("текст админа не экранирован для разметки бота: %q", got[0].Vars["text"])
+	if got[0].Vars["text"] != "Проверили <b>всё</b> работает" {
+		t.Errorf("ядро не должно экранировать: это делает бот при подстановке: %q", got[0].Vars["text"])
 	}
 	audit := e.st.Audit()
 	if last := audit[len(audit)-1]; last.Action != "user.message" || last.Target != strconv.FormatInt(e.user.ID, 10) {
