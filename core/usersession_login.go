@@ -46,10 +46,49 @@ type WebLoginStarted struct {
 
 // WebLoginPrompt это то, что бот показывает абоненту, открывшему ссылку: откуда входят и три кода.
 type WebLoginPrompt struct {
-	ID    int64
-	IP    string
-	Agent string
-	Codes []string
+	ID     int64
+	IP     string
+	Device Device // распознанные браузер и система: сырую строку клиента абонент не видит
+	Codes  []string
+}
+
+// LoginAnswer это итог нажатия в боте. Locked: это была третья неверная попытка за час, вход в браузере для этого
+// абонента закрыт на час.
+type LoginAnswer struct {
+	Confirmed bool
+	Locked    bool
+}
+
+// Пределы неверных нажатий кода: три за час закрывают вход в браузере для абонента на час.
+const (
+	webFailMax    = 3
+	webFailWindow = time.Hour
+)
+
+// webLocked говорит, закрыт ли абоненту вход в браузере.
+func webLocked(tx Tx, tgID int64, now time.Time) (bool, error) {
+	count, until, err := tx.Limit("weblock:" + itoa(tgID))
+	return err == nil && count > 0 && now.Before(until), err
+}
+
+// webFail засчитывает неверный код. Третий за час включает блок на час. Отдаёт, включился ли блок сейчас.
+func webFail(tx Tx, tgID int64, now time.Time) (bool, error) {
+	key := "webfail:" + itoa(tgID)
+	count, until, err := tx.Limit(key)
+	if err != nil {
+		return false, err
+	}
+	if !now.Before(until) {
+		count, until = 0, now.Add(webFailWindow)
+	}
+	count++
+	if err := tx.SetLimit(key, count, until); err != nil {
+		return false, err
+	}
+	if count < webFailMax {
+		return false, nil
+	}
+	return true, tx.SetLimit("weblock:"+itoa(tgID), 1, now.Add(webFailWindow))
 }
 
 // WebLoginResult это ответ на опрос. Токен есть только у LoginConfirmed и только в первый раз.
@@ -108,20 +147,28 @@ func (c *Core) WebLoginOpen(ctx context.Context, nonce string, tgID int64) (WebL
 		if _, err := tx.UserByTg(tgID); err != nil {
 			return err
 		}
+		if locked, err := webLocked(tx, tgID, c.clock.Now()); err != nil || locked {
+			if err == nil {
+				err = ErrLoginLocked
+			}
+			return err
+		}
 		l.TgID = tgID
 		if err := tx.SaveUserLogin(l); err != nil {
 			return err
 		}
-		p = WebLoginPrompt{ID: l.ID, IP: l.IP, Agent: l.Agent, Codes: codeChoices(l.Code)}
+		p = WebLoginPrompt{ID: l.ID, IP: l.IP, Device: ClientDevice(l.Agent), Codes: codeChoices(l.Code)}
 		return nil
 	})
 	return p, err
 }
 
 // WebLoginAnswer принимает нажатие кода в боте. Нажать может только тот, кто открыл ссылку, один раз.
-// Верный код подтверждает вход. Неверный код и «no» (кнопка «Это не я») закрывают запрос. Отдаёт, подтверждён ли вход.
-func (c *Core) WebLoginAnswer(ctx context.Context, id, pressedBy int64, code string) (bool, error) {
-	yes := false
+// Верный код подтверждает вход. Неверный код и «no» (кнопка «Это не я») закрывают этот запрос сразу. Неверный код
+// ещё идёт в счёт: три за час закрывают вход в браузере для абонента на час («Это не я» в счёт не идёт: так
+// отвечает тот, кому прислали чужую ссылку, и наказывать его незачем).
+func (c *Core) WebLoginAnswer(ctx context.Context, id, pressedBy int64, code string) (LoginAnswer, error) {
+	var out LoginAnswer
 	err := c.tx(ctx, func(tx Tx) error {
 		now := c.clock.Now()
 		l, err := tx.UserLogin(id)
@@ -137,18 +184,30 @@ func (c *Core) WebLoginAnswer(ctx context.Context, id, pressedBy int64, code str
 		if !now.Before(l.ExpiresAt) {
 			return ErrLoginExpired
 		}
-		yes = subtle.ConstantTimeCompare([]byte(code), []byte(l.Code)) == 1
+		if locked, err := webLocked(tx, pressedBy, now); err != nil || locked {
+			if err == nil {
+				err = ErrLoginLocked
+			}
+			return err
+		}
+		out.Confirmed = subtle.ConstantTimeCompare([]byte(code), []byte(l.Code)) == 1
 		l.Answer = "no"
-		if yes {
+		if out.Confirmed {
 			l.Answer = "yes"
 		}
 		l.AnsweredAt = now
-		return tx.SaveUserLogin(l)
+		if err := tx.SaveUserLogin(l); err != nil {
+			return err
+		}
+		if !out.Confirmed && code != "no" {
+			out.Locked, err = webFail(tx, pressedBy, now)
+		}
+		return err
 	})
 	if err != nil {
-		return false, err
+		return LoginAnswer{}, err
 	}
-	return yes, nil
+	return out, nil
 }
 
 // WebLoginPoll это опрос браузера. Подтверждённый вход один раз отдаёт токен сессии браузера на 30 дней.

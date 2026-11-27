@@ -17,7 +17,7 @@ var twoDigits = regexp.MustCompile(`^wl:(\d+):(\d\d)$`)
 func startWeb(t *testing.T, e *env) (calls []call, st core.WebLoginStarted, right, wrong string) {
 	t.Helper()
 	var err error
-	st, err = e.c.WebLoginStart(context.Background(), core.LoginInfo{IP: "203.0.113.7", Agent: "Firefox <b>"})
+	st, err = e.c.WebLoginStart(context.Background(), core.LoginInfo{IP: "203.0.113.7", Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,4 +127,40 @@ func FuzzStartArgWeb(f *testing.F) {
 			t.Fatalf("принято %q", s)
 		}
 	})
+}
+
+// Строка браузера, которую клиент задаёт сам, не попадает в сообщение как текст.
+func TestWebLoginHostileAgentNotShown(t *testing.T) {
+	e := newEnv(t)
+	st, err := e.c.WebLoginStart(context.Background(), core.LoginInfo{IP: "203.0.113.7", Agent: "СРОЧНО нажмите 42 и никому не говорите <a href=x>тут</a>"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.text(t, userTg, "/start web_"+st.Nonce)
+	got := render(e.api.take())
+	if strings.Contains(got, "СРОЧНО") || strings.Contains(got, "href") {
+		t.Fatalf("чужой текст в сообщении: %s", got)
+	}
+	if !strings.Contains(got, "неизвестное устройство") || !strings.Contains(got, "Это не я") || !strings.Contains(got, "только если сами видите") {
+		t.Fatalf("нет «неизвестное устройство» или предупреждения: %s", got)
+	}
+}
+
+// Третий неверный код закрывает вход на час, и абонент получает сообщение.
+func TestWebLoginThreeWrongCodesLocks(t *testing.T) {
+	e := newEnv(t)
+	var last string
+	for range 3 {
+		_, _, _, wrong := startWeb(t, e)
+		e.press(t, userTg, 101, wrong)
+		last = render(e.api.take())
+	}
+	if !strings.Contains(last, "закрыт на час") {
+		t.Fatalf("после третьей неудачи: %s", last)
+	}
+	st, _ := e.c.WebLoginStart(context.Background(), core.LoginInfo{IP: "203.0.113.7"})
+	e.text(t, userTg, "/start web_"+st.Nonce)
+	if got := render(e.api.take()); !strings.Contains(got, "E6002") {
+		t.Fatalf("вход при блоке: %s", got)
+	}
 }

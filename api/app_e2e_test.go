@@ -35,8 +35,8 @@ func TestEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := e.c.WebLoginAnswer(ctx, prompt.ID, u.TgID, st.Code); err != nil || !ok {
-		t.Fatalf("нажатие кода: %v %v", ok, err)
+	if a, err := e.c.WebLoginAnswer(ctx, prompt.ID, u.TgID, st.Code); err != nil || !a.Confirmed {
+		t.Fatalf("нажатие кода: %v %v", a, err)
 	}
 	rec = poll(e, st.ID)
 	c := cookieNamed(rec, SessionCookie)

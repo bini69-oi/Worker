@@ -2,9 +2,11 @@ package texts
 
 // appDefs это тексты кабинета (ключи app.*) и тексты бота, которые нужны входу на сайт.
 var appDefs = []Def{
-	{Key: "bot.web_login", Params: []string{"ip", "agent"},
-		Default: "🔐 <b>Вход на сайт</b>\nIP: {ip}\nБраузер: {agent}\n\nНажмите код, который видите на сайте. Нужен он только если вы сами входите на сайт прямо сейчас. Это не вы? Нажмите «Это не я».",
-		En:      "🔐 <b>Website login</b>\nIP: {ip}\nBrowser: {agent}\n\nTap the code you see on the site. You only need it if you are logging in to the site right now. Not you? Tap “Not me”."},
+	{Key: "bot.web_login", Params: []string{"ip", "device"},
+		Default: "🔐 <b>Вход на сайт</b>\nIP: {ip}\nУстройство: {device}\n\nНажмите код, только если сами видите его на своём экране в браузере прямо сейчас. Если ссылку или код вам прислал или продиктовал кто-то другой, нажмите «Это не я».",
+		En:      "🔐 <b>Website login</b>\nIP: {ip}\nDevice: {device}\n\nTap the code only if you can see it yourself on your own browser screen right now. If someone else sent you this link or told you the code, tap “Not me”."},
+	{Key: "bot.web_device_unknown", Default: "неизвестное устройство", En: "unknown device"},
+	{Key: "bot.web_login_locked", Default: "🚫 Вход отклонён. Было три неверных кода подряд, вход на сайт для вас закрыт на час. Если это были не вы, смените пароль Telegram и завершите чужие сеансы.", En: "🚫 Login rejected. Three wrong codes in a row: website login is blocked for you for an hour. If it wasn't you, check your Telegram sessions."},
 	{Key: "bot.web_login_ok", Default: "✅ Вход подтверждён. Вернитесь на сайт.",
 		En: "✅ Login confirmed. Go back to the site."},
 	{Key: "bot.web_login_no", Default: "🚫 Вход отклонён. Если это были не вы, ничего делать не нужно.",

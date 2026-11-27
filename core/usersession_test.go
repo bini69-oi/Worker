@@ -9,7 +9,7 @@ import (
 	"github.com/bini69-oi/worker/core"
 )
 
-var webInfo = core.LoginInfo{IP: "5.6.7.8", Agent: "Safari"}
+var webInfo = core.LoginInfo{IP: "5.6.7.8", Agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.5 Safari/605.1.15"}
 
 func TestUserSessionTelegramLifetime(t *testing.T) {
 	e := newEnv(t)

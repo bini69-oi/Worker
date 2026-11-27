@@ -48,8 +48,8 @@ func TestLoginBrowserFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := e.c.WebLoginAnswer(t.Context(), prompt.ID, u.TgID, st.Code); err != nil || !ok {
-		t.Fatalf("нажатие: %v %v", ok, err)
+	if a, err := e.c.WebLoginAnswer(t.Context(), prompt.ID, u.TgID, st.Code); err != nil || !a.Confirmed {
+		t.Fatalf("нажатие: %v %v", a, err)
 	}
 	rec = poll(e, st.ID)
 	decode(t, rec, &p)
