@@ -32,8 +32,10 @@ func sessionKey(r *http.Request) string {
 	if tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && tok != "" {
 		return hashKey(tok)
 	}
-	if c, err := r.Cookie(SessionCookie); err == nil && c.Value != "" {
-		return hashKey(c.Value)
+	for _, name := range []string{SessionCookie, AdminCookie} {
+		if c, err := r.Cookie(name); err == nil && c.Value != "" {
+			return hashKey(c.Value)
+		}
 	}
 	return "ip:" + guard.Host(r.RemoteAddr)
 }

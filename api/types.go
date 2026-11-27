@@ -7,5 +7,8 @@ import "reflect"
 func Types() []reflect.Type {
 	return []reflect.Type{
 		reflect.TypeFor[ErrorBody](),
+		reflect.TypeFor[AdminLoginStarted](),
+		reflect.TypeFor[AdminLoginState](),
+		reflect.TypeFor[AdminMe](),
 	}
 }

@@ -31,6 +31,7 @@ var statuses = map[*core.Error]int{
 	core.ErrSessionGone:    http.StatusUnauthorized,
 	core.ErrBadToken:       http.StatusUnauthorized,
 	core.ErrBadLogin:       http.StatusUnauthorized,
+	core.ErrNotConfirmed:   http.StatusUnauthorized,
 	core.ErrTooManyTries:   http.StatusTooManyRequests,
 	core.ErrLoginLocked:    http.StatusTooManyRequests,
 	core.ErrInternal:       http.StatusInternalServerError,
