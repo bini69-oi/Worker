@@ -11,7 +11,30 @@ import (
 type ErrorBody struct {
 	Code string `json:"code"`
 	Text string `json:"text"`
+	// Money есть у ошибки «не хватает денег»: цена, баланс и недостача.
+	Money *MoneyDetails `json:"money,omitempty"`
+	// Limit есть у ошибки «сумма вне пределов кассы».
+	Limit *LimitDetails `json:"limit,omitempty"`
 }
+
+// MoneyDetails это цифры покупки, на которую не хватило денег. Копейки.
+type MoneyDetails struct {
+	Price   int64 `json:"price"`
+	Balance int64 `json:"balance"`
+	Missing int64 `json:"missing"`
+}
+
+// LimitDetails это пределы суммы кассы в копейках, 0 значит без предела.
+type LimitDetails struct {
+	Min int64 `json:"min"`
+	Max int64 `json:"max"`
+}
+
+// moneyError это core.ErrNotEnoughMoney с цифрами покупки для ответа.
+type moneyError struct{ MoneyDetails }
+
+func (e *moneyError) Error() string { return core.ErrNotEnoughMoney.Error() }
+func (e *moneyError) Unwrap() error { return core.ErrNotEnoughMoney }
 
 // statuses это HTTP-статусы ошибок ядра. Ошибка ядра без записи здесь отвечает 409: запрос верный,
 // но состояние абонента его не допускает (пробный уже был, смена тарифа уже ждёт).
@@ -57,9 +80,18 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		s.deps.Log.Error("внутренняя ошибка API", "method", r.Method, "path", r.URL.Path, "err", err)
 	}
 	lang := langOf(r.Context())
-	var le *langError
-	if errors.As(err, &le) {
-		lang = le.lang
+	var lerr *langError
+	if errors.As(err, &lerr) {
+		lang = lerr.lang
 	}
-	s.write(w, status, ErrorBody{Code: ce.Code, Text: s.deps.Text(ce.Key, lang)})
+	body := ErrorBody{Code: ce.Code, Text: s.deps.Text(ce.Key, lang)}
+	var me *moneyError
+	if errors.As(err, &me) {
+		body.Money = &me.MoneyDetails
+	}
+	var lim *core.LimitError
+	if errors.As(err, &lim) {
+		body.Limit = &LimitDetails{Min: lim.Min, Max: lim.Max}
+	}
+	s.write(w, status, body)
 }

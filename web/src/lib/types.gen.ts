@@ -1,13 +1,25 @@
 // Код создан командой make types из структур Go (пакет api). Руками не править.
 
+export interface BuyResponse {
+  sub: SubView;
+  queued: boolean;
+}
+
 export interface ErrorBody {
   code: string;
   text: string;
+  money?: MoneyDetails | null;
+  limit?: LimitDetails | null;
 }
 
 export interface GatewayView {
   name: string;
   title: string;
+}
+
+export interface LimitDetails {
+  min: number;
+  max: number;
 }
 
 export interface LoginPollResponse {
@@ -32,11 +44,30 @@ export interface MeResponse {
   bot_link: string;
 }
 
+export interface MoneyDetails {
+  price: number;
+  balance: number;
+  missing: number;
+}
+
 export interface NextPlanView {
   tariff_id: number;
   tariff: string;
   days: number;
   starts_at: string;
+}
+
+export interface PeriodView {
+  days: number;
+  price: number;
+}
+
+export interface QuoteResponse {
+  price: number;
+  balance: number;
+  missing: number;
+  queued: boolean;
+  starts_at: string | null;
 }
 
 export interface SessionResponse {
@@ -59,6 +90,18 @@ export interface SubView {
   extra_traffic_bytes: number;
   extra_devices: number;
   next: NextPlanView | null;
+}
+
+export interface TariffView {
+  id: number;
+  name: string;
+  traffic_bytes: number;
+  devices: number;
+  periods: PeriodView[];
+}
+
+export interface TariffsResponse {
+  tariffs: TariffView[];
 }
 
 export interface TextsResponse {

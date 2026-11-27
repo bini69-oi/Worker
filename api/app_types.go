@@ -29,6 +29,10 @@ func appTypes() []reflect.Type {
 		reflect.TypeFor[LoginPollResponse](),
 		reflect.TypeFor[MeResponse](),
 		reflect.TypeFor[TextsResponse](),
+		reflect.TypeFor[SubView](),
+		reflect.TypeFor[TariffsResponse](),
+		reflect.TypeFor[QuoteResponse](),
+		reflect.TypeFor[BuyResponse](),
 	}
 }
 
@@ -79,4 +83,45 @@ type NextPlanView struct {
 type TextsResponse struct {
 	Lang  string            `json:"lang"`
 	Texts map[string]string `json:"texts"`
+}
+
+// BuyRequest это выбор тарифа и срока для расчёта и покупки.
+type BuyRequest struct {
+	TariffID int64 `json:"tariff_id"`
+	Days     int   `json:"days"`
+}
+
+// TariffsResponse это тарифы, которые продаются.
+type TariffsResponse struct {
+	Tariffs []TariffView `json:"tariffs"`
+}
+
+// TariffView это тариф со сроками. Лимиты 0 значат «без лимита».
+type TariffView struct {
+	ID           int64        `json:"id"`
+	Name         string       `json:"name"`
+	TrafficBytes int64        `json:"traffic_bytes"`
+	Devices      int          `json:"devices"`
+	Periods      []PeriodView `json:"periods"`
+}
+
+// PeriodView это срок тарифа и цена в копейках.
+type PeriodView struct {
+	Days  int   `json:"days"`
+	Price int64 `json:"price"`
+}
+
+// QuoteResponse это расчёт покупки. StartsAt есть, когда тариф другой и включится с конца текущего периода.
+type QuoteResponse struct {
+	Price    int64      `json:"price"`
+	Balance  int64      `json:"balance"`
+	Missing  int64      `json:"missing"`
+	Queued   bool       `json:"queued"`
+	StartsAt *time.Time `json:"starts_at"`
+}
+
+// BuyResponse это подписка после покупки. Queued: покупка другого тарифа ждёт конца текущего периода.
+type BuyResponse struct {
+	Sub    SubView `json:"sub"`
+	Queued bool    `json:"queued"`
 }

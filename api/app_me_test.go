@@ -139,3 +139,19 @@ func TestTextsOpenAndPerLang(t *testing.T) {
 		t.Fatalf("мусорный язык: %d", rec.Code)
 	}
 }
+
+// pay проводит платёж через ручную кассу: абонент создал счёт, админ подтвердил.
+func (e *appEnv) pay(tgID, amount int64) {
+	e.t.Helper()
+	u, err := e.c.UserByTg(e.t.Context(), tgID)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	p, _, err := e.c.CreatePayment(e.t.Context(), u.ID, "manual", amount)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	if err := e.c.ConfirmManual(e.t.Context(), testOwner, p.ID); err != nil {
+		e.t.Fatal(err)
+	}
+}
