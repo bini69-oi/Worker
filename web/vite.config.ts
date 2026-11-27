@@ -19,5 +19,6 @@ export default defineConfig({
   },
   test: {
     include: ['src/**/*.test.ts'],
+    css: { include: /.+/ }, // тест вёрстки читает style.css как текст
   },
 })

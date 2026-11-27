@@ -59,7 +59,7 @@
         <tr>
           <td data-label="День">{d.day}</td>
           <td data-label="Выручка" class={d.negative ? 'err' : ''}>{d.revenue} <span class="muted">{d.refunded}</span></td>
-          <td><progress max="100" value={d.share}></progress></td>
+          <td data-label="Доля"><progress max="100" value={d.share}></progress></td>
         </tr>
       {/each}
     </tbody>
