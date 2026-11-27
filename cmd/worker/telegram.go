@@ -96,3 +96,10 @@ func (n *notifier) User(ctx context.Context, x core.NotifyTask) error     { retu
 func (n *notifier) Admin(ctx context.Context, x core.AdminTask) error     { return n.b.Admin(ctx, x) }
 func (n *notifier) Confirm(ctx context.Context, x core.ConfirmTask) error { return n.b.Confirm(ctx, x) }
 func (n *notifier) Owner(ctx context.Context, x core.AdminTask) error     { return n.b.Owner(ctx, x) }
+
+// broadcaster отдаёт рассылки боту, который собирается после ядра.
+type broadcaster struct{ b *bot.Bot }
+
+func (r *broadcaster) Send(ctx context.Context, tgID int64, text, buttonText, buttonURL string) error {
+	return r.b.Send(ctx, tgID, text, buttonText, buttonURL)
+}

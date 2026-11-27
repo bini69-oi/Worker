@@ -84,12 +84,14 @@ func build(env Env, base slog.Handler) (*app, error) {
 	secrets.Add(t.secret)
 	gws := gateways(cfg, t, env.PublicURL)
 	notes := &notifier{}
+	casts := &broadcaster{}
 	c := core.New(core.Deps{
 		Store:    store.NewCoreStore(db),
 		Config:   cfg,
 		Panel:    panel.CoreAdapter{Client: panel.New(env.PanelURL, env.PanelToken, nil)},
 		Gateways: pay.CoreGateways(gws),
 		Notifier: notes,
+		Sender:   casts,
 		Telegram: bot.Tokens{BaseURL: env.TelegramURL, Hook: t.hook, Secret: func() string { return t.secret }},
 		Channels: bot.Channels{API: t.client},
 		OwnerID:  env.OwnerID,
@@ -106,6 +108,7 @@ func build(env Env, base slog.Handler) (*app, error) {
 	t.bot = bot.New(bot.Options{Core: c, Texts: tx, API: t.client, Config: cfg, Log: log, Name: "", URL: env.PublicURL,
 		Owner: env.OwnerID, DLKey: env.SecretKey})
 	notes.b = t.bot
+	casts.b = t.bot
 
 	hooks := &guard.Limiter{Max: hookLimit, Window: time.Minute}
 	mux := http.NewServeMux()

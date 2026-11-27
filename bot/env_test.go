@@ -46,6 +46,7 @@ type fakeAPI struct {
 	calls   []call
 	nextMsg int
 	editErr error
+	sendErr error // ошибка на отправку нового сообщения
 	member  string
 }
 
@@ -57,6 +58,10 @@ func (f *fakeAPI) add(c call) {
 
 func (f *fakeAPI) SendMessage(_ context.Context, p tg.SendParams) (tg.Message, error) {
 	f.mu.Lock()
+	if f.sendErr != nil {
+		defer f.mu.Unlock()
+		return tg.Message{}, f.sendErr
+	}
 	f.nextMsg++
 	id := f.nextMsg + 100
 	f.mu.Unlock()

@@ -60,13 +60,13 @@ func (t *tx) CancelBroadcast(id int64, at time.Time) (bool, error) {
 
 func (t *tx) BroadcastStep(id, userID int64, sent, failed, blocked int) (bool, error) {
 	b, ok := t.st.bcs[id]
-	if !ok || b.Status != core.BcRunning {
+	if !ok || (b.Status != core.BcRunning && b.Status != core.BcCancelled) {
 		return false, nil
 	}
 	b.CursorUserID = userID
 	b.Sent, b.Failed, b.Blocked = b.Sent+sent, b.Failed+failed, b.Blocked+blocked
 	t.st.bcs[id] = b
-	return true, nil
+	return b.Status == core.BcRunning, nil
 }
 
 func (t *tx) FinishBroadcast(id int64, at time.Time) (bool, error) {

@@ -63,9 +63,17 @@ func (t *coreTx) CancelBroadcast(id int64, at time.Time) (bool, error) {
 }
 
 func (t *coreTx) BroadcastStep(id, userID int64, sent, failed, blocked int) (bool, error) {
-	return changed(t.q.ExecContext(t.ctx,
+	ok, err := changed(t.q.ExecContext(t.ctx,
 		`UPDATE broadcasts SET cursor_user_id = ?, sent = sent + ?, failed = failed + ?, blocked = blocked + ?
-		 WHERE id = ? AND status = 'running'`, userID, sent, failed, blocked, id))
+		 WHERE id = ? AND status IN ('running', 'cancelled')`, userID, sent, failed, blocked, id))
+	if err != nil || !ok {
+		return false, err
+	}
+	var status string
+	if err := t.q.QueryRowContext(t.ctx, "SELECT status FROM broadcasts WHERE id = ?", id).Scan(&status); err != nil {
+		return false, err
+	}
+	return status == core.BcRunning, nil
 }
 
 func (t *coreTx) FinishBroadcast(id int64, at time.Time) (bool, error) {

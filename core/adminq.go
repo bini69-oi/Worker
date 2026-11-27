@@ -148,8 +148,9 @@ type AdminTx interface {
 	StartBroadcast(id int64, total int, at time.Time) (bool, error)
 	// CancelBroadcast отменяет черновик или идущую рассылку. false значит, что она уже закончена.
 	CancelBroadcast(id int64, at time.Time) (bool, error)
-	// BroadcastStep записывает итог по одному абоненту и двигает курсор, только если рассылка идёт.
-	// false значит, что её уже отменили: пачку надо остановить.
+	// BroadcastStep записывает итог по одному абоненту и двигает курсор. Пишет и в только что отменённую рассылку:
+	// сообщение, которое уже ушло, должно попасть в счётчики. Отдаёт, идёт ли рассылка: false значит, что
+	// её отменили и пачку надо остановить.
 	BroadcastStep(id, userID int64, sent, failed, blocked int) (bool, error)
 	// FinishBroadcast переводит идущую рассылку в «готово».
 	FinishBroadcast(id int64, at time.Time) (bool, error)

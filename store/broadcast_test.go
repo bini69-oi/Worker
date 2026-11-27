@@ -86,14 +86,14 @@ func TestBroadcastLifecycle(t *testing.T) {
 			t.Error("отмена идущей")
 		}
 		if ok, _ := tx.BroadcastStep(a, 4, 1, 0, 0); ok {
-			t.Error("шаг после отмены записан")
+			t.Error("шаг после отмены считает рассылку идущей")
 		}
 		if ok, _ := tx.FinishBroadcast(a, tNow); ok {
 			t.Error("отменённая закончена")
 		}
 		return nil
 	})
-	if got, _ = s.BroadcastByID(ctx, a); got.Status != core.BcCancelled || got.Sent != 2 {
+	if got, _ = s.BroadcastByID(ctx, a); got.Status != core.BcCancelled || got.Sent != 3 { // сообщение, ушедшее при отмене, в счётчиках
 		t.Errorf("после отмены: %+v", got)
 	}
 	list, _ := s.Broadcasts(ctx, 0, 10)

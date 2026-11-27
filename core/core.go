@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"sync/atomic"
 	"time"
 )
 
@@ -210,6 +211,7 @@ type Core struct {
 	gateways []Gateway
 	telegram TelegramAPI
 	sender   BroadcastSender
+	bcNext   atomic.Value // time.Time: раньше этого момента пачка рассылки не уходит
 	channels Channels
 	owner    int64
 	log      *slog.Logger
@@ -237,6 +239,7 @@ func New(d Deps) *Core {
 		kick: make(chan struct{}, 1), actions: map[string]action{}, filter: d.Secrets,
 		sender: d.Sender,
 	}
+	c.bcNext.Store(time.Time{})
 	return c
 }
 
