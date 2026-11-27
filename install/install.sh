@@ -19,6 +19,7 @@ ENV_FILE=/etc/worker/env
 DATA_DIR=/var/lib/worker
 UNIT_FILE=/etc/systemd/system/worker.service
 HTTP_ADDR=127.0.0.1:8080
+CADDYFILE=/etc/caddy/Caddyfile
 TG_API="${WORKER_TG_API:-https://api.telegram.org}"
 # Вопросы читаются из терминала, а не из stdin: при curl | bash stdin занят самим скриптом.
 TTY_IN="${WORKER_INSTALL_TTY:-/dev/tty}"
@@ -75,7 +76,7 @@ detect_arch() {
 # check_tools проверяет, что нужные программы есть. Сам ничего не доустанавливает.
 check_tools() {
   local missing=""
-  for c in curl openssl systemctl useradd install sort awk; do
+  for c in curl openssl systemctl useradd runuser install sort awk ss; do
     command -v "$c" >/dev/null 2>&1 || missing="$missing $c"
   done
   [ -z "$missing" ] || die "не хватает программ:$missing. Установите их (apt install curl openssl) и запустите снова"
@@ -418,6 +419,93 @@ wait_health() {
   return 1
 }
 
+# port_busy ПОРТ: порт уже слушает какая-то служба сервера.
+port_busy() {
+  ss -ltnH | awk '{print $4}' | grep -Eq "[:.]$1\$"
+}
+
+caddy_present() {
+  command -v caddy >/dev/null 2>&1
+}
+
+# install_caddy ставит Caddy из официального репозитория проекта.
+install_caddy() {
+  command -v gpg >/dev/null 2>&1 || die "для установки Caddy нужен gpg: apt install gnupg"
+  say "Ставлю Caddy из официального репозитория..."
+  curl -fsSL --proto '=https' --tlsv1.2 https://dl.cloudsmith.io/public/caddy/stable/gpg.key |
+    gpg --batch --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  curl -fsSL --proto '=https' --tlsv1.2 https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt \
+    -o /etc/apt/sources.list.d/caddy-stable.list
+  chmod 0644 /usr/share/keyrings/caddy-stable-archive-keyring.gpg /etc/apt/sources.list.d/caddy-stable.list
+  DEBIAN_FRONTEND=noninteractive apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq caddy
+}
+
+# caddy_config печатает Caddyfile для домена. Текст совпадает с install/Caddyfile.tmpl (это проверяет тест).
+caddy_config() {
+  sed "s/{{DOMAIN}}/$DOMAIN/g" <<'CADDY'
+{{DOMAIN}} {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8080 {
+		header_up X-Real-IP {remote_host}
+	}
+}
+CADDY
+}
+
+# nginx_config печатает кусок конфига nginx для домена.
+nginx_config() {
+  cat <<NGINX
+server {
+    listen 80;
+    server_name $DOMAIN;
+
+    location / {
+        proxy_pass http://$HTTP_ADDR;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$remote_addr;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+NGINX
+}
+
+# print_proxy_hint: на сервере уже есть свой веб-сервер. Ничего не меняем, печатаем готовый конфиг.
+print_proxy_hint() {
+  say ""
+  say "$1"
+  say "Caddy не ставлю и ваш веб-сервер не трогаю. Добавьте для домена $DOMAIN (например,"
+  say "в /etc/nginx/conf.d/worker.conf), проверьте nginx -t и перечитайте конфиг:"
+  say ""
+  nginx_config
+  say ""
+  say "Потом выпустите сертификат (например, certbot --nginx -d $DOMAIN). Для другого прокси: домен $DOMAIN"
+  say "направьте на http://$HTTP_ADDR и передавайте заголовок X-Real-IP. Пока https для домена нет, Telegram"
+  say "не сможет присылать боту сообщения."
+}
+
+# setup_https: свободны 80 и 443 и своего Caddy нет, ставим Caddy и пишем Caddyfile. Иначе только подсказка.
+# Результат в HTTPS_DONE (1: Caddy настроен).
+setup_https() {
+  HTTPS_DONE=0
+  if port_busy 80 || port_busy 443; then
+    print_proxy_hint "Порт 80 или 443 на этом сервере уже занят (скорее всего, панелью или nginx)."
+    return 0
+  fi
+  if caddy_present; then
+    print_proxy_hint "На сервере уже стоит Caddy."
+    return 0
+  fi
+  install_caddy
+  caddy_config >"$CADDYFILE"
+  chmod 0644 "$CADDYFILE"
+  systemctl enable caddy >/dev/null 2>&1 || true
+  systemctl restart caddy || die "Caddy не запустился: journalctl -u caddy -n 50"
+  HTTPS_DONE=1
+  say "Caddy настроен для $DOMAIN, сертификат он выпустит сам."
+}
+
 # set_owner_password задаёт пароль владельца командой worker от пользователя службы, ввод из терминала.
 set_owner_password() {
   say ""
@@ -493,9 +581,11 @@ main() {
   say "Жду ответа службы..."
   wait_health || die "служба не ответила за 60 секунд: journalctl -u worker -n 50"
   say "Служба работает."
+  setup_https
   set_owner_password
   say ""
   say "Готово. Бот: https://t.me/$BOT_USERNAME"
+  [ "$HTTPS_DONE" -eq 1 ] || say "Не забудьте настроить https для $DOMAIN по подсказке выше."
 }
 
 # WORKER_INSTALL_SOURCE_ONLY нужен тестам: подключить функции и ничего не запускать.
