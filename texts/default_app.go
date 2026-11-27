@@ -163,4 +163,7 @@ var appDefs = []Def{
 	{Key: "app.logout", Default: "Выйти", En: "Sign out"},
 	{Key: "app.logout_all", Default: "Выйти на всех устройствах", En: "Sign out on all devices"},
 	{Key: "app.logout_all_confirm", Default: "Точно выйти везде?", En: "Sign out everywhere?"},
+
+	{Key: "app.reopen_title", Default: "Откройте кабинет заново", En: "Please reopen the cabinet"},
+	{Key: "app.reopen_hint", Default: "Эта страница открыта давно. Закройте её и откройте кабинет из чата с ботом ещё раз.", En: "This page was opened a while ago. Close it and open the cabinet from the bot chat again."},
 }

@@ -55,12 +55,48 @@ describe('вход в Mini App', () => {
     expect(get(s.state)).toBe('banned')
   })
 
-  it('подделанные данные запуска: кабинет не открывается, есть ошибка для «Повторить»', async () => {
+  it('данные запуска устарели или подделаны: понятный экран «откройте кабинет из бота заново»', async () => {
     const ep = fakeEp({ sessionTg: vi.fn(async () => Promise.reject(err(401, 'E6040'))) })
     const { s } = make(ep, 'x')
     await s.boot()
+    expect(get(s.state)).toBe('stale')
+  })
+
+  it('сеть недоступна при входе: «Нет связи» с повтором, а не экран про устаревшие данные', async () => {
+    const ep = fakeEp({ sessionTg: vi.fn(async () => Promise.reject(new NetworkError())) })
+    const { s } = make(ep, 'x')
+    await s.boot()
     expect(get(s.state)).toBe('failed')
-    expect(get(s.failure)).toMatchObject({ status: 'error', code: 'E6040' })
+    expect(get(s.failure)).toEqual({ status: 'offline' })
+  })
+
+  it('токен из sessionStorage ещё жив: используется он, данные запуска не тратятся', async () => {
+    const ep = fakeEp()
+    const { s } = make(ep, 'x', memStorage({ worker_token: 'old' }))
+    await s.boot()
+    expect(get(s.state)).toBe('ready')
+    expect(ep.sessionTg).not.toHaveBeenCalled()
+    expect(s.token()).toBe('old')
+  })
+
+  it('токен из sessionStorage не признан (401): входим заново по данным запуска', async () => {
+    let first = true
+    const ep = fakeEp({ me: vi.fn(async () => (first ? ((first = false), Promise.reject(err(401, 'E6008'))) : me)) })
+    const { s, storage } = make(ep, 'x', memStorage({ worker_token: 'old' }))
+    await s.boot()
+    expect(ep.sessionTg).toHaveBeenCalledTimes(1)
+    expect(get(s.state)).toBe('ready')
+    expect(storage.m.get('worker_token')).toBe('tg-token')
+  })
+
+  it('устаревший токен и устаревшие данные запуска: экран «откройте заново»', async () => {
+    const ep = fakeEp({
+      me: vi.fn(async () => Promise.reject(err(401, 'E6008'))),
+      sessionTg: vi.fn(async () => Promise.reject(err(401, 'E6040'))),
+    })
+    const { s } = make(ep, 'x', memStorage({ worker_token: 'old' }))
+    await s.boot()
+    expect(get(s.state)).toBe('stale')
   })
 
   it('401 посреди работы: вход тихо повторяется и экраны перечитываются', async () => {

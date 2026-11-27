@@ -117,3 +117,24 @@ export function openChat(app: TgWebApp | null, win: Window, url: string): void {
   if (app) app.openTelegramLink(url)
   else openExternal(null, win, url)
 }
+
+/**
+ * Окно для оплаты в браузере открывается сразу в обработчике нажатия, до ответа сервера: Safari и другие браузеры
+ * блокируют окно, открытое после await. Адрес выставляется потом (finishPopup). В Telegram окно не нужно.
+ */
+export function openPopup(app: TgWebApp | null, win: Window): Window | null {
+  if (app) return null
+  return win.open('about:blank', '_blank')
+}
+
+/** Ведёт заранее открытое окно на адрес. Окна нет (заблокировано): обычное открытие. */
+export function finishPopup(popup: Window | null, app: TgWebApp | null, win: Window, url: string): void {
+  if (!popup) return openExternal(app, win, url)
+  popup.opener = null // страница кассы не получает доступа к кабинету
+  popup.location.href = url
+}
+
+/** Ответ не нужен окну (ошибка, реквизиты вместо ссылки): закрыть. */
+export function closePopup(popup: Window | null): void {
+  popup?.close()
+}

@@ -23,7 +23,7 @@ export interface Loader<T> extends Readable<View<T>> {
 }
 
 /** Загрузчик данных экрана. Если запросов несколько подряд, в экран попадает ответ последнего. */
-export function createLoader<T>(fn: () => Promise<T>): Loader<T> {
+export function createLoader<T>(fn: () => Promise<T>, opts: { auto?: boolean } = {}): Loader<T> {
   const store = writable<View<T>>({ status: 'loading' })
   let seq = 0
   async function run(silent: boolean): Promise<void> {
@@ -41,7 +41,7 @@ export function createLoader<T>(fn: () => Promise<T>): Loader<T> {
     reload: () => run(false),
     refresh: () => run(true),
   }
-  void run(false)
+  if (opts.auto !== false) void run(false)
   return loader
 }
 

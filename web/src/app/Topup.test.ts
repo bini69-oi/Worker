@@ -103,20 +103,47 @@ describe('Topup: кассы', () => {
     expect(window.location.hash).not.toContain('/pay/')
   })
 
-  it('касса со ссылкой: ссылка открывается в новой вкладке, страница показывает статус платежа', async () => {
-    const open = vi.fn()
+  it('касса со ссылкой: окно открывается сразу при нажатии, потом ведёт на ссылку кассы', async () => {
+    const popup = { location: { href: '' }, opener: {}, close: vi.fn() }
+    const open = vi.fn(() => popup)
+    let answer: (v: TopupResponse) => void = () => {}
+    const topup = vi.fn(() => new Promise<TopupResponse>((r) => (answer = r)))
+    const { root } = await show({ amount: '30000' }, { ep: { topup }, win: { open, navigator: {} } })
+    click(root, 'Касса fake')
+    expect(open).toHaveBeenCalledTimes(1) // до ответа сервера
+    expect(popup.location.href).toBe('')
+    answer(golden<TopupResponse>('topup_link'))
+    await vi.waitFor(() => expect(window.location.hash).toBe('#/pay/1'))
+    expect(popup.location.href).toBe('https://pay.test/fake')
+    expect(popup.opener).toBeNull()
+    expect(popup.close).not.toHaveBeenCalled()
+  })
+
+  it('окно заблокировано браузером: ссылка открывается обычным путём', async () => {
+    const open = vi.fn().mockReturnValueOnce(null).mockReturnValue({})
     const topup = vi.fn(async () => golden<TopupResponse>('topup_link'))
     const { root } = await show({ amount: '30000' }, { ep: { topup }, win: { open, navigator: {} } })
     click(root, 'Касса fake')
     await vi.waitFor(() => expect(window.location.hash).toBe('#/pay/1'))
-    expect(open).toHaveBeenCalledWith('https://pay.test/fake', '_blank', 'noopener,noreferrer')
+    expect(open).toHaveBeenLastCalledWith('https://pay.test/fake', '_blank', 'noopener,noreferrer')
+  })
+
+  it('ошибка кассы: пустое окно закрывается', async () => {
+    const popup = { location: { href: '' }, close: vi.fn() }
+    const e = golden<ErrorBody>('error_not_found')
+    const topup = vi.fn(async () => Promise.reject(new ApiError(502, e)))
+    const { root } = await show({ amount: '30000' }, { ep: { topup }, win: { open: vi.fn(() => popup), navigator: {} } })
+    click(root, 'Касса fake')
+    await vi.waitFor(() => expect(popup.close).toHaveBeenCalled())
   })
 
   it('ручная касса: реквизиты на экране и «Проверить оплату»', async () => {
     const topup = vi.fn(async () => golden<TopupResponse>('topup_manual'))
-    const { root } = await show({ amount: '30000' }, { ep: { topup } })
+    const popup = { location: { href: '' }, close: vi.fn() }
+    const { root } = await show({ amount: '30000' }, { ep: { topup }, win: { open: vi.fn(() => popup), navigator: {} } })
     click(root, 'Касса manual')
     await vi.waitFor(() => expect(root.textContent).toContain('Карта 0000'))
+    expect(popup.close).toHaveBeenCalled() // реквизиты вместо ссылки: пустое окно не нужно
     expect(window.location.hash).not.toContain('/pay/')
   })
 

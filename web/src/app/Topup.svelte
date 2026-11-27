@@ -3,7 +3,7 @@
   import Async from '../lib/Async.svelte'
   import { ApiError } from '../lib/api'
   import { useT } from '../lib/context'
-  import { openExternal, openInvoice } from '../lib/telegram'
+  import { closePopup, finishPopup, openInvoice, openPopup } from '../lib/telegram'
   import { money } from '../lib/texts'
   import type { MeResponse, TopupResponse } from '../lib/types.gen'
   import { useApp } from './context'
@@ -44,6 +44,9 @@
   async function create(gateway: string) {
     busy = true
     failure = ''
+    // В браузере окно оплаты открывается тут же, до ответа сервера, иначе его блокирует Safari.
+    const popup = openPopup(tg, win)
+    let used = false
     try {
       const r = await ep.topup(gateway, amount)
       if (r.invoice_link && tg) {
@@ -51,7 +54,8 @@
         if (status === 'paid' || status === 'pending') router.go(`/pay/${r.payment_id}`)
         else if (status === 'failed') failure = $t('err.internal')
       } else if (r.url) {
-        openExternal(tg, win, r.url)
+        used = true
+        finishPopup(popup, tg, win, r.url)
         router.go(`/pay/${r.payment_id}`)
       } else if (r.details) {
         manual = r
@@ -61,6 +65,7 @@
     } catch (e) {
       show(e)
     } finally {
+      if (!used) closePopup(popup)
       busy = false
     }
   }
