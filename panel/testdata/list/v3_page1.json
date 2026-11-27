@@ -1,0 +1,4 @@
+{"response":{"total":3,"users":[
+{"id":101,"shortUuid":"abc123","username":"alice","status":"ACTIVE","trafficLimitBytes":53687091200,"trafficLimitStrategy":"MONTH_ROLLING","expireAt":"2027-03-15T00:00:00.000Z","telegramId":4242,"email":null,"description":null,"tag":null,"hwidDeviceLimit":3,"externalSquadUuid":null,"subscriptionUrl":"https://sub.example.com/abc123","activeInternalSquads":[{"uuid":"11111111-1111-4111-8111-111111111111","name":"main"}],"userTraffic":{"usedTrafficBytes":10,"lifetimeUsedTrafficBytes":10,"onlineAt":null},"createdAt":"2026-01-10T10:00:00.000Z","updatedAt":"2026-02-01T10:00:00.000Z"},
+{"id":102,"shortUuid":"def456","username":"bob_no_tg","status":"DISABLED","trafficLimitBytes":0,"trafficLimitStrategy":"NO_RESET","expireAt":"2099-01-01T00:00:00.000Z","telegramId":null,"hwidDeviceLimit":null,"subscriptionUrl":"https://sub.example.com/def456","activeInternalSquads":[],"createdAt":"2025-12-01T10:00:00.000Z"}
+]}}
