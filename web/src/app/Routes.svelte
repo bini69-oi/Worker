@@ -6,9 +6,13 @@
   import { useApp } from './context'
   import Buy from './Buy.svelte'
   import Connect from './Connect.svelte'
+  import Devices from './Devices.svelte'
+  import History from './History.svelte'
   import Home from './Home.svelte'
   import Notice from './Notice.svelte'
   import Pay from './Pay.svelte'
+  import Promo from './Promo.svelte'
+  import Ref from './Ref.svelte'
   import Topup from './Topup.svelte'
 
   type Screen = Component<{ params: Record<string, string> }>
@@ -19,6 +23,10 @@
     ['/topup', Topup as unknown as Screen],
     ['/topup/:amount', Topup as unknown as Screen],
     ['/pay/:id', Pay as unknown as Screen],
+    ['/devices', Devices as unknown as Screen],
+    ['/ref', Ref as unknown as Screen],
+    ['/promo', Promo as unknown as Screen],
+    ['/history', History as unknown as Screen],
     ['/buy', Buy as unknown as Screen],
     ['/buy/:tariff', Buy as unknown as Screen],
     ['/buy/:tariff/:days', Buy as unknown as Screen],
