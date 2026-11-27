@@ -59,7 +59,7 @@ func newAppEnv(t *testing.T) *appEnv {
 		Gateways: []core.Gateway{manual.New(e.cfg)}, OwnerID: testOwner})
 	e.s = New(Deps{Text: fakeTexts, Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Now: e.clock.Now})
 	RegisterApp(e.s, AppDeps{Core: e.c, Config: e.cfg, BotToken: func() string { return testBotToken },
-		BotName: func() string { return "worker_bot" }, PublicURL: "https://w.test", DLKey: []byte(strings.Repeat("k", 32))})
+		BotName: func() string { return "worker_bot" }, Texts: fakeTextMap, PublicURL: "https://w.test", DLKey: []byte(strings.Repeat("k", 32))})
 	return e
 }
 
@@ -145,4 +145,17 @@ func strReplace(s, old, repl string) string { return strings.Replace(s, old, rep
 func (e *appEnv) as(token, method, target, body string) *httptest.ResponseRecorder {
 	e.t.Helper()
 	return e.req(method, target, body, "Authorization", "Bearer "+token)
+}
+
+// fakeTextMap отдаёт по два ключа на префикс со значением «язык:ключ».
+func fakeTextMap(lang string, prefixes ...string) map[string]string {
+	out := map[string]string{}
+	for _, p := range prefixes {
+		k := p + "hello"
+		if p == "err." {
+			k = "err.x"
+		}
+		out[k] = lang + ":" + k
+	}
+	return out
 }

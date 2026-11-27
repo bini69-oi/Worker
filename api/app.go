@@ -50,6 +50,7 @@ func RegisterApp(s *Server, d AppDeps) *App {
 		authFail:  &guard.Limiter{Max: authFailLimit, Window: time.Minute, Now: s.deps.Now}}
 	a.sessionRoutes()
 	a.loginRoutes()
+	a.meRoutes()
 	return a
 }
 

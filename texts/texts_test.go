@@ -270,3 +270,24 @@ func TestUnknownKeyAndBadInput(t *testing.T) {
 		t.Errorf("для неизвестного ключа ждали сам ключ, получили %q", got)
 	}
 }
+
+func TestByPrefix(t *testing.T) {
+	tx, f := newTexts(t, "ru")
+	got := tx.ByPrefix("en", "err.", "bot.web_")
+	if got["err.not_found"] != "Not found" || got["bot.web_login_ok"] == "" {
+		t.Fatalf("английские тексты: %v", got)
+	}
+	if _, ok := got["notify.remind"]; ok {
+		t.Fatal("в ответ попал ключ вне префиксов")
+	}
+	f.rows[cacheKey{"err.not_found", "en"}] = "Nothing here"
+	if err := tx.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	if got := tx.ByPrefix("en", "err."); got["err.not_found"] != "Nothing here" {
+		t.Fatalf("правка админа не видна: %v", got["err.not_found"])
+	}
+	if got := tx.ByPrefix("de", "err."); got["err.not_found"] == "" {
+		t.Fatal("для неизвестного языка нет текста по умолчанию")
+	}
+}
