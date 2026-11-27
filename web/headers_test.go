@@ -1,6 +1,7 @@
 package web
 
 import (
+	"strings"
 	"testing"
 	"testing/fstest"
 )
@@ -25,8 +26,18 @@ func TestAppHeaders(t *testing.T) {
 
 func TestAdminHeaders(t *testing.T) {
 	rec := get(newHandler(built()), "GET", "/admin/")
-	if got := rec.Header().Get("Content-Security-Policy"); got != "default-src 'self'; frame-ancestors 'none'" {
+	got := rec.Header().Get("Content-Security-Policy")
+	if got != "default-src 'self'; script-src 'self'; frame-ancestors 'none'" {
 		t.Errorf("CSP админки: %q", got)
+	}
+	// Админка не встраивается и не грузит чужие скрипты, в том числе скрипт Telegram.
+	for _, bad := range []string{"telegram.org", "unsafe-inline", "unsafe-eval", "frame-ancestors https"} {
+		if strings.Contains(got, bad) {
+			t.Errorf("в CSP админки лишнее %q", bad)
+		}
+	}
+	if rec.Header().Get("X-Frame-Options") != "" && rec.Header().Get("X-Frame-Options") != "DENY" {
+		t.Errorf("X-Frame-Options: %q", rec.Header().Get("X-Frame-Options"))
 	}
 	if rec.Header().Get("Referrer-Policy") != "no-referrer" || rec.Header().Get("X-Content-Type-Options") != "nosniff" {
 		t.Errorf("нет Referrer-Policy или nosniff")

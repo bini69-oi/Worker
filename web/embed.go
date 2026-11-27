@@ -78,7 +78,7 @@ func newHandler(fsys fs.FS) http.Handler {
 // админке ни то ни другое: её нельзя встроить никуда.
 const (
 	appCSP   = "default-src 'self'; script-src 'self' https://telegram.org; frame-ancestors https://web.telegram.org"
-	adminCSP = "default-src 'self'; frame-ancestors 'none'"
+	adminCSP = "default-src 'self'; script-src 'self'; frame-ancestors 'none'"
 )
 
 // secure ставит заголовки безопасности на любой ответ, в том числе 404 и заглушку.
