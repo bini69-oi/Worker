@@ -491,3 +491,30 @@ func TestUpdateGuardsWholeSwap(t *testing.T) {
 		t.Errorf("порядок шагов %s", got)
 	}
 }
+
+// Проверка папки идёт до скачивания: при отказе в сеть не ходят и ничего не меняют.
+func TestUpdateRefusesUnsafeBinDir(t *testing.T) {
+	rel := newReleases(t, "новая версия")
+	e := newUpdater(t, rel)
+	e.u.CheckDir = func(string) error { return errors.New("папку пишут все") }
+	err := e.u.Run(t.Context(), "")
+	if err == nil || !strings.Contains(err.Error(), "папку пишут все") {
+		t.Fatalf("небезопасная папка принята: %v", err)
+	}
+	if len(rel.hits) != 0 || content(t, e.bin) != oldBin {
+		t.Fatal("после отказа что-то скачано или изменено")
+	}
+}
+
+// Скачанный файл получает права 755 на открытом файле, несмотря на umask 077 процесса.
+func TestDownloadMode(t *testing.T) {
+	rel := newReleases(t, "новая версия")
+	e := newUpdater(t, rel)
+	dst := e.bin + ".dl"
+	if _, err := e.u.download(t.Context(), rel.srv.URL+"/download/v1.2.3/worker-linux-amd64", dst); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := os.Stat(dst); st.Mode().Perm() != 0o755 {
+		t.Errorf("права скачанного файла %v", st.Mode())
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -50,6 +51,8 @@ type updater struct {
 	// Guard вызывается перед заменой бинарника и возвращает функцию, которая снимает защиту. Пока она включена,
 	// процесс не умирает от Ctrl+C, обрыва ssh (SIGHUP, SIGPIPE) и SIGTERM: проверка и откат доводятся до конца.
 	Guard func() func()
+	// CheckDir проверяет папку бинарника до скачивания. nil: без проверки (тесты).
+	CheckDir func(dir string) error
 	// Health ждёт, пока служба ответит на /healthz. Нет (nil): проверки нет.
 	Health func(ctx context.Context) error
 }
@@ -62,6 +65,11 @@ func (u *updater) Run(ctx context.Context, tag string) error {
 	}
 	if u.Arch != "amd64" && u.Arch != "arm64" {
 		return fmt.Errorf("архитектура %s не поддерживается, есть amd64 и arm64", u.Arch)
+	}
+	if u.CheckDir != nil {
+		if err := u.CheckDir(filepath.Dir(u.BinPath)); err != nil {
+			return err
+		}
 	}
 	if tag == "" {
 		var err error
@@ -132,9 +140,6 @@ func (u *updater) Run(ctx context.Context, tag string) error {
 func (u *updater) swap(ctx context.Context, newPath string) error {
 	if u.Guard != nil {
 		defer u.Guard()()
-	}
-	if err := os.Chmod(newPath, 0o755); err != nil {
-		return err
 	}
 	oldPath := u.BinPath + ".old"
 	if err := copyFile(u.BinPath, oldPath); err != nil {
@@ -257,6 +262,10 @@ func (u *updater) download(ctx context.Context, url, dst string) (string, error)
 	}
 	h := sha256.New()
 	n, err := io.Copy(io.MultiWriter(f, h), io.LimitReader(resp.Body, maxBinary+1))
+	if err == nil {
+		// Права выставляются на открытом файле, а не по пути: между созданием и chmod путь не подменить.
+		err = f.Chmod(0o755)
+	}
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}

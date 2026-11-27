@@ -39,7 +39,7 @@ func updateCommand(env Env, args []string, out io.Writer) error {
 	}
 	u := &updater{
 		BaseURL: releasesURL, Client: &http.Client{Timeout: 5 * time.Minute}, PubKey: install.ReleasePub,
-		Arch: runtime.GOARCH, BinPath: exe, Out: out, Current: version, AllowDowngrade: allowDowngrade, Guard: guardSignals,
+		Arch: runtime.GOARCH, BinPath: exe, Out: out, Current: version, AllowDowngrade: allowDowngrade, Guard: guardSignals, CheckDir: checkBinDir,
 		Backup:  func(ctx context.Context) (string, error) { return ownerBackup(ctx, exe, env.DBPath) },
 		Restart: restartService,
 		Health: func(ctx context.Context) error {

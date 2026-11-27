@@ -48,6 +48,32 @@ func ownerAttr(euid int, dbPath string, owner func(dir string) (uid, gid uint32,
 	return &syscall.SysProcAttr{Credential: &syscall.Credential{Uid: uid, Gid: gid}}, nil
 }
 
+// checkBinDir отказывает, если папку с бинарником может изменить не root: кто может писать в папку, тот подменит
+// новый бинарник между проверкой суммы и заменой, а потом его запустит root.
+func checkBinDir(dir string) error {
+	st, err := os.Stat(dir)
+	if err != nil {
+		return err
+	}
+	sys, ok := st.Sys().(*syscall.Stat_t)
+	if !ok {
+		return errors.New("владелец папки не определён")
+	}
+	return binDirProblem(dir, st.Mode(), sys.Uid)
+}
+
+// binDirProblem это правило checkBinDir без обращения к диску.
+func binDirProblem(dir string, mode os.FileMode, uid uint32) error {
+	switch {
+	case uid != 0:
+		return fmt.Errorf("папка %s принадлежит не root: бинарник, которым управляет root, нельзя держать там, куда пишут другие. "+
+			"Положите worker в /usr/local/bin (владелец root)", dir)
+	case mode.Perm()&0o022 != 0:
+		return fmt.Errorf("в папку %s могут писать не только root (права %o): обновление отменено. Выполните chmod go-w %s", dir, mode.Perm(), dir)
+	}
+	return nil
+}
+
 // guardSignals перехватывает сигналы, которые иначе убили бы процесс посреди замены бинарника: Ctrl+C, обрыв ssh,
 // SIGTERM и SIGPIPE (запись в закрытый терминал). Возвращает функцию, которая возвращает обычное поведение.
 func guardSignals() func() {
