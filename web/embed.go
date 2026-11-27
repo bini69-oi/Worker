@@ -39,6 +39,7 @@ func Handler() http.Handler {
 
 func newHandler(fsys fs.FS) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		secure(w.Header(), r.URL.Path)
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -73,6 +74,25 @@ func newHandler(fsys fs.FS) http.Handler {
 	})
 }
 
+// Политики безопасности страниц. Кабинету нужен скрипт Telegram и показ во фрейме Telegram Web,
+// админке ни то ни другое: её нельзя встроить никуда.
+const (
+	appCSP   = "default-src 'self'; script-src 'self' https://telegram.org; frame-ancestors https://web.telegram.org"
+	adminCSP = "default-src 'self'; frame-ancestors 'none'"
+)
+
+// secure ставит заголовки безопасности на любой ответ, в том числе 404 и заглушку.
+func secure(h http.Header, urlPath string) {
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Referrer-Policy", "no-referrer")
+	switch {
+	case strings.HasPrefix(urlPath, "/app"):
+		h.Set("Content-Security-Policy", appCSP)
+	case strings.HasPrefix(urlPath, "/admin"):
+		h.Set("Content-Security-Policy", adminCSP)
+	}
+}
+
 // filePath превращает адрес в путь внутри сборки. Отдаём только app/, admin/ и assets/: остальное в build
 // (README.txt, манифест) наружу не уходит. Адрес папки это её index.html.
 func filePath(urlPath string) (string, bool) {
@@ -99,7 +119,6 @@ func filePath(urlPath string) (string, bool) {
 func serve(w http.ResponseWriter, r *http.Request, name string, data []byte, status int, cache string) {
 	h := w.Header()
 	h.Set("Cache-Control", cache)
-	h.Set("X-Content-Type-Options", "nosniff")
 	if status != http.StatusOK {
 		h.Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(status)
