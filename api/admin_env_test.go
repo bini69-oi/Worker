@@ -8,11 +8,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/bini69-oi/worker/core"
 	"github.com/bini69-oi/worker/core/coretest"
+	"github.com/bini69-oi/worker/pay/manual"
+	"github.com/bini69-oi/worker/pay/stars"
 	"github.com/bini69-oi/worker/settings"
 )
 
@@ -34,6 +37,7 @@ type adminEnv struct {
 	cfg   *settings.Settings
 	panel *coretest.Panel
 	notes *coretest.Notifier
+	stars *stars.Gateway
 	owner string // cookie владельца
 }
 
@@ -41,11 +45,18 @@ func newAdminEnv(t *testing.T) *adminEnv {
 	t.Helper()
 	e := &adminEnv{t: t, st: coretest.NewStore(), clock: coretest.NewClock(t0), cfg: coretest.NewConfig(t),
 		panel: coretest.NewPanel(), notes: &coretest.Notifier{}}
-	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes, OwnerID: adminOwner})
+	for k, v := range map[string]string{"manual.enabled": "true", "manual.details": "Карта 0000", "stars.enabled": "true"} {
+		if err := e.cfg.Set(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.stars = stars.New(e.cfg)
+	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes, OwnerID: adminOwner,
+		Gateways: []core.Gateway{manual.New(e.cfg), e.stars}})
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	// Часы лимита запросов идут вперёд сами: тесты шлют много запросов подряд, а часы ядра стоят на месте.
-	var tick time.Duration
-	e.s = New(Deps{Text: fakeTexts, Log: log, Now: func() time.Time { tick += time.Second; return t0.Add(tick) }})
+	var tick atomic.Int64
+	e.s = New(Deps{Text: fakeTexts, Log: log, Now: func() time.Time { return t0.Add(time.Duration(tick.Add(1)) * time.Second) }})
 	RegisterAdmin(e.s, AdminDeps{Core: e.c, Bot: func() string { return "test_bot" }})
 	if err := e.c.SetOwnerPassword(context.Background(), ownerPass); err != nil {
 		t.Fatal(err)

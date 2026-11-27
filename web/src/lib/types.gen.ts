@@ -58,6 +58,11 @@ export interface AdminPayment {
   paid_at: string | null;
 }
 
+export interface AdminPaymentList {
+  items: AdminPayment[];
+  next: number;
+}
+
 export interface AdminSub {
   tariff: string;
   trial: boolean;

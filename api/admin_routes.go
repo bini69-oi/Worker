@@ -36,6 +36,10 @@ func (a *adminAPI) routes() []adminRoute {
 		{"POST /api/admin/users/{id}/message", core.PermSupport, a.userMessage},
 		{"POST /api/admin/users/{id}/devices/reset", core.PermGrant, a.userDevicesReset},
 		{"POST /api/admin/users/{id}/link/revoke", core.PermGrant, a.userLinkRevoke},
+
+		{"GET /api/admin/payments", core.PermStats, a.paymentsList},
+		{"POST /api/admin/payments/{id}/confirm", core.PermGrant, a.paymentConfirm},
+		{"POST /api/admin/payments/{id}/refund", core.PermOwner, a.paymentRefund},
 	}
 }
 
