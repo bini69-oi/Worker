@@ -220,3 +220,41 @@ func (s *Settings) Duration(key string) time.Duration {
 	d, _ := time.ParseDuration(v)
 	return d
 }
+
+// Validate проверяет значение по типу настройки и её своей проверке, ничего не записывая. Нужна, чтобы отказать
+// сразу, а не после «Да» владельца. Значение в текст ошибки не попадает.
+func (s *Settings) Validate(key, raw string) error {
+	def, ok := find(key)
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
+	}
+	norm, err := normalize(def.Kind, raw)
+	if err != nil {
+		return fmt.Errorf("%s: %w", key, err)
+	}
+	if check := checks[key]; check != nil {
+		if err := check(norm); err != nil {
+			return fmt.Errorf("%s: %w: %w", key, ErrBadValue, err)
+		}
+	}
+	return nil
+}
+
+// Current отдаёт текущее значение и признак «изменено» (в базе есть строка, а не умолчание). Секрет отдаёт
+// пустое значение: для него есть Masked.
+func (s *Settings) Current(key string) (value string, changed bool) {
+	def, ok := find(key)
+	if !ok {
+		return "", false
+	}
+	s.mu.RLock()
+	v, set := s.vals[key]
+	s.mu.RUnlock()
+	if def.Secret {
+		return "", set
+	}
+	if !set {
+		return def.Default, false
+	}
+	return v, true
+}

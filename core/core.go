@@ -243,6 +243,7 @@ func New(d Deps) *Core {
 		sender: d.Sender, texts: d.Texts,
 	}
 	c.bcNext.Store(time.Time{})
+	c.actions["setting"] = action{perm: PermOwner, fn: c.onSettingApproved}
 	return c
 }
 

@@ -122,6 +122,9 @@ func (c *Core) answer(ctx context.Context, confirmID, pressedBy int64, decide fu
 					return err
 				}
 			}
+			if err := c.audit(ctx, tx, pressedBy, "reject:"+cf.Kind, itoa(cf.ID), nil, now); err != nil {
+				return err
+			}
 			return c.alert(tx, "admin.confirm_rejected", vars, now)
 		}
 		if cf.Kind == "login" {
