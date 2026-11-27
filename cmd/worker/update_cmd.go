@@ -53,8 +53,12 @@ func updateCommand(env Env, args []string, out io.Writer) error {
 // ownerBackup запускает `<бинарник> backup` от пользователя, которому принадлежит папка с базой, и возвращает
 // путь к файлу бэкапа. Так файлы бэкапа и базы не меняют владельца.
 func ownerBackup(ctx context.Context, exe, dbPath string) (string, error) {
+	attr, err := asOwner(dbPath)
+	if err != nil {
+		return "", err
+	}
 	cmd := exec.CommandContext(ctx, exe, "backup")
-	cmd.SysProcAttr = asOwner(filepath.Dir(dbPath))
+	cmd.SysProcAttr = attr
 	b, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(string(b)))
