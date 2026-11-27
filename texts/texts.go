@@ -152,24 +152,37 @@ func (t *Texts) Reset(key, lang string) error {
 	return nil
 }
 
-// Langs отдаёт языки, на которых есть тексты: язык умолчаний из кода и языки правок админа.
+// Langs отдаёт языки, на которых есть тексты: русский и английский из кода и языки правок админа.
 func (t *Texts) Langs() []string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	seen := map[string]bool{codeLang: true}
-	out := []string{codeLang}
+	seen := map[string]bool{codeLang: true, enLang: true}
+	out := []string{codeLang, enLang}
+	var extra []string
 	for k := range t.vals {
 		if !seen[k.lang] {
 			seen[k.lang] = true
-			out = append(out, k.lang)
+			extra = append(extra, k.lang)
 		}
 	}
-	sort.Strings(out[1:])
-	return out
+	sort.Strings(extra)
+	return append(out, extra...)
 }
 
-// Raw отдаёт текст без подстановок. Порядок: язык абонента, язык по умолчанию из настроек,
-// русский текст из кода. Для неизвестного ключа отдаёт сам ключ, чтобы ошибку было видно.
+// builtin отдаёт умолчание из кода для языка: русский или английский.
+func (d Def) builtin(lang string) (string, bool) {
+	switch lang {
+	case codeLang:
+		return d.Default, true
+	case enLang:
+		return d.En, true
+	}
+	return "", false
+}
+
+// Raw отдаёт текст без подстановок. Порядок: правка админа и умолчание на языке абонента,
+// то же на языке по умолчанию из настроек, русский текст из кода. Для неизвестного ключа
+// отдаёт сам ключ, чтобы ошибку было видно.
 func (t *Texts) Raw(key, lang string) string {
 	def, ok := find(key)
 	if !ok {
@@ -181,8 +194,8 @@ func (t *Texts) Raw(key, lang string) string {
 		if v, ok := t.vals[cacheKey{key, l}]; ok {
 			return v
 		}
-		if l == codeLang {
-			return def.Default
+		if v, ok := def.builtin(l); ok {
+			return v
 		}
 	}
 	return def.Default

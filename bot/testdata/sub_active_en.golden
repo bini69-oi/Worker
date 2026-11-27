@@ -1,0 +1,14 @@
+== edit chat=1001 msg=101
+<b>My subscription</b>
+
+Plan: Month
+✅ Subscribed until 31.01.2026, 30 days left
+Traffic: 100 GB
+Devices: 3
+Auto-renewal: off
+[📋 Copy link ⧉ https://sub.test/ref-1/0]
+[🚀 Connect → con] | [🔄 Renew → buy]
+[🔁 Turn on auto-renewal → ar:1]
+[📱 Devices → dev] | [♻️ Reissue link → rv]
+[← Back → m]
+== answer chat=0 msg=0

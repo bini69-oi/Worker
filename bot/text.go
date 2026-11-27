@@ -2,7 +2,6 @@ package bot
 
 import (
 	"html"
-	"slices"
 	"strconv"
 	"strings"
 )
@@ -23,19 +22,23 @@ func (b *Bot) t(r *req, key string, vars map[string]string) string {
 	return b.tx.Render(key, r.lang, safe)
 }
 
-// lang выбирает язык абонента: язык Telegram, если на нём есть тексты, иначе язык по умолчанию.
+// lang выбирает язык абонента по коду Telegram: ru, uk, be и kk дают русский, любой другой код
+// английский, пустой код язык по умолчанию из настройки lang.default (или русский).
 func (b *Bot) lang(code string) string {
 	code = strings.ToLower(code)
 	if i := strings.IndexByte(code, '-'); i > 0 {
 		code = code[:i]
 	}
-	if slices.Contains(b.tx.Langs(), code) {
-		return code
+	switch code {
+	case "":
+		if def := b.cfg.String("lang.default"); def != "" {
+			return def
+		}
+		return "ru"
+	case "ru", "uk", "be", "kk":
+		return "ru"
 	}
-	if def := b.cfg.String("lang.default"); def != "" {
-		return def
-	}
-	return "ru"
+	return "en"
 }
 
 // money пишет копейки рублями: 25000 → «250 ₽», 25050 → «250,50 ₽».

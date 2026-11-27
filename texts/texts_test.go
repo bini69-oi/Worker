@@ -3,10 +3,12 @@ package texts
 import (
 	"context"
 	"errors"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 type fakeStore struct {
@@ -128,36 +130,115 @@ func TestUnknownPlaceholderRejected(t *testing.T) {
 	}
 }
 
+func TestEnglishDefault(t *testing.T) {
+	tx, _ := newTexts(t, "ru")
+	if got := tx.Raw("sub.expiring", "en"); got != "{days} days left" {
+		t.Fatalf("без правок ждали английское умолчание, получили %q", got)
+	}
+	if got := tx.Raw("sub.expiring", "ru"); got != "Осталось {days} дн." {
+		t.Fatalf("русское умолчание сломано: %q", got)
+	}
+}
+
 func TestFallbackLanguage(t *testing.T) {
 	tx, _ := newTexts(t, "ru")
-	if got := tx.Raw("sub.expiring", "en"); got != "Осталось {days} дн." {
+	// Для языка без перевода берётся язык по умолчанию из настроек.
+	if got := tx.Raw("sub.expiring", "de"); got != "Осталось {days} дн." {
 		t.Fatalf("без перевода ждали русский, получили %q", got)
 	}
-	// Русская правка тоже запасная для английского.
+	// Русская правка не перебивает английское умолчание.
 	if err := tx.Set("sub.expiring", "ru", "Дней: {days}"); err != nil {
 		t.Fatal(err)
 	}
-	if got := tx.Raw("sub.expiring", "en"); got != "Дней: {days}" {
-		t.Fatalf("ждали правку русского, получили %q", got)
+	if got := tx.Raw("sub.expiring", "en"); got != "{days} days left" {
+		t.Fatalf("ждали английское умолчание, получили %q", got)
+	}
+	if got := tx.Raw("sub.expiring", "de"); got != "Дней: {days}" {
+		t.Fatalf("ждали правку русского для немецкого, получили %q", got)
 	}
 	if err := tx.Set("sub.expiring", "en", "Days left: {days}"); err != nil {
 		t.Fatal(err)
 	}
 	if got := tx.Raw("sub.expiring", "en"); got != "Days left: {days}" {
-		t.Fatalf("ждали английский, получили %q", got)
+		t.Fatalf("ждали английскую правку, получили %q", got)
 	}
 }
 
 func TestFallbackToNonRuDefaultLang(t *testing.T) {
 	tx, _ := newTexts(t, "en")
+	if got := tx.Raw("sub.expiring", "de"); got != "{days} days left" {
+		t.Fatalf("ждали английское умолчание, получили %q", got)
+	}
 	if err := tx.Set("sub.expiring", "en", "Days left: {days}"); err != nil {
 		t.Fatal(err)
 	}
 	if got := tx.Raw("sub.expiring", "de"); got != "Days left: {days}" {
 		t.Fatalf("ждали язык по умолчанию из настроек, получили %q", got)
 	}
-	if got := tx.Raw("buy.success", "de"); got != defs[0].Default {
-		t.Fatalf("нет и там: ждали текст из кода, получили %q", got)
+}
+
+func TestLangs(t *testing.T) {
+	tx, _ := newTexts(t, "ru")
+	if got := strings.Join(tx.Langs(), ","); got != "ru,en" {
+		t.Fatalf("получили %s", got)
+	}
+	if err := tx.Set("buy.success", "de", "Fertig {days}"); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Set("buy.success", "en", "Done {days}"); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(tx.Langs(), ","); got != "ru,en,de" {
+		t.Fatalf("получили %s", got)
+	}
+}
+
+func paramSet(s string) map[string]bool {
+	out := map[string]bool{}
+	for _, m := range placeholderRe.FindAllStringSubmatch(s, -1) {
+		out[m[1]] = true
+	}
+	return out
+}
+
+var tagRe = regexp.MustCompile(`</?([a-z]+)>`)
+
+func TestEnglishComplete(t *testing.T) {
+	for _, d := range defs {
+		if strings.TrimSpace(d.En) == "" {
+			t.Errorf("%s: нет английского текста", d.Key)
+			continue
+		}
+		if err := checkParams(d, d.En); err != nil {
+			t.Errorf("%s: %v", d.Key, err)
+		}
+		// Набор в En равен набору в Default; Params допускает лишние, бот передаёт их про запас.
+		got := paramSet(d.En)
+		ru := paramSet(d.Default)
+		if len(got) != len(ru) {
+			t.Errorf("%s: подстановки En %v не равны Default %v", d.Key, got, ru)
+		}
+		for p := range ru {
+			if !got[p] {
+				t.Errorf("%s: в En нет {%s}", d.Key, p)
+			}
+		}
+		open := map[string]int{}
+		for _, m := range tagRe.FindAllStringSubmatch(d.En, -1) {
+			if strings.HasPrefix(m[0], "</") {
+				open[m[1]]--
+			} else {
+				open[m[1]]++
+			}
+		}
+		for tag, n := range open {
+			if n != 0 {
+				t.Errorf("%s: тег <%s> не закрыт в En", d.Key, tag)
+			}
+		}
+		if strings.HasPrefix(d.Key, "btn.") && utf8.RuneCountInString(d.En) > 32 {
+			t.Errorf("%s: кнопка длиннее 32 символов: %q", d.Key, d.En)
+		}
 	}
 }
 

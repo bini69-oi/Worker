@@ -1,8 +1,12 @@
 == commands chat=0 msg=0
  [{start Главное меню} {buy Купить или продлить} {sub Моя подписка} {balance Баланс} {help Помощь}]
+== commands chat=0 msg=0
+en [{start Main menu} {buy Buy or renew} {sub My subscription} {balance Balance} {help Help}]
 == menu_button chat=0 msg=0
  
 == commands chat=0 msg=0
  [{start Главное меню} {buy Купить или продлить} {sub Моя подписка} {balance Баланс} {help Помощь}]
+== commands chat=0 msg=0
+en [{start Main menu} {buy Buy or renew} {sub My subscription} {balance Balance} {help Help}]
 == menu_button chat=0 msg=0
 📲 Открыть приложение https://vpn.example/app/
