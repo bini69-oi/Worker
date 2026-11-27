@@ -76,13 +76,62 @@ func TestAskAllAbortsOnEOF(t *testing.T) {
 
 func TestInsideHost(t *testing.T) {
 	for host, want := range map[string]bool{
-		"localhost": true, "127.0.0.1": true, "10.1.2.3": true, "192.168.0.5": true, "172.16.0.1": true,
-		"172.31.9.9": true, "panel": true, "172.32.0.1": false, "panel.example.com": false, "8.8.8.8": false,
+		"localhost": true, "127.0.0.1": true, "127.5.5.5": true, "10.1.2.3": true, "192.168.0.5": true, "172.16.0.1": true,
+		"172.31.9.9": true, "panel": true, "::1": true, "fd12:3456::1": true,
+		"172.32.0.1": false, "172.15.0.1": false, "192.169.0.1": false, "11.0.0.1": false, "panel.example.com": false,
+		"8.8.8.8": false, "10.example.com": false, "127.0.0.1.evil.com": false, "10.0.0.256": false, "010.0.0.1": false,
+		"10.0.0": false, "2001:db8::1": false, "fe80::1": false, "1.2.3.4.5": false,
 	} {
-		_, err := bash(t, nil, "inside_host "+host)
+		_, err := bash(t, nil, "inside_host '"+host+"'")
 		if (err == nil) != want {
 			t.Errorf("inside_host %s: ждали %v, получили err=%v", host, want, err)
 		}
+	}
+}
+
+// Хост берётся так же, как в Go (u.Hostname()): userinfo, порт, путь и фрагмент не обманывают проверку.
+func TestURLHostAndInside(t *testing.T) {
+	cases := []struct {
+		url, host string
+		inside    bool
+	}{
+		{"http://127.0.0.1:3000", "127.0.0.1", true},
+		{"http://user:pw@10.0.0.5/api", "10.0.0.5", true},
+		{"http://[::1]:3000", "::1", true},
+		{"http://panel:3000/x", "panel", true},
+		{"http://localhost", "localhost", true},
+		{"http://10.example.com", "10.example.com", false},
+		{"http://127.0.0.1@panel.example.com", "panel.example.com", false},
+		{"http://127.0.0.1:80@panel.example.com:3000/", "panel.example.com", false},
+		{"http://localhost@evil.com", "evil.com", false},
+		{"http://a@127.0.0.1@evil.com", "evil.com", false},
+		{"http://panel.example.com#@127.0.0.1", "panel.example.com", false},
+		{"http://panel.example.com?x=@127.0.0.1", "panel.example.com", false},
+		{"http://panel.example.com/@127.0.0.1", "panel.example.com", false},
+		{"http://8.8.8.8", "8.8.8.8", false},
+	}
+	for _, c := range cases {
+		out, err := bash(t, nil, "url_host '"+c.url+"'")
+		if err != nil || strings.TrimSpace(out) != c.host {
+			t.Errorf("url_host %s = %q, ждали %q", c.url, out, c.host)
+		}
+		_, err = bash(t, nil, "inside_host \"$(url_host '"+c.url+"')\"")
+		if (err == nil) != c.inside {
+			t.Errorf("%s: внутренний=%v, ждали %v", c.url, err == nil, c.inside)
+		}
+	}
+}
+
+// check_panel не пускает http к чужому хосту, как бы адрес ни маскировали, и не доходит до запроса к панели.
+func TestCheckPanelHTTPDisguised(t *testing.T) {
+	for _, url := range []string{"http://10.example.com", "http://127.0.0.1@panel.example.com", "http://panel.example.com#@127.0.0.1"} {
+		out, err := bash(t, nil, "panel_status() { echo REQUESTED; echo 200; }; check_panel '"+url+"' tok")
+		if err == nil || strings.Contains(out, "REQUESTED") || !strings.Contains(out, "открытым текстом") {
+			t.Errorf("%s принят: %v\n%s", url, err, out)
+		}
+	}
+	if out, err := bash(t, nil, "panel_status() { echo 200; }; check_panel 'http://127.0.0.1:3000' tok"); err != nil {
+		t.Errorf("локальная панель по http отклонена: %v\n%s", err, out)
 	}
 }
 

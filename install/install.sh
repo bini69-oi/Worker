@@ -337,12 +337,51 @@ check_domain() {
   return 1
 }
 
-# inside_host ХОСТ: адрес этого сервера, своей сети или имя без точки. Туда ключ панели можно слать по http.
-inside_host() {
-  case "$1" in
-    localhost | 127.* | 10.* | 192.168.* | 172.1[6-9].* | 172.2[0-9].* | 172.3[0-1].*) return 0 ;;
+# url_host АДРЕС печатает хост так же, как Go в u.Hostname(): без схемы, без userinfo (всё до последней @ в
+# авторитете), без порта, без скобок IPv6. Авторитет кончается на первом /, ? или #.
+url_host() {
+  local rest="${1#*://}" host
+  rest="${rest%%[/?#]*}"
+  rest="${rest##*@}"
+  case "$rest" in
+    \[*) host="${rest#\[}"; host="${host%%\]*}" ;;
+    *) host="${rest%%:*}" ;;
   esac
-  case "$1" in *.*) return 1 ;; *) return 0 ;; esac
+  printf '%s' "$host" | tr '[:upper:]' '[:lower:]'
+}
+
+# ipv4_octets АДРЕС: четыре числа 0-255 без ведущих нулей, по одному в строке. Не IPv4: код 1.
+ipv4_octets() {
+  local o
+  printf '%s' "$1" | grep -Eq '^(0|[1-9][0-9]{0,2})(\.(0|[1-9][0-9]{0,2})){3}$' || return 1
+  for o in ${1//./ }; do
+    [ "$o" -le 255 ] || return 1
+    echo "$o"
+  done
+}
+
+# inside_host ХОСТ: этот сервер, своя сеть (10/8, 172.16/12, 192.168/16, 127/8, ::1, fc00::/7) или имя без точки.
+# Туда ключ панели можно слать по http. IP проверяется точно: 10.example.com и 127.0.0.1.evil.com не внутренние.
+inside_host() {
+  local a b rest
+  [ "$1" = localhost ] && return 0
+  if rest=$(ipv4_octets "$1"); then
+    { read -r a; read -r b; } <<<"$rest"
+    case "$a" in 10 | 127) return 0 ;; esac
+    [ "$a" -eq 192 ] && [ "$b" -eq 168 ] && return 0
+    [ "$a" -eq 172 ] && [ "$b" -ge 16 ] && [ "$b" -le 31 ] && return 0
+    return 1
+  fi
+  case "$1" in
+    *:*)
+      [ "$1" = "::1" ] && return 0
+      printf '%s' "$1" | grep -Eqi '^f[cd][0-9a-f]{2}:[0-9a-f:]*$' && return 0
+      return 1
+      ;;
+    *.*) return 1 ;;
+    "") return 1 ;;
+    *) return 0 ;;
+  esac
 }
 
 check_panel() {
@@ -355,9 +394,7 @@ check_panel() {
     say "В токене панели не должно быть пробелов и кавычек."
     return 1
   fi
-  host="${url#*://}"
-  host="${host%%/*}"
-  host="${host%%:*}"
+  host=$(url_host "$url")
   case "$url" in
     http://*) inside_host "$host" || {
       say "По http ключ панели шёл бы по сети открытым текстом. Для панели на другом сервере нужен https."
