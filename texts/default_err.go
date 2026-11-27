@@ -12,6 +12,8 @@ var errDefs = []Def{
 		En: "Text is too long"},
 	{Key: "err.maintenance", Default: "Идут технические работы, загляните позже",
 		En: "Maintenance in progress, please check back later"},
+	{Key: "err.internal", Default: "Что-то пошло не так, попробуйте позже",
+		En: "Something went wrong, please try again later"},
 	{Key: "err.not_enough_money", Default: "Не хватает денег на балансе",
 		En: "Not enough balance"},
 	{Key: "err.zero_amount", Default: "Сумма должна быть не нулевой",

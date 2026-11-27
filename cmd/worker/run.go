@@ -24,6 +24,7 @@ import (
 	"github.com/bini69-oi/worker/store"
 	"github.com/bini69-oi/worker/texts"
 	"github.com/bini69-oi/worker/tg"
+	"github.com/bini69-oi/worker/web"
 )
 
 // app это собранный процесс: база, настройки, ядро, HTTP и фоновые задачи.
@@ -113,6 +114,10 @@ func build(env Env, base slog.Handler) (*app, error) {
 	mux.Handle("POST /panel/webhook", hooks.Wrap(panel.WebhookHandler(c, func() string { return cfg.Secret("panel.webhook_secret") }, log)))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.Handle("POST /tg/webhook", tg.NewWebhook(t.secret, t.updates, t.bot.Urgent))
+	static := web.Handler()
+	for _, p := range []string{"/app/", "/admin/", "/assets/"} {
+		mux.Handle(p, static)
+	}
 	mux.Handle("GET /dl/{app}/{token}", hooks.Wrap(apps.Handler(c, env.SecretKey, time.Now,
 		func(key string) string { return tx.Render(key, cfg.String("lang.default"), nil) })))
 

@@ -24,3 +24,23 @@ jobs:
       - run: shellcheck install/install.sh
       - run: make check
       - run: make vuln
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - run: npm ci
+        working-directory: web
+      - run: make web-check
+      # Типы фронта пишутся из структур Go. Файл в git устарел: правка в Go без make types.
+      - run: make types
+      - name: Типы устарели
+        run: git diff --exit-code web/src/lib/types.gen.ts || { echo "типы устарели: make types"; exit 1; }

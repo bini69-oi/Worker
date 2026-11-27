@@ -30,6 +30,7 @@ var (
 	ErrInvalid     = newErr("E1003", "err.invalid", "неверные данные")
 	ErrTooLong     = newErr("E1004", "err.too_long", "слишком длинный текст")
 	ErrMaintenance = newErr("E1005", "err.maintenance", "идут технические работы, загляните позже")
+	ErrInternal    = newErr("E1006", "err.internal", "внутренняя ошибка")
 )
 
 // Деньги
