@@ -81,6 +81,23 @@ export interface AdminGatewayRevenue {
   revenue: number;
 }
 
+export interface AdminImportReason {
+  reason: string;
+  count: number;
+}
+
+export interface AdminImportReport {
+  subs: number;
+  new_users: number;
+  reasons: AdminImportReason[];
+  skipped: AdminImportSkip[];
+}
+
+export interface AdminImportSkip {
+  username: string;
+  reason: string;
+}
+
 export interface AdminLedger {
   amount: number;
   reason: string;

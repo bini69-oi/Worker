@@ -244,6 +244,7 @@ func New(d Deps) *Core {
 	}
 	c.bcNext.Store(time.Time{})
 	c.actions["setting"] = action{perm: PermOwner, fn: c.onSettingApproved}
+	c.actions["import"] = action{perm: PermOwner, fn: c.onImportApproved}
 	return c
 }
 

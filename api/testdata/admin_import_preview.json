@@ -1,0 +1,16 @@
+{
+  "subs": 1,
+  "new_users": 1,
+  "reasons": [
+    {
+      "reason": "нет Telegram ID",
+      "count": 1
+    }
+  ],
+  "skipped": [
+    {
+      "username": "no_tg",
+      "reason": "нет Telegram ID"
+    }
+  ]
+}

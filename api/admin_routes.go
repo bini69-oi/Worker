@@ -69,6 +69,8 @@ func (a *adminAPI) routes() []adminRoute {
 		{"GET /api/admin/sessions", core.PermOwner, a.sessionsList},
 		{"POST /api/admin/sessions/close", core.PermOwner, a.sessionClose},
 		{"GET /api/admin/audit", core.PermOwner, a.auditList},
+		{"POST /api/admin/import/preview", core.PermOwner, a.importPreview},
+		{"POST /api/admin/import/apply", core.PermOwner, a.importApply},
 		{"GET /api/admin/maintenance", core.PermOwner, a.maintenanceGet},
 		{"POST /api/admin/maintenance", core.PermOwner, a.maintenanceSet},
 		{"GET /api/admin/notifications", core.PermOwner, a.notifyGet},
