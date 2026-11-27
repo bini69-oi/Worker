@@ -42,10 +42,15 @@ type Stats struct {
 // и зависшие задачи очереди. Нужно право stats. Период до 90 дней, иначе ErrPeriodTooLong и ничего не считается.
 // Дни считаются в часовом поясе from.
 func (c *Core) Stats(ctx context.Context, actorTg int64, from, to time.Time) (Stats, error) {
-	st := Stats{From: from, To: to}
 	if _, err := c.Require(ctx, actorTg, PermStats, "stats.get"); err != nil {
-		return st, err
+		return Stats{From: from, To: to}, err
 	}
+	return c.stats(ctx, from, to)
+}
+
+// stats считает сводку без проверки права: её зовут Stats и итог дня, который идёт не от имени админа.
+func (c *Core) stats(ctx context.Context, from, to time.Time) (Stats, error) {
+	st := Stats{From: from, To: to}
 	if !to.After(from) {
 		return st, ErrInvalid
 	}

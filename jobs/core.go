@@ -38,6 +38,7 @@ func CoreJobs(c *core.Core, cfg Config) []Job {
 		{Name: "autorenew", Every: fixed(10 * time.Minute), Run: count(c.AutoRenewDue)},
 		// Рассылка: ядро само держит предел 25 в секунду, задача лишь будит его раз в секунду.
 		{Name: "broadcast", Every: fixed(time.Second), Run: count(c.RunBroadcast)},
+		{Name: "summary", Every: fixed(time.Minute), Run: count(c.SendSummary)},
 		{Name: "payments", Every: fixed(time.Minute), Run: count(c.ReconcilePayments)},
 		{Name: "support", Every: fixed(24 * time.Hour), Run: count(c.CleanSupport)},
 		{Name: "reconcile", Every: minutes(cfg, "panel.reconcile_minutes"), Run: count(c.Reconcile)},

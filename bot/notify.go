@@ -23,7 +23,7 @@ func init() {
 var _ core.Notifier = (*Bot)(nil)
 
 // moneyVars это подстановки, в которых ядро передаёт копейки: бот пишет их рублями.
-var moneyVars = map[string]bool{"amount": true, "missing": true}
+var moneyVars = map[string]bool{"amount": true, "missing": true, "revenue": true}
 
 // userButton это кнопка под уведомлением абоненту: куда ведёт и какой текст.
 var userButton = map[string][2]string{
