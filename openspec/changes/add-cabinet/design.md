@@ -96,6 +96,8 @@ id запроса знает только браузер, `nonce` только �
 | `POST /api/app/promo` | промокод | `ApplyPromo` |
 | `GET /api/app/ref` | ссылка и статистика рефералки | `RefStats` |
 | `POST /api/app/autorenew` | автопродление | `SetAutoRenew` |
+| `POST /api/app/plan/cancel` | отмена ждущей смены тарифа | `CancelPlan` |
+| `POST /api/app/addons/traffic`, `POST /api/app/addons/device` | докупка трафика и устройства | `BuyTraffic`, `BuyDevice` |
 | `POST /api/app/logout`, `POST /api/app/logout-all` | выход | сессии ядра |
 
 Каждый обработчик берёт id абонента только из сессии. **Почему:** id в теле запроса можно подменить, сессию нет.
