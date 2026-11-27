@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bini69-oi/worker/api"
 	"github.com/bini69-oi/worker/apps"
 	"github.com/bini69-oi/worker/bot"
 	"github.com/bini69-oi/worker/core"
@@ -113,6 +114,7 @@ func build(env Env, base slog.Handler) (*app, error) {
 	mux.Handle("POST /panel/webhook", hooks.Wrap(panel.WebhookHandler(c, func() string { return cfg.Secret("panel.webhook_secret") }, log)))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.Handle("POST /tg/webhook", tg.NewWebhook(t.secret, t.updates, t.bot.Urgent))
+	mux.Handle("/api/app/", appAPI(c, cfg, tx, t, env, log))
 	static := web.Handler()
 	for _, p := range []string{"/app/", "/admin/", "/assets/"} {
 		mux.Handle(p, static)
@@ -171,4 +173,18 @@ func (a *app) serve(ctx context.Context, ln net.Listener) error {
 	}
 	a.log.Info("worker остановлен")
 	return err
+}
+
+// appAPI собирает HTTP API кабинета: ядро, тексты на языке абонента и счета Stars через Telegram.
+func appAPI(c *core.Core, cfg *settings.Settings, tx *texts.Texts, t *telegram, env Env, log *slog.Logger) http.Handler {
+	srv := api.New(api.Deps{Log: log, Text: func(key, lang string) string { return tx.Render(key, lang, nil) }})
+	api.RegisterApp(srv, api.AppDeps{
+		Core: c, Config: cfg, BotToken: func() string { return env.BotToken }, BotName: t.botName,
+		PublicURL: env.PublicURL, DLKey: env.SecretKey, Texts: tx.ByPrefix,
+		StarsInvoice: func(ctx context.Context, title, desc, payload string, stars int64) (string, error) {
+			return t.client.CreateInvoiceLink(ctx, tg.InvoiceParams{Title: title, Description: desc, Payload: payload, Currency: "XTR",
+				Prices: []tg.LabeledPrice{{Label: title, Amount: stars}}})
+		},
+	})
+	return srv
 }
