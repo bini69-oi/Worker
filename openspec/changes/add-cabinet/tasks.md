@@ -38,7 +38,7 @@
 
 ## 5. Общее фронта
 
-- [ ] 5.1 `lib/api.ts`: запросы, токен или cookie, `X-Worker`, ошибки, 401; проверка: vitest на эталонах
+- [x] 5.1 `lib/api.ts`: запросы, токен или cookie, `X-Worker`, ошибки, 401; проверка: vitest на эталонах
 - [ ] 5.2 `lib/router.ts`: маршруты через `#`, назад; проверка: vitest
 - [ ] 5.3 `lib/telegram.ts`: загрузка скрипта только в Telegram, тема, кнопка «Назад», `openInvoice`, `openLink`; проверка: vitest с фейковым `WebApp`
 - [ ] 5.4 `lib/texts.ts` и тема CSS-переменными, светлая и тёмная; проверка: vitest
