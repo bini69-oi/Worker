@@ -139,3 +139,38 @@ func TestRotateRefusesWhileBotRuns(t *testing.T) {
 		t.Fatal("rotate при работающем боте оставил файл ключа")
 	}
 }
+
+// worker admin allow-all: владелец, запершийся списком адресов, сбрасывает его на сервере, запись идёт в журнал.
+func TestAdminAllowAllCommand(t *testing.T) {
+	env := Env{DBPath: filepath.Join(t.TempDir(), "w.db"), SecretKey: settings.NewKey(), OwnerID: 1}
+	db, err := store.Open(env.DBPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := settings.New(store.NewSettingsStore(db), env.SecretKey, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Set("admin.allow_ips", "203.0.113.5"); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	var out bytes.Buffer
+	if err := command(env, []string{"admin", "allow-all"}, nil, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "сброшен") {
+		t.Errorf("вывод: %q", out.String())
+	}
+	db, _ = store.Open(env.DBPath)
+	defer db.Close()
+	fresh, err := settings.New(store.NewSettingsStore(db), env.SecretKey, time.Now)
+	if err != nil || fresh.String("admin.allow_ips") != "" {
+		t.Fatalf("список не сброшен: %q %v", fresh.String("admin.allow_ips"), err)
+	}
+	rows, err := store.NewCoreStore(db).AuditLog(context.Background(), core.AuditFilter{Action: "admin.allow_all"}, 5)
+	if err != nil || len(rows) != 1 || rows[0].AdminTg != 1 || rows[0].Details["old"] != "203.0.113.5" {
+		t.Errorf("журнал: %+v %v", rows, err)
+	}
+}

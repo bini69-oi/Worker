@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"strings"
+	"time"
 
 	"golang.org/x/term"
 
@@ -34,12 +35,14 @@ func command(env Env, args []string, in io.Reader, out io.Writer) error {
 		return rotate(env, out)
 	case "admin password":
 		return ownerPassword(env, in, out)
+	case "admin allow-all":
+		return adminAllowAll(env, out)
 	case "import panel":
 		return importPanel(env, false, out)
 	case "import panel --apply":
 		return importPanel(env, true, out)
 	}
-	return errors.New("неизвестная команда, есть: rotate, admin password, import panel [--apply], backup [--check файл], restore файл, update [--version v1.2.3]")
+	return errors.New("неизвестная команда, есть: rotate, admin password, admin allow-all, import panel [--apply], backup [--check файл], restore файл, update [--version v1.2.3]")
 }
 
 // ownerPassword задаёт пароль владельца. Пароль просится дважды; в терминале ввод не виден.
@@ -134,5 +137,25 @@ func rotate(env Env, out io.Writer) error {
 		return fmt.Errorf("секреты не перешифрованы, база на прежнем ключе: %w", err)
 	}
 	fmt.Fprintf(out, "Готово. Новый ключ лежит в %s, впишите его в .env вместо старого и запустите бота:\n%s", path, line)
+	return nil
+}
+
+// adminAllowAll сбрасывает список адресов админки (admin.allow_ips): запасной ход владельцу, который запер себя.
+// Команда только на сервере, запись о ней идёт в журнал действий.
+func adminAllowAll(env Env, out io.Writer) error {
+	db, err := store.Open(env.DBPath)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	cfg, err := settings.New(store.NewSettingsStore(db), env.SecretKey, time.Now)
+	if err != nil {
+		return err
+	}
+	c := core.New(core.Deps{Store: store.NewCoreStore(db), Config: cfg, OwnerID: env.OwnerID})
+	if err := c.AllowAllAdminIPs(context.Background()); err != nil {
+		return err
+	}
+	fmt.Fprintln(out, "Список адресов админки сброшен: админка открыта с любых адресов.")
 	return nil
 }

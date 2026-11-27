@@ -229,6 +229,28 @@ func TestAdminEndToEnd(t *testing.T) {
 		t.Fatalf("журнал: %+v", audit)
 	}
 
+	// 6a. Список адресов: чужой адрес получает 404 и на страницу, и на API, до входа и сессии. Свой (127.0.0.1) проходит.
+	if err := a.cfg.Set("admin.allow_ips", "203.0.113.5"); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/api/admin/me", "/admin/", "/api/admin/login/1.x"} {
+		if code, _, _ := c.do("GET", path, ""); code != 404 {
+			t.Fatalf("%s с чужого адреса: %d", path, code)
+		}
+	}
+	if code, _, _ := c.do("POST", "/api/admin/login", `{"tg_id":1,"password":"x"}`); code != 404 {
+		t.Fatalf("вход с чужого адреса: %d", code)
+	}
+	if err := a.cfg.Set("admin.allow_ips", "127.0.0.1, 10.0.0.0/8"); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, _ := c.do("GET", "/api/admin/me", ""); code != 200 {
+		t.Fatalf("свой адрес: %d", code)
+	}
+	if err := a.cfg.Reset("admin.allow_ips"); err != nil {
+		t.Fatal(err)
+	}
+
 	// 6. Чужая форма с cookie админа без X-Worker не меняет ничего.
 	req, _ := http.NewRequest("POST", srv.URL+fmt.Sprintf("/api/admin/users/%d/days", u.ID), strings.NewReader(`days=30`))
 	req.Header.Set("Cookie", c.cookie)

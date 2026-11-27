@@ -118,9 +118,9 @@ func build(env Env, base slog.Handler) (*app, error) {
 	mux.Handle("POST /panel/webhook", hooks.Wrap(panel.WebhookHandler(c, func() string { return cfg.Secret("panel.webhook_secret") }, log)))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.Handle("POST /tg/webhook", tg.NewWebhook(t.secret, t.updates, t.bot.Urgent))
-	mountAdmin(mux, c, tx, t, log)
 	static := web.Handler()
-	for _, p := range []string{"/app/", "/admin/", "/assets/"} {
+	mountAdmin(mux, c, tx, t, cfg, static, log)
+	for _, p := range []string{"/app/", "/assets/"} {
 		mux.Handle(p, static)
 	}
 	mux.Handle("GET /dl/{app}/{token}", hooks.Wrap(apps.Handler(c, env.SecretKey, time.Now,

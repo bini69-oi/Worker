@@ -191,3 +191,20 @@ func (c *Core) SettingList(ctx context.Context, actorTg int64) ([]SettingInfo, e
 	}
 	return out, nil
 }
+
+// AllowAllAdminIPs сбрасывает список адресов админки (admin.allow_ips). Его зовёт только команда на сервере
+// `worker admin allow-all`: владелец, запершийся своим списком, не может войти в админку, а из админки
+// сброс идёт через «Да». Запись о сбросе идёт в журнал действий от имени владельца.
+func (c *Core) AllowAllAdminIPs(ctx context.Context) error {
+	cfg, err := c.configAdmin()
+	if err != nil {
+		return err
+	}
+	return c.ownerAction(ctx, c.owner, "admin.allow_all", func() (string, map[string]string, error) {
+		old, _ := cfg.Current("admin.allow_ips")
+		if err := cfg.Reset("admin.allow_ips"); err != nil {
+			return "", nil, err
+		}
+		return "admin.allow_ips", map[string]string{"old": old}, nil
+	})
+}
