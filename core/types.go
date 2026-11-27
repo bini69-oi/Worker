@@ -101,6 +101,20 @@ type Subscription struct {
 	// Докупленное: трафик действует до конца периода, устройства переходят в следующий.
 	ExtraTrafficBytes int64
 	ExtraDevices      int
+
+	// Imported значит, что подписка перенесена из панели: лимиты и имя берутся из снимка Own, а не из тарифа.
+	// Покупка нашего тарифа снимает признак.
+	Imported bool
+	Own      PanelLimits
+}
+
+// PanelLimits это лимиты и имя пользователя в панели, перенесённые как есть.
+type PanelLimits struct {
+	Username     string
+	TrafficBytes int64
+	Devices      int
+	Reset        string
+	Squads       []string
 }
 
 // Reason это причина движения денег.

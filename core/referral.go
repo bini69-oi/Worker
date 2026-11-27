@@ -26,6 +26,15 @@ func itoa(n int64) string { return strconv.FormatInt(n, 10) }
 // registerTx создаёт абонента с личным реферальным кодом. Пригласивший записывается только здесь,
 // при первом входе, поэтому старый абонент по чужой ссылке пригласившего не меняет.
 func (c *Core) registerTx(tx Tx, tgID int64, username, lang, refCode string, now time.Time) (User, error) {
+	u, err := createUserTx(tx, tgID, username, lang, refCode, now)
+	if err != nil {
+		return u, err
+	}
+	return u, enqueueAdmin(tx, AdminTask{Topic: TopicNew, Key: "admin.new_user", Vars: userVars(u)}, now)
+}
+
+// createUserTx заводит абонента без события «новый абонент»: импорт заводит тысячи и шлёт один итог.
+func createUserTx(tx Tx, tgID int64, username, lang, refCode string, now time.Time) (User, error) {
 	u := User{TgID: tgID, Username: username, Lang: lang, CreatedAt: now}
 	if refCode != "" {
 		if r, err := tx.UserByRef(refCode); err == nil {
@@ -44,10 +53,7 @@ func (c *Core) registerTx(tx Tx, tgID int64, username, lang, refCode string, now
 			return u, ErrDuplicate
 		}
 	}
-	if err != nil {
-		return u, err
-	}
-	return u, enqueueAdmin(tx, AdminTask{Topic: TopicNew, Key: "admin.new_user", Vars: userVars(u)}, now)
+	return u, err
 }
 
 // userVars это подстановки об абоненте для событий админам: бот делает из них ссылку на человека.

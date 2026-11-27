@@ -81,7 +81,7 @@ func (c *Core) SetAutoRenew(ctx context.Context, userID int64, on bool) error {
 		if err != nil {
 			return err
 		}
-		if s.Trial {
+		if s.Trial || s.Imported { // продлевать нечем: тарифа у подписки нет
 			return ErrInvalid
 		}
 		if on {

@@ -132,6 +132,15 @@ func (t *tx) SubByUser(userID int64) (core.Subscription, error) {
 	return core.Subscription{}, core.ErrNotFound
 }
 
+func (t *tx) SubByPanel(ref string) (core.Subscription, error) {
+	for _, s := range t.st.subs {
+		if ref != "" && s.PanelUUID == ref {
+			return s, nil
+		}
+	}
+	return core.Subscription{}, core.ErrNotFound
+}
+
 func (t *tx) SaveSub(s core.Subscription) (int64, error) {
 	if s.ID == 0 {
 		if _, err := t.SubByUser(s.UserID); err == nil {

@@ -109,7 +109,7 @@ func (c *Core) buyTx(tx Tx, userID, tariffID int64, days int, now time.Time) (Su
 	if !exists {
 		sub = Subscription{UserID: userID, CreatedAt: now}
 	}
-	sub.TariffID, sub.PeriodDays, sub.Price, sub.Trial = tariffID, days, b.period.Price, false
+	sub.TariffID, sub.PeriodDays, sub.Price, sub.Trial, sub.Imported = tariffID, days, b.period.Price, false, false
 	sub.ExpiresAt = base.Add(time.Duration(days) * day)
 	sub.Status, sub.UpdatedAt = SubActive, now
 	if sub.ID, err = tx.SaveSub(sub); err != nil {

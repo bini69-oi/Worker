@@ -3,6 +3,7 @@ package paneltest
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -42,6 +43,7 @@ func (p *Panel) view(u *User) map[string]any {
 		"hwidDeviceLimit":      u.DeviceLimit,
 		"activeInternalSquads": squads,
 		"description":          u.Description,
+		"createdAt":            u.CreatedAt.UTC().Format("2006-01-02T15:04:05.000Z"),
 	}
 	if p.gen == V3 {
 		out["id"] = u.ID
@@ -91,6 +93,21 @@ func (p *Panel) apply(u *User, b userBody) string {
 	return ""
 }
 
+// listUsers отдаёт страницу абонентов по start и size, как GET /api/users.
+func (p *Panel) listUsers(w http.ResponseWriter, r *http.Request) {
+	start, err1 := strconv.Atoi(r.URL.Query().Get("start"))
+	size, err2 := strconv.Atoi(r.URL.Query().Get("size"))
+	if err1 != nil || err2 != nil || start < 0 || size < 1 {
+		fail(w, http.StatusBadRequest, "bad start or size")
+		return
+	}
+	page := []map[string]any{}
+	for i := start; i < len(p.users) && i < start+size; i++ {
+		page = append(page, p.view(p.users[i]))
+	}
+	reply(w, map[string]any{"users": page, "total": len(p.users)})
+}
+
 func (p *Panel) createUser(w http.ResponseWriter, r *http.Request) {
 	var b userBody
 	if json.NewDecoder(r.Body).Decode(&b) != nil || b.Username == "" {
@@ -101,7 +118,7 @@ func (p *Panel) createUser(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "user already exists")
 		return
 	}
-	u := &User{UUID: newUUID(), ID: p.nextID, ShortUUID: newShort()}
+	u := &User{UUID: newUUID(), ID: p.nextID, ShortUUID: newShort(), CreatedAt: p.now()}
 	if msg := p.apply(u, b); msg != "" {
 		fail(w, http.StatusBadRequest, msg)
 		return

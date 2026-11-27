@@ -48,12 +48,15 @@ type Panel interface {
 	DeleteDevice(ctx context.Context, ref, hwid string) error
 	ResetDevices(ctx context.Context, ref string) error
 	RevokeLink(ctx context.Context, ref string) (PanelResult, error)
+	// EachUser читает всех пользователей панели страницами. Только чтение, для импорта.
+	EachUser(ctx context.Context, fn func(PanelPage) error) error
 }
 
 const gib = 1 << 30
 
 // panelUser собирает состояние абонента в панели из подписки. Пробный период берёт лимиты из настроек,
-// платная подписка из тарифа.
+// перенесённая из панели подписка свой снимок, платная лимиты тарифа. Имя из панели остаётся навсегда,
+// чтобы сверка не переименовывала перенесённых пользователей.
 func (c *Core) panelUser(s Subscription, u User, t Tariff, now time.Time) PanelUser {
 	p := PanelUser{
 		Ref:         s.PanelUUID,
@@ -62,6 +65,13 @@ func (c *Core) panelUser(s Subscription, u User, t Tariff, now time.Time) PanelU
 		ExpireAt:    s.ExpiresAt,
 		Enabled:     s.Status == SubActive && s.ExpiresAt.After(now) && u.BannedAt.IsZero(),
 		Description: fmt.Sprintf("worker user %d", u.ID),
+	}
+	if s.Own.Username != "" {
+		p.Username = s.Own.Username
+	}
+	if s.Imported {
+		p.TrafficBytes, p.Devices, p.Reset, p.Squads = s.Own.TrafficBytes, s.Own.Devices, s.Own.Reset, s.Own.Squads
+		return p
 	}
 	if s.Trial {
 		p.TrafficBytes = c.cfg.Int("trial.traffic_gb") * gib
@@ -96,7 +106,7 @@ func (c *Core) syncSub(ctx context.Context, subID int64) error {
 			return err
 		}
 		var t Tariff
-		if !sub.Trial {
+		if !sub.Trial && !sub.Imported {
 			if t, err = tx.Tariff(sub.TariffID); err != nil {
 				return err
 			}

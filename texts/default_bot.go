@@ -71,6 +71,8 @@ var botDefs = []Def{
 		En: "off"},
 	{Key: "sub.trial_name", Default: "пробный",
 		En: "trial"},
+	{Key: "sub.imported_name", Default: "прежний",
+		En: "previous plan"},
 	{Key: "btn.copy", Default: "📋 Скопировать ссылку",
 		En: "📋 Copy link"},
 	{Key: "btn.extend", Default: "🔄 Продлить",

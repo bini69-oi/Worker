@@ -21,12 +21,53 @@ type Panel struct {
 	devices map[string][]core.PanelDevice
 	links   map[string]int // номер выпуска ссылки
 	next    int
+	listed  []core.PanelEntry
+	skipped []core.PanelSkip
 	Calls   int
 }
 
 // NewPanel возвращает пустую живую панель.
 func NewPanel() *Panel {
 	return &Panel{users: map[string]core.PanelUser{}, devices: map[string][]core.PanelDevice{}, links: map[string]int{}}
+}
+
+// AddListed кладёт в панель пользователя для импорта: его отдаст EachUser. Sync его потом видит по Ref.
+func (p *Panel) AddListed(e core.PanelEntry) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.listed = append(p.listed, e)
+	p.users[e.Ref] = core.PanelUser{Ref: e.Ref, Username: e.Username, TgID: e.TgID, ExpireAt: e.ExpireAt,
+		TrafficBytes: e.TrafficBytes, Devices: e.Devices, Reset: e.Reset, Squads: slices.Clone(e.Squads), Enabled: e.Status != "DISABLED"}
+}
+
+// AddSkipped кладёт запись, которую клиент панели не пропустил бы.
+func (p *Panel) AddSkipped(s core.PanelSkip) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.skipped = append(p.skipped, s)
+}
+
+// EachUser отдаёт пользователей из AddListed страницами по два, чтобы тесты проходили через несколько страниц.
+func (p *Panel) EachUser(ctx context.Context, fn func(core.PanelPage) error) error {
+	p.mu.Lock()
+	if err := p.enter(); err != nil {
+		p.mu.Unlock()
+		return err
+	}
+	listed, skipped := slices.Clone(p.listed), slices.Clone(p.skipped)
+	p.mu.Unlock()
+	if err := fn(core.PanelPage{Skipped: skipped}); err != nil {
+		return err
+	}
+	for page := range slices.Chunk(listed, 2) {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := fn(core.PanelPage{Users: page}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SetDown кладёт или поднимает панель.

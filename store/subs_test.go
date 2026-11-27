@@ -117,3 +117,34 @@ func TestSubPlanFields(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSubImportedFields(t *testing.T) {
+	s, uid := newCoreStore(t)
+	ctx := context.Background()
+	own := core.PanelLimits{Username: "old_one", TrafficBytes: 50 << 30, Devices: 3, Reset: "MONTH", Squads: []string{"sq-1", "sq-2"}}
+	err := s.Tx(ctx, func(tx core.Tx) error {
+		id, err := tx.SaveSub(core.Subscription{UserID: uid, PanelUUID: "r1", Status: core.SubActive, ExpiresAt: tNow, CreatedAt: tNow, UpdatedAt: tNow,
+			Imported: true, Own: own})
+		if err != nil {
+			return err
+		}
+		got, err := tx.SubByPanel("r1")
+		if err != nil {
+			return err
+		}
+		if got.ID != id || !got.Imported || got.Own.Username != own.Username || got.Own.TrafficBytes != own.TrafficBytes ||
+			got.Own.Devices != 3 || got.Own.Reset != "MONTH" || len(got.Own.Squads) != 2 || got.Own.Squads[1] != "sq-2" {
+			t.Fatalf("снимок панели: %+v", got)
+		}
+		if _, err := tx.SubByPanel(""); !errors.Is(err, core.ErrNotFound) {
+			t.Fatalf("пустой ref нашёл подписку: %v", err)
+		}
+		if _, err := tx.SubByPanel("r2"); !errors.Is(err, core.ErrNotFound) {
+			t.Fatalf("чужой ref: %v", err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

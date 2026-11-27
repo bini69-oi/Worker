@@ -25,8 +25,12 @@ func command(env Env, args []string, in io.Reader, out io.Writer) error {
 		return rotate(env, out)
 	case "admin password":
 		return ownerPassword(env, in, out)
+	case "import panel":
+		return importPanel(env, false, out)
+	case "import panel --apply":
+		return importPanel(env, true, out)
 	}
-	return errors.New("неизвестная команда, есть: rotate, admin password")
+	return errors.New("неизвестная команда, есть: rotate, admin password, import panel [--apply]")
 }
 
 // ownerPassword задаёт пароль владельца. Пароль просится дважды; в терминале ввод не виден.

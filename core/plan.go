@@ -61,7 +61,7 @@ func (c *Core) startPlan(tx Tx, s Subscription, now time.Time) (switched bool, e
 	if err != nil {
 		return false, err
 	}
-	s.TariffID, s.PeriodDays, s.Price = t.ID, s.NextDays, s.NextPrice
+	s.TariffID, s.PeriodDays, s.Price, s.Imported = t.ID, s.NextDays, s.NextPrice, false
 	s.ExpiresAt = s.ExpiresAt.Add(time.Duration(s.NextDays) * day)
 	s.NextTariffID, s.NextDays, s.NextPrice = 0, 0, 0
 	s.ExtraTrafficBytes, s.ExtraDevices = 0, 0 // у нового тарифа свои лимиты

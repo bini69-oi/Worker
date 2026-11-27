@@ -39,6 +39,8 @@ func (p *Panel) route(w http.ResponseWriter, r *http.Request, route string, args
 	switch route {
 	case "GET /api/system/metadata", "GET /api/system/health":
 		p.version(w)
+	case "GET /api/users":
+		p.listUsers(w, r)
 	case "POST /api/users":
 		p.createUser(w, r)
 	case "PATCH /api/users":

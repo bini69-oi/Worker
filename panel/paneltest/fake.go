@@ -41,6 +41,7 @@ type User struct {
 	Squads      []string
 	Description string
 	Devices     []string
+	CreatedAt   time.Time
 }
 
 // Panel это фейковая панель. Все методы безопасны для одновременного использования.
@@ -92,6 +93,19 @@ func (p *Panel) Calls(route string) int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.calls[route]
+}
+
+// Add кладёт абонента в панель, как будто его завели до нас, и отдаёт его идентификатор.
+func (p *Panel) Add(u User) string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	u.UUID, u.ID, u.ShortUUID = newUUID(), p.nextID, newShort()
+	if u.CreatedAt.IsZero() {
+		u.CreatedAt = p.now()
+	}
+	p.nextID++
+	p.users = append(p.users, &u)
+	return p.refOf(&u)
 }
 
 // Users возвращает копии всех абонентов.

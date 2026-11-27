@@ -57,7 +57,7 @@ func (c *Core) addon(ctx context.Context, userID int64, kind string,
 			return err
 		}
 		sub, err := tx.SubByUser(userID)
-		if err != nil || sub.Trial || sub.Status != SubActive || !sub.ExpiresAt.After(now) {
+		if err != nil || sub.Trial || sub.Imported || sub.Status != SubActive || !sub.ExpiresAt.After(now) {
 			return ErrNoSub
 		}
 		t, err := tx.Tariff(sub.TariffID)
@@ -101,7 +101,7 @@ func (c *Core) Addons(ctx context.Context, userID int64) (AddonOffer, error) {
 	err := c.store.Tx(ctx, func(tx Tx) error {
 		now := c.clock.Now()
 		sub, err := tx.SubByUser(userID)
-		if err != nil || sub.Trial || sub.Status != SubActive || !sub.ExpiresAt.After(now) {
+		if err != nil || sub.Trial || sub.Imported || sub.Status != SubActive || !sub.ExpiresAt.After(now) {
 			return nil
 		}
 		t, err := tx.Tariff(sub.TariffID)

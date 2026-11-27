@@ -80,6 +80,8 @@ type Tx interface {
 
 	Sub(id int64) (Subscription, error)
 	SubByUser(userID int64) (Subscription, error)
+	// SubByPanel находит подписку по идентификатору в панели. Пустой ref ничего не находит.
+	SubByPanel(ref string) (Subscription, error)
 	// SaveSub создаёт подписку (ID == 0) или обновляет её.
 	SaveSub(s Subscription) (int64, error)
 	// ActiveSubsUntil отдаёт активные подписки, которые кончаются не позже t.

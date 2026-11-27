@@ -60,3 +60,19 @@ func (a CoreAdapter) RevokeLink(ctx context.Context, ref string) (core.PanelResu
 	res, err := a.Client.RevokeLink(ctx, ref)
 	return toCore(res), coreErr(err)
 }
+
+// EachUser читает пользователей панели наибольшими страницами и отдаёт их ядру для импорта.
+func (a CoreAdapter) EachUser(ctx context.Context, fn func(core.PanelPage) error) error {
+	return a.Client.EachUsersPage(ctx, MaxPageSize, func(p UsersPage) error {
+		out := core.PanelPage{Users: make([]core.PanelEntry, 0, len(p.Users))}
+		for _, u := range p.Users {
+			out.Users = append(out.Users, core.PanelEntry{Ref: u.PanelID, Username: u.Username, TgID: u.TelegramID,
+				Status: u.Status, ExpireAt: u.ExpireAt, CreatedAt: u.CreatedAt, SubURL: u.SubURL,
+				TrafficBytes: u.TrafficLimitBytes, Devices: u.DeviceLimit, Reset: string(u.TrafficReset), Squads: u.Squads})
+		}
+		for _, s := range p.Skipped {
+			out.Skipped = append(out.Skipped, core.PanelSkip{Ref: s.PanelID, Username: s.Username, Reason: s.Reason})
+		}
+		return fn(out)
+	})
+}
