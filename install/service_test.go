@@ -34,7 +34,7 @@ func TestServiceSandbox(t *testing.T) {
 	want := map[string]string{
 		"User": "worker", "Group": "worker", "ExecStart": "/usr/local/bin/worker",
 		"WorkingDirectory": "/var/lib/worker", "EnvironmentFile": "/etc/worker/env",
-		"NoNewPrivileges": "true", "ProtectSystem": "strict", "ReadWritePaths": "/var/lib/worker",
+		"NoNewPrivileges": "true", "ProtectSystem": "strict", "ReadWritePaths": "/var/lib/worker", "InaccessiblePaths": "/etc/worker",
 		"ProtectHome": "true", "PrivateTmp": "true", "PrivateDevices": "true",
 		"ProtectKernelTunables": "true", "ProtectKernelModules": "true", "ProtectControlGroups": "true",
 		"RestrictNamespaces": "true", "LockPersonality": "true", "MemoryDenyWriteExecute": "true",

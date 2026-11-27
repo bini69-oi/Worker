@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -15,7 +16,7 @@ func TestInstallScriptEnvLoads(t *testing.T) {
 	script, _ := filepath.Abs("../../install/install.sh")
 	etc := t.TempDir()
 	run := `. ` + script + `
-chown() { :; }
+chown() { echo "$*" >` + etc + `/chown.log; }
 ETC_DIR=` + etc + `; ENV_FILE=` + etc + `/env; DATA_DIR=/var/lib/worker
 BOT_TOKEN=123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw; OWNER_ID=42; DOMAIN=bot.example.com
 PANEL_URL=https://panel.example.com; PANEL_TOKEN='tok#en=1'; SECRET_KEY=$(openssl rand -base64 32)
@@ -26,8 +27,11 @@ write_env`
 		t.Fatalf("%v\n%s", err, out)
 	}
 	file := filepath.Join(etc, "env")
-	if st, err := os.Stat(file); err != nil || st.Mode().Perm() != 0o600 {
+	if st, err := os.Stat(file); err != nil || st.Mode().Perm() != 0o640 {
 		t.Fatalf("права файла настроек: %v %v", st, err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(etc, "chown.log")); !strings.HasPrefix(string(b), "root:worker ") {
+		t.Errorf("владелец файла настроек: %q, ждали root:worker", b)
 	}
 	env, warns, err := loadEnv(file, func(string) string { return "" })
 	if err != nil {

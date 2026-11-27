@@ -142,8 +142,8 @@ func readEnvFile(path string) (map[string]string, []string, error) {
 	defer f.Close()
 
 	var warns []string
-	if st, err := f.Stat(); err == nil && st.Mode().Perm()&0o077 != 0 {
-		warns = append(warns, fmt.Sprintf("%s читают другие пользователи сервера, выполните: chmod 600 %s", path, path))
+	if st, err := f.Stat(); err == nil && st.Mode().Perm()&0o007 != 0 {
+		warns = append(warns, fmt.Sprintf("%s читают другие пользователи сервера, выполните: chmod 640 %s (или 600)", path, path))
 	}
 
 	vals, err := parseEnv(f)

@@ -48,12 +48,13 @@ curl -fsSL https://raw.githubusercontent.com/bini69-oi/worker/main/install/insta
 | Путь | Что | Права |
 |---|---|---|
 | `/usr/local/bin/worker` | бинарник | root, 755 |
-| `/etc/worker/env` | токены и ключ | 600, владелец `worker` |
+| `/etc/worker/env` | токены и ключ | `root:worker`, 640: служба только читает |
 | `/var/lib/worker/` | база, замок, бэкапы (`backups/`) | `worker`, 700 |
 | `/etc/systemd/system/worker.service` | служба | root |
 | `/etc/caddy/Caddyfile` | https для домена (если ставили Caddy) | root |
 
-Служба работает от пользователя `worker`, пишет только в `/var/lib/worker` и слушает только `127.0.0.1:8080`: наружу бот
+Служба работает от пользователя `worker`, пишет только в `/var/lib/worker`, папку `/etc/worker` не видит (systemd читает
+настройки до песочницы) и слушает только `127.0.0.1:8080`: наружу бот
 выходит через Caddy или nginx.
 
 ## https: Caddy или ваш nginx

@@ -197,7 +197,8 @@ Type=simple
 User=worker
 Group=worker
 WorkingDirectory=/var/lib/worker
-# Токены и ключи лежат в /etc/worker/env (права 600). Читает их systemd, процессу файл не открыт.
+# Токены и ключи лежат в /etc/worker/env (root:worker, 640). systemd читает файл до песочницы (systemd.exec: файлы
+# EnvironmentFile читаются до изменений файловой системы), а сама служба папку /etc/worker не видит.
 EnvironmentFile=/etc/worker/env
 ExecStart=/usr/local/bin/worker
 Restart=on-failure
@@ -207,6 +208,7 @@ RestartSec=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ReadWritePaths=/var/lib/worker
+InaccessiblePaths=/etc/worker
 StateDirectory=worker
 StateDirectoryMode=0700
 ProtectHome=true
@@ -415,7 +417,7 @@ show_key() {
   read_answer "Сохранили? Нажмите Enter, чтобы продолжить: "
 }
 
-# write_env пишет настройки службы. Файл создаётся закрытым (600), сразу под владельцем worker и меняется целиком.
+# write_env пишет настройки службы. Файл создаётся закрытым (umask 077), потом root:worker 640 и подменяется целиком.
 write_env() {
   (
     umask 077
@@ -431,8 +433,9 @@ write_env() {
       printf 'DB_PATH=%s/worker.db\n' "$DATA_DIR"
       printf 'HTTP_ADDR=%s\n' "$HTTP_ADDR"
     } >"$tmp"
-    chown worker:worker "$tmp"
-    chmod 600 "$tmp"
+    # Владелец root, группа worker читает: службе записывать в свои настройки нечего.
+    chown root:worker "$tmp"
+    chmod 640 "$tmp"
     mv -f "$tmp" "$ENV_FILE"
   )
 }

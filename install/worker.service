@@ -9,7 +9,8 @@ Type=simple
 User=worker
 Group=worker
 WorkingDirectory=/var/lib/worker
-# Токены и ключи лежат в /etc/worker/env (права 600). Читает их systemd, процессу файл не открыт.
+# Токены и ключи лежат в /etc/worker/env (root:worker, 640). systemd читает файл до песочницы (systemd.exec: файлы
+# EnvironmentFile читаются до изменений файловой системы), а сама служба папку /etc/worker не видит.
 EnvironmentFile=/etc/worker/env
 ExecStart=/usr/local/bin/worker
 Restart=on-failure
@@ -19,6 +20,7 @@ RestartSec=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ReadWritePaths=/var/lib/worker
+InaccessiblePaths=/etc/worker
 StateDirectory=worker
 StateDirectoryMode=0700
 ProtectHome=true

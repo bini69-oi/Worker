@@ -93,7 +93,7 @@ func TestLoadEnvWideRights(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(warns) != 1 || !strings.Contains(warns[0], "chmod 600") {
+	if len(warns) != 1 || !strings.Contains(warns[0], "chmod 640") {
 		t.Fatalf("ждали предупреждение о правах, получили %v", warns)
 	}
 }
@@ -194,5 +194,15 @@ func TestListenAddr(t *testing.T) {
 	}
 	if got := listenAddr(Env{}, ":9999"); got != ":9999" {
 		t.Errorf("без HTTP_ADDR адрес из настройки: %q", got)
+	}
+}
+
+// Группа worker читает серверный файл (640): это не предупреждение. Читать всем (644, 604) предупреждение.
+func TestLoadEnvGroupReadable(t *testing.T) {
+	if _, warns, err := loadEnv(writeEnv(t, goodFile(), 0o640), noEnv); err != nil || len(warns) != 0 {
+		t.Errorf("640: %v %v", warns, err)
+	}
+	if _, warns, _ := loadEnv(writeEnv(t, goodFile(), 0o604), noEnv); len(warns) != 1 {
+		t.Errorf("604 должен давать предупреждение: %v", warns)
 	}
 }
