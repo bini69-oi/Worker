@@ -46,6 +46,11 @@
     }
     return { screen: Home as unknown as Screen, params: {} }
   })
+  // Новый экран открывается сверху, а не на месте, где остановилась прошлая прокрутка.
+  $effect(() => {
+    void $path
+    window.scrollTo(0, 0)
+  })
   const maintenance = $derived($me.status === 'ready' && $me.data.maintenance)
 </script>
 

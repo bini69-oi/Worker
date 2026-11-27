@@ -12,6 +12,7 @@ html {
 
 body {
   margin: 0;
+  -webkit-tap-highlight-color: transparent;
   background: var(--bg);
   color: var(--text);
   font: 400 16px/1.45 var(--font);
@@ -65,6 +66,12 @@ a {
   gap: 12px;
 }
 
+.btn,
+.tile,
+.chip {
+  touch-action: manipulation;
+}
+
 .btn {
   appearance: none;
   display: inline-flex;
@@ -105,6 +112,13 @@ a {
   background: transparent;
   color: var(--text);
   box-shadow: inset 0 0 0 1.5px var(--line);
+}
+
+.btn.quiet {
+  min-height: 44px;
+  background: transparent;
+  color: var(--hint);
+  font-weight: 500;
 }
 
 .btn.danger {

@@ -115,11 +115,11 @@
 
         {#if !tg}
           <div class="stack">
-            <button class="btn line wide" type="button" onclick={() => app.session.logout(false)}>{$t('app.logout')}</button>
+            <button class="btn quiet wide" type="button" onclick={() => app.session.logout(false)}>{$t('app.logout')}</button>
             {#if asking === 'all'}
               <button class="btn danger wide" type="button" onclick={() => app.session.logout(true)}>{$t('app.logout_all_confirm')}</button>
             {:else}
-              <button class="btn line wide" type="button" onclick={() => (asking = 'all')}>{$t('app.logout_all')}</button>
+              <button class="btn quiet wide" type="button" onclick={() => (asking = 'all')}>{$t('app.logout_all')}</button>
             {/if}
           </div>
         {/if}
