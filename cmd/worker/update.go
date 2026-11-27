@@ -42,6 +42,8 @@ type updater struct {
 	Out     io.Writer
 	Backup  func(ctx context.Context) (string, error)
 	Restart func(ctx context.Context) error
+	// Health ждёт, пока служба ответит на /healthz. Нет (nil): проверки нет.
+	Health func(ctx context.Context) error
 }
 
 // Run обновляет до версии tag ("" значит последняя). Порядок: подпись списка сумм, скачивание и сумма бинарника,
@@ -104,6 +106,7 @@ func (u *updater) Run(ctx context.Context, tag string) error {
 }
 
 // swap кладёт новый бинарник на место прежнего: прежний копируется рядом, новый встаёт переименованием.
+// Потом служба перезапускается и проверяется. Не поднялась: возвращается прежний бинарник.
 func (u *updater) swap(ctx context.Context, newPath string) error {
 	if err := os.Chmod(newPath, 0o755); err != nil {
 		return err
@@ -116,11 +119,37 @@ func (u *updater) swap(ctx context.Context, newPath string) error {
 	if err := os.Rename(newPath, u.BinPath); err != nil {
 		return fmt.Errorf("бинарник не заменён: %w", err)
 	}
+	if err := u.start(ctx); err != nil {
+		return u.rollback(ctx, oldPath, err)
+	}
+	fmt.Fprintln(u.Out, "Обновлено, служба отвечает.")
+	return nil
+}
+
+// start перезапускает службу и ждёт, пока она ответит.
+func (u *updater) start(ctx context.Context) error {
 	if err := u.Restart(ctx); err != nil {
 		return fmt.Errorf("служба не перезапустилась: %w", err)
 	}
-	fmt.Fprintln(u.Out, "Обновлено.")
-	return nil
+	if u.Health == nil {
+		return nil
+	}
+	return u.Health(ctx)
+}
+
+// rollback возвращает прежний бинарник и перезапускает службу. Идёт до конца, даже если владелец нажал Ctrl+C.
+func (u *updater) rollback(ctx context.Context, oldPath string, cause error) error {
+	ctx = context.WithoutCancel(ctx)
+	fmt.Fprintf(u.Out, "Новая версия не поднялась: %v\nВозвращаю прежнюю.\n", cause)
+	if err := os.Rename(oldPath, u.BinPath); err != nil {
+		return fmt.Errorf("новая версия не поднялась (%v), а прежний бинарник вернуть не удалось: %w; "+
+			"копия лежит в %s", cause, err, oldPath)
+	}
+	if err := u.start(ctx); err != nil {
+		return fmt.Errorf("новая версия не поднялась (%v), прежнюю вернул, но и она не отвечает: %v; "+
+			"смотрите: journalctl -u %s -n 50", cause, err, serviceName)
+	}
+	return fmt.Errorf("новая версия не поднялась (%v); прежняя версия возвращена и отвечает", cause)
 }
 
 // get скачивает небольшой файл целиком, не больше limit байт.

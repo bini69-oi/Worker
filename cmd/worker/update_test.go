@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/bini69-oi/worker/release"
 )
@@ -256,6 +257,139 @@ func TestUpdateCommandArgs(t *testing.T) {
 	for _, args := range [][]string{{"--version"}, {"v1.2.3"}, {"--version", "1.2.3"}, {"--version", "v1.2.3", "x"}, {"--force"}} {
 		if err := updateCommand(Env{}, args, &bytes.Buffer{}); err == nil {
 			t.Errorf("аргументы %v приняты", args)
+		}
+	}
+}
+
+// Новая версия не стартует: через проверку возвращается прежний бинарник, служба перезапущена, причина в выводе.
+func TestUpdateRollsBackWhenNotHealthy(t *testing.T) {
+	rel := newReleases(t, "сломанная версия")
+	e := newUpdater(t, rel)
+	e.u.Health = func(context.Context) error {
+		*e.events = append(*e.events, "health")
+		if content(t, e.bin) == "сломанная версия" {
+			return errors.New("/healthz не ответил за 60 секунд")
+		}
+		return nil
+	}
+	err := e.u.Run(t.Context(), "")
+	if err == nil {
+		t.Fatal("обновление, после которого бот не поднялся, не считается ошибкой")
+	}
+	for _, want := range []string{"/healthz не ответил", "прежняя версия возвращена"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("в ошибке нет %q: %v", want, err)
+		}
+	}
+	if content(t, e.bin) != oldBin {
+		t.Fatal("прежний бинарник не возвращён")
+	}
+	if got := strings.Join(*e.events, ","); got != "backup,restart,health,restart,health" {
+		t.Errorf("порядок шагов %s", got)
+	}
+	for _, leftover := range []string{e.bin + ".new", e.bin + ".old"} {
+		if _, err := os.Stat(leftover); err == nil {
+			t.Errorf("остался %s", leftover)
+		}
+	}
+	if st, _ := os.Stat(e.bin); st.Mode().Perm() != 0o755 {
+		t.Errorf("права после отката %v", st.Mode())
+	}
+}
+
+func TestUpdateRollbackAlsoFails(t *testing.T) {
+	rel := newReleases(t, "сломанная версия")
+	e := newUpdater(t, rel)
+	e.u.Health = func(context.Context) error { return errors.New("нет ответа") }
+	err := e.u.Run(t.Context(), "")
+	if err == nil || !strings.Contains(err.Error(), "journalctl") {
+		t.Fatalf("при неудачном откате нужна подсказка про журнал: %v", err)
+	}
+	if content(t, e.bin) != oldBin {
+		t.Fatal("прежний бинарник не возвращён")
+	}
+}
+
+func TestUpdateRollsBackWhenRestartFails(t *testing.T) {
+	rel := newReleases(t, "новая версия")
+	e := newUpdater(t, rel)
+	calls := 0
+	e.u.Restart = func(context.Context) error {
+		calls++
+		if calls == 1 {
+			return errors.New("unit failed")
+		}
+		return nil
+	}
+	e.u.Health = func(context.Context) error { return nil }
+	err := e.u.Run(t.Context(), "")
+	if err == nil || !strings.Contains(err.Error(), "unit failed") {
+		t.Fatalf("причина потеряна: %v", err)
+	}
+	if content(t, e.bin) != oldBin || calls != 2 {
+		t.Fatalf("откат не сделан: бинарник %q, перезапусков %d", content(t, e.bin), calls)
+	}
+}
+
+func TestUpdateHealthyKeepsNew(t *testing.T) {
+	rel := newReleases(t, "новая версия")
+	e := newUpdater(t, rel)
+	e.u.Health = func(context.Context) error { return nil }
+	if err := e.u.Run(t.Context(), ""); err != nil {
+		t.Fatal(err)
+	}
+	if content(t, e.bin) != "новая версия" {
+		t.Fatal("рабочая версия откатилась")
+	}
+}
+
+func TestWaitHealthy(t *testing.T) {
+	var n int
+	ok := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		n++
+		if n < 3 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+	}))
+	defer ok.Close()
+	if err := waitHealthy(t.Context(), ok.URL, 5*time.Second, time.Millisecond); err != nil {
+		t.Fatalf("поднявшийся бот не признан: %v", err)
+	}
+
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(500) }))
+	defer down.Close()
+	start := time.Now()
+	if err := waitHealthy(t.Context(), down.URL, 50*time.Millisecond, 5*time.Millisecond); err == nil {
+		t.Fatal("упавший бот признан живым")
+	}
+	if time.Since(start) > 2*time.Second {
+		t.Fatal("ждали дольше срока")
+	}
+
+	// Один ответ 200 и сразу падение: не считается, нужно два подряд.
+	var m int
+	flap := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		m++
+		if m != 1 {
+			w.WriteHeader(500)
+		}
+	}))
+	defer flap.Close()
+	if err := waitHealthy(t.Context(), flap.URL, 80*time.Millisecond, 5*time.Millisecond); err == nil {
+		t.Fatal("мигающий бот признан живым по одному ответу")
+	}
+}
+
+func TestHealthURL(t *testing.T) {
+	for in, want := range map[string]string{
+		"":               "http://127.0.0.1:8080/healthz",
+		":9090":          "http://127.0.0.1:9090/healthz",
+		"127.0.0.1:8081": "http://127.0.0.1:8081/healthz",
+		"0.0.0.0:80":     "http://127.0.0.1:80/healthz",
+		"[::]:8080":      "http://127.0.0.1:8080/healthz",
+	} {
+		if got := healthURL(in); got != want {
+			t.Errorf("healthURL(%q) = %q, ждали %q", in, got, want)
 		}
 	}
 }

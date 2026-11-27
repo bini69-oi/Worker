@@ -153,3 +153,28 @@ func TestEnvPath(t *testing.T) {
 		t.Errorf("с переменной %q", got)
 	}
 }
+
+func TestLoadEnvHTTPAddr(t *testing.T) {
+	env, warns, err := loadEnv(writeEnv(t, goodFile()+"HTTP_ADDR=127.0.0.1:8080\n", 0o600), noEnv)
+	if err != nil || len(warns) != 0 || env.HTTPAddr != "127.0.0.1:8080" {
+		t.Fatalf("HTTP_ADDR не прочитан: %+v %v %v", env, warns, err)
+	}
+	env, _, _ = loadEnv(writeEnv(t, goodFile(), 0o600), noEnv)
+	if env.HTTPAddr != "" {
+		t.Errorf("без переменной адрес должен быть пустым: %q", env.HTTPAddr)
+	}
+	for _, bad := range []string{"8080", "127.0.0.1", "host:port", "127.0.0.1:99999"} {
+		if _, _, err := loadEnv(writeEnv(t, goodFile()+"HTTP_ADDR="+bad+"\n", 0o600), noEnv); err == nil {
+			t.Errorf("HTTP_ADDR=%s принят", bad)
+		}
+	}
+}
+
+func TestListenAddr(t *testing.T) {
+	if got := listenAddr(Env{HTTPAddr: "127.0.0.1:8080"}, ":9999"); got != "127.0.0.1:8080" {
+		t.Errorf("HTTP_ADDR должен быть главнее настройки: %q", got)
+	}
+	if got := listenAddr(Env{}, ":9999"); got != ":9999" {
+		t.Errorf("без HTTP_ADDR адрес из настройки: %q", got)
+	}
+}

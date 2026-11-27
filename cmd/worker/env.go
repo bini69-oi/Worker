@@ -26,6 +26,17 @@ type Env struct {
 	DBPath     string
 	// TelegramURL это адрес Bot API. Пусто: боевой api.telegram.org. Нужен для своего сервера Bot API.
 	TelegramURL string
+	// HTTPAddr это адрес, на котором слушает HTTP. Пусто: берётся настройка http.addr из базы. Установщик ставит
+	// сюда 127.0.0.1:8080, чтобы служба не торчала наружу мимо https.
+	HTTPAddr string
+}
+
+// listenAddr это адрес HTTP: HTTP_ADDR из окружения главнее настройки из базы.
+func listenAddr(env Env, setting string) string {
+	if env.HTTPAddr != "" {
+		return env.HTTPAddr
+	}
+	return setting
 }
 
 var requiredKeys = []string{"BOT_TOKEN", "OWNER_TG_ID", "PUBLIC_URL", "PANEL_URL", "PANEL_TOKEN", "SECRET_KEY"}
@@ -76,6 +87,12 @@ func loadEnv(path string, getenv func(string) string) (Env, []string, error) {
 	if raw := get("TELEGRAM_API_URL"); raw != "" {
 		if env.TelegramURL, err = cleanURL(raw, false); err != nil {
 			return Env{}, warns, fmt.Errorf("TELEGRAM_API_URL: %w", err)
+		}
+	}
+
+	if env.HTTPAddr = get("HTTP_ADDR"); env.HTTPAddr != "" {
+		if _, port, err := net.SplitHostPort(env.HTTPAddr); err != nil || !validPort(port) {
+			return Env{}, warns, errors.New("HTTP_ADDR: нужен адрес вида 127.0.0.1:8080")
 		}
 	}
 
@@ -151,8 +168,13 @@ func unquote(s string) string {
 	return s
 }
 
+func validPort(p string) bool {
+	n, err := strconv.Atoi(p)
+	return err == nil && n > 0 && n < 65536
+}
+
 func knownKey(key string) bool {
-	return key == "DB_PATH" || key == "TELEGRAM_API_URL" || slices.Contains(requiredKeys, key)
+	return key == "DB_PATH" || key == "HTTP_ADDR" || key == "TELEGRAM_API_URL" || slices.Contains(requiredKeys, key)
 }
 
 // cleanURL проверяет адрес и убирает слэш в конце. Публичный адрес только https: иначе Telegram не примет вебхук.

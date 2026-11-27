@@ -86,7 +86,7 @@ func run(ctx context.Context, env Env, base slog.Handler) error {
 	if err != nil {
 		return err
 	}
-	ln, err := net.Listen("tcp", a.cfg.String("http.addr"))
+	ln, err := net.Listen("tcp", listenAddr(env, a.cfg.String("http.addr")))
 	if err != nil {
 		a.db.Close()
 		return err
