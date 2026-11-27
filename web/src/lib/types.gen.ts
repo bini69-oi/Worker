@@ -1,8 +1,31 @@
 // Код создан командой make types из структур Go (пакет api). Руками не править.
 
+export interface AppView {
+  id: string;
+  name: string;
+  stores: Record<string, string>;
+  open_url: string;
+}
+
 export interface BuyResponse {
   sub: SubView;
   queued: boolean;
+}
+
+export interface ConnectResponse {
+  sub_url: string;
+  apps: AppView[];
+}
+
+export interface DeviceView {
+  hwid: string;
+  platform: string;
+  model: string;
+  created_at: string;
+}
+
+export interface DevicesResponse {
+  devices: DeviceView[];
 }
 
 export interface ErrorBody {

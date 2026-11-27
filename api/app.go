@@ -54,6 +54,7 @@ func RegisterApp(s *Server, d AppDeps) *App {
 	a.buyRoutes()
 	a.payRoutes()
 	a.accountRoutes()
+	a.connectRoutes()
 	return a
 }
 

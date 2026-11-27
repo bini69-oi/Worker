@@ -38,6 +38,8 @@ func appTypes() []reflect.Type {
 		reflect.TypeFor[HistoryResponse](),
 		reflect.TypeFor[RefResponse](),
 		reflect.TypeFor[PromoResponse](),
+		reflect.TypeFor[ConnectResponse](),
+		reflect.TypeFor[DevicesResponse](),
 	}
 }
 
@@ -192,4 +194,31 @@ type PromoResponse struct {
 // AutoRenewRequest включает или выключает автопродление. Поле on обязательно.
 type AutoRenewRequest struct {
 	On *bool `json:"on"`
+}
+
+// ConnectResponse это ссылка подписки и приложения для подключения. SubURL пуст, пока подписку оформляет панель.
+type ConnectResponse struct {
+	SubURL string    `json:"sub_url"`
+	Apps   []AppView `json:"apps"`
+}
+
+// AppView это приложение: ссылки на магазины по платформам (ios, android, desktop) и переход, который добавляет подписку.
+type AppView struct {
+	ID      string            `json:"id"`
+	Name    string            `json:"name"`
+	Stores  map[string]string `json:"stores"`
+	OpenURL string            `json:"open_url"`
+}
+
+// DevicesResponse это устройства абонента.
+type DevicesResponse struct {
+	Devices []DeviceView `json:"devices"`
+}
+
+// DeviceView это устройство. HWID нужен, чтобы удалить именно его.
+type DeviceView struct {
+	HWID      string    `json:"hwid"`
+	Platform  string    `json:"platform"`
+	Model     string    `json:"model"`
+	CreatedAt time.Time `json:"created_at"`
 }
