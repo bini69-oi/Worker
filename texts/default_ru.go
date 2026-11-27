@@ -27,7 +27,7 @@ var coreDefs = []Def{
 }
 
 // defs это все тексты: по файлу на часть, чтобы ни один файл не разрастался.
-var defs = slices.Concat(coreDefs, errDefs, botDefs, notifyDefs)
+var defs = slices.Concat(coreDefs, errDefs, botDefs, notifyDefs, appDefs)
 
 // Defs возвращает копию списка текстов.
 func Defs() []Def {

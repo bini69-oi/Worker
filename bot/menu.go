@@ -41,6 +41,7 @@ func (b *Bot) register() {
 	b.acts["pcanok"] = b.onCancelPlan
 	b.acts["at"] = b.onTrafficPacks
 	b.acts["ad"] = b.onDevice
+	b.acts["wl"] = b.onWebLogin
 	b.inputs[waitPromo] = b.onPromoInput
 	b.inputs[waitAmount] = b.onAmountInput
 }
