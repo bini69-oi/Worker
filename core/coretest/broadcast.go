@@ -149,6 +149,8 @@ type Sender struct {
 	Fail map[int64]error
 	// Wait это сколько секунд просить подождать (ответ 429) на ближайшей отправке. Сбрасывается после неё.
 	Wait int
+	// RejectMarkup заставляет Telegram отвергать разметку любого сообщения.
+	RejectMarkup bool
 	// OnSend зовётся после каждой удачной отправки: тест успевает отменить рассылку «посередине».
 	OnSend func(n int)
 }
@@ -160,6 +162,10 @@ func (s *Sender) Send(_ context.Context, tgID int64, text, btnText, btnURL strin
 		s.Wait = 0
 		s.mu.Unlock()
 		return &core.RetryAfter{Seconds: w}
+	}
+	if s.RejectMarkup {
+		s.mu.Unlock()
+		return core.ErrMarkupRejected
 	}
 	if s.Gone[tgID] {
 		s.mu.Unlock()

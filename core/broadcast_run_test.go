@@ -238,3 +238,27 @@ func TestBroadcastDoneNotice(t *testing.T) {
 		t.Errorf("после конца ушло %d", n)
 	}
 }
+
+// Telegram отверг разметку: рассылка останавливается после первого отказа, админы получают уведомление.
+func TestBroadcastStopsOnRejectedMarkup(t *testing.T) {
+	e := newBcEnv(t)
+	b := e.running(t, 100)
+	e.sender.RejectMarkup = true
+	e.tick(t)
+	got := e.state(t, b.ID)
+	if got.Status != core.BcCancelled || got.Failed != 1 || got.Sent != 0 {
+		t.Fatalf("после отказа: %+v", got)
+	}
+	for range 3 {
+		if n := e.tick(t); n != 0 {
+			t.Fatalf("после остановки ушло %d", n)
+		}
+	}
+	found := false
+	for _, n := range adminTasks(t, e.env) {
+		found = found || (n.Key == "admin.broadcast_rejected" && n.Topic == core.TopicErrors)
+	}
+	if !found {
+		t.Error("админы не получили уведомление")
+	}
+}

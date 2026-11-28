@@ -36,6 +36,8 @@ func TestBroadcastSend(t *testing.T) {
 			func(err error) bool { return errors.Is(err, core.ErrRecipientGone) }},
 		{"удалил аккаунт", &tg.Error{Code: 403, Description: "Forbidden: user is deactivated"},
 			func(err error) bool { return errors.Is(err, core.ErrRecipientGone) }},
+		{"разметка отвергнута", &tg.Error{Code: 400, Description: "Bad Request: can't parse entities: Unsupported start tag"},
+			func(err error) bool { return errors.Is(err, core.ErrMarkupRejected) }},
 		{"429", &tg.Error{Code: 429, Description: "Too Many Requests", RetryAfter: 9},
 			func(err error) bool { var r *core.RetryAfter; return errors.As(err, &r) && r.Seconds == 9 }},
 		{"прочее", &tg.Error{Code: 400, Description: "Bad Request: chat not found"},

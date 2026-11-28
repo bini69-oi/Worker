@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/bini69-oi/worker/core"
 	"github.com/bini69-oi/worker/tg"
@@ -25,8 +26,16 @@ func (b *Bot) Send(ctx context.Context, tgID int64, text, buttonText, buttonURL 
 		return err
 	case te.IsBlocked():
 		return core.ErrRecipientGone
+	case te.Code == 400 && markupRejected(te.Description):
+		return core.ErrMarkupRejected
 	case te.Code == 429:
 		return &core.RetryAfter{Seconds: te.RetryAfter}
 	}
 	return err
+}
+
+// markupRejected узнаёт ответ Telegram об ошибке разбора разметки.
+func markupRejected(desc string) bool {
+	d := strings.ToLower(desc)
+	return strings.Contains(d, "can't parse entities") || strings.Contains(d, "can't find end of")
 }

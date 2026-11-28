@@ -76,6 +76,8 @@ func (c *Core) sendOne(ctx context.Context, b Broadcast, u User) (stop bool, err
 		sent = 1
 	case errors.Is(sendErr, ErrRecipientGone):
 		blocked = 1
+	case errors.Is(sendErr, ErrMarkupRejected):
+		return true, c.stopBroadcast(ctx, b, u)
 	case errors.As(sendErr, &wait):
 		c.bcNext.Store(c.clock.Now().Add(time.Duration(max(wait.Seconds, 1)) * time.Second))
 		return true, nil // этого абонента повторим в следующей пачке: курсор не двигаем
@@ -109,5 +111,21 @@ func (c *Core) finishBroadcast(ctx context.Context, id int64) error {
 		}
 		return enqueueAdmin(tx, AdminTask{Topic: TopicSummary, Key: "admin.broadcast_done", Vars: map[string]string{
 			"sent": itoa(int64(b.Sent)), "failed": itoa(int64(b.Failed)), "blocked": itoa(int64(b.Blocked)), "total": itoa(int64(b.Total))}}, now)
+	})
+}
+
+// stopBroadcast останавливает рассылку, у которой Telegram отверг разметку: статус «отменена», отказ в счётчике
+// ошибок, админам уведомление в тему «Ошибки». Остальные получатели ничего не получают.
+func (c *Core) stopBroadcast(ctx context.Context, b Broadcast, u User) error {
+	return c.tx(ctx, func(tx Tx) error {
+		now := c.clock.Now()
+		if _, err := tx.BroadcastStep(b.ID, u.ID, 0, 1, 0); err != nil {
+			return err
+		}
+		if ok, err := tx.CancelBroadcast(b.ID, now); err != nil || !ok {
+			return err
+		}
+		return enqueueAdmin(tx, AdminTask{Topic: TopicErrors, Key: "admin.broadcast_rejected",
+			Vars: map[string]string{"id": itoa(b.ID)}}, now)
 	})
 }

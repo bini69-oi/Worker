@@ -62,6 +62,10 @@ type BroadcastSender interface {
 // ErrRecipientGone значит, что сообщение не дойдёт: получатель заблокировал бота.
 var ErrRecipientGone = errors.New("получатель недоступен")
 
+// ErrMarkupRejected значит, что Telegram не принял разметку текста: следующим получателям будет то же самое,
+// поэтому рассылка останавливается после первого отказа.
+var ErrMarkupRejected = errors.New("разметка отвергнута Telegram")
+
 // RetryAfter это ответ 429 Telegram: подождать столько секунд.
 type RetryAfter struct{ Seconds int }
 
