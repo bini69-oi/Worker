@@ -28,7 +28,7 @@ func TestAuditFilterByAction(t *testing.T) {
 		t.Fatalf("%+v %v", page, err)
 	}
 	r := page.Items[0]
-	if r.AdminTg != owner || r.Target != strconv.FormatInt(e.user.ID, 10) || r.Details["days"] != "30" || r.At.IsZero() {
+	if r.AdminTg != owner || r.Target != "user:"+strconv.FormatInt(e.user.ID, 10) || r.Details["days"] != "30" || r.At.IsZero() {
 		t.Errorf("кто, кому, сколько и когда: %+v", r)
 	}
 	if page, _ = e.c.Audit(ctx, owner, core.AuditFilter{AdminTg: 999}, 0); len(page.Items) != 0 {

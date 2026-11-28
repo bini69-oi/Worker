@@ -106,3 +106,35 @@ func TestAdminDevicesAndLink(t *testing.T) {
 		t.Errorf("нет такого абонента, а ошибки нет")
 	}
 }
+
+// Карточка абонента показывает только записи о нём: действие над платежом, тарифом или настройкой с тем же
+// числом в target не попадает в чужую карточку.
+func TestUserCardAuditOnlyAboutUser(t *testing.T) {
+	ctx := context.Background()
+	e := newCfgEnv(t)
+	helperWith(t, e.env, 50, core.PermUsers)
+	if err := e.st.Tx(ctx, func(tx core.Tx) error {
+		for _, a := range []core.AuditEntry{
+			{AdminTg: owner, Action: "payment.confirm", Target: itoa(int(e.user.ID)), At: e.clock.Now()},
+			{AdminTg: owner, Action: "tariff.save", Target: itoa(int(e.user.ID)), At: e.clock.Now()},
+			{AdminTg: owner, Action: "setting.set", Target: "stars.rate", Details: map[string]string{"new": "999"}, At: e.clock.Now()},
+		} {
+			if err := tx.AddAudit(a); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.c.AdminAdjust(ctx, owner, e.user.ID, 100, "своя запись"); err != nil {
+		t.Fatal(err)
+	}
+	card, err := e.c.UserCard(ctx, 50, e.user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(card.Audit) != 1 || card.Audit[0].Action != "balance.adjust" {
+		t.Errorf("в карточке чужие записи: %+v", card.Audit)
+	}
+}

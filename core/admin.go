@@ -22,7 +22,7 @@ func (c *Core) AdminAdjust(ctx context.Context, adminID, userID, amount int64, c
 			return "", nil, err
 		}
 		details := map[string]string{"amount": itoa(amount), "comment": comment}
-		return itoa(userID), details, c.helperMoney(tx, a, "balance.adjust", userID, amount, now)
+		return userTarget(userID), details, c.helperMoney(tx, a, "balance.adjust", userID, amount, now)
 	})
 	return out, err
 }

@@ -189,3 +189,7 @@ type StatsData struct {
 	StuckTasks int
 	StuckUsers []int64 // абоненты зависших задач, не больше 20
 }
+
+// userTarget это «над чем» в журнале для действий над абонентом: с типом, чтобы номер абонента не путался
+// с номером платежа, тарифа или рассылки. По нему карточка абонента выбирает свои записи.
+func userTarget(userID int64) string { return "user:" + itoa(userID) }

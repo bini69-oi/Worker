@@ -4,7 +4,7 @@
       "id": 5,
       "admin_tg": 1,
       "action": "sub.grant_days",
-      "target": "7",
+      "target": "user:7",
       "details": {
         "days": "30"
       },

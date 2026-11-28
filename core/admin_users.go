@@ -106,9 +106,10 @@ func (c *Core) UserCard(ctx context.Context, actorTg, userID int64) (UserCard, e
 	if card.Payments, err = c.store.UserPayments(ctx, userID, cardLimit); err != nil {
 		return card, err
 	}
-	if card.Audit, err = c.store.AuditLog(ctx, AuditFilter{Target: itoa(userID)}, cardLimit); err != nil {
+	if card.Audit, err = c.store.AuditLog(ctx, AuditFilter{Target: userTarget(userID)}, cardLimit); err != nil {
 		return card, err
 	}
+	c.cleanAudit(card.Audit)
 	card.Devices, card.DevicesOK = c.cardDevices(ctx, userID)
 	return card, nil
 }
@@ -178,7 +179,7 @@ func (c *Core) SendToUser(ctx context.Context, actorTg, userID int64, text strin
 			return "", nil, err
 		}
 		short := []rune(text)
-		return itoa(userID), map[string]string{"text": string(short[:min(len(short), 200)])}, nil
+		return userTarget(userID), map[string]string{"text": string(short[:min(len(short), 200)])}, nil
 	})
 }
 
@@ -227,6 +228,6 @@ func (c *Core) adminPanelOp(ctx context.Context, actorTg, userID int64, action s
 		return err
 	}
 	return c.asAdmin(ctx, actorTg, PermGrant, action, func(Tx, Admin, time.Time) (string, map[string]string, error) {
-		return itoa(userID), nil, nil
+		return userTarget(userID), nil, nil
 	})
 }

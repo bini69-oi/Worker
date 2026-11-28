@@ -20,14 +20,20 @@ func (c *Core) Audit(ctx context.Context, actorTg int64, f AuditFilter, cursor i
 		page.Items = rows[:PageSize]
 		page.Next = page.Items[PageSize-1].ID
 	}
-	if c.filter != nil {
-		for i, r := range page.Items {
-			clean := make(map[string]string, len(r.Details))
-			for k, v := range r.Details {
-				clean[k] = c.filter.String(v)
-			}
-			page.Items[i].Details = clean
-		}
-	}
+	c.cleanAudit(page.Items)
 	return page, nil
+}
+
+// cleanAudit пропускает значения записей журнала через фильтр секретов.
+func (c *Core) cleanAudit(rows []AuditRow) {
+	if c.filter == nil {
+		return
+	}
+	for i, r := range rows {
+		clean := make(map[string]string, len(r.Details))
+		for k, v := range r.Details {
+			clean[k] = c.filter.String(v)
+		}
+		rows[i].Details = clean
+	}
 }

@@ -41,7 +41,7 @@ func TestSendToUser(t *testing.T) {
 		t.Errorf("ядро не должно экранировать: это делает бот при подстановке: %q", got[0].Vars["text"])
 	}
 	audit := e.st.Audit()
-	if last := audit[len(audit)-1]; last.Action != "user.message" || last.Target != strconv.FormatInt(e.user.ID, 10) {
+	if last := audit[len(audit)-1]; last.Action != "user.message" || last.Target != "user:"+strconv.FormatInt(e.user.ID, 10) {
 		t.Errorf("журнал: %+v", last)
 	}
 	e.process(t)

@@ -64,7 +64,7 @@ func (c *Core) setBan(ctx context.Context, actorTg, userID int64, on bool, comme
 		} else if !errors.Is(err, ErrNotFound) {
 			return "", nil, err
 		}
-		return itoa(userID), map[string]string{"comment": comment}, nil
+		return userTarget(userID), map[string]string{"comment": comment}, nil
 	})
 	if errors.Is(err, errSame) {
 		return nil

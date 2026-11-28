@@ -44,7 +44,7 @@ func (c *Core) GrantDays(ctx context.Context, actorTg, userID int64, days int) (
 			}
 		}
 		out = sub
-		return itoa(userID), map[string]string{"days": itoa(int64(days))}, nil
+		return userTarget(userID), map[string]string{"days": itoa(int64(days))}, nil
 	})
 	return out, err
 }
