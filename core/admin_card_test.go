@@ -102,6 +102,19 @@ func TestAdminDevicesAndLink(t *testing.T) {
 	if err := e.c.AdminResetDevices(ctx, owner, e.user.ID); !errors.Is(err, core.ErrPanelDown) {
 		t.Errorf("панель лежит: %v", err)
 	}
+	// Панель не ответила: в журнале остался запрос, итога нет.
+	var requests, results int
+	for _, a := range e.st.Audit() {
+		if a.Action == "devices.reset.request" {
+			requests++
+		}
+		if a.Action == "devices.reset" {
+			results++
+		}
+	}
+	if requests != 2 || results != 1 {
+		t.Errorf("журнал: запросов %d, итогов %d", requests, results)
+	}
 	if err := e.c.AdminResetDevices(ctx, owner, 9999); err == nil {
 		t.Errorf("нет такого абонента, а ошибки нет")
 	}

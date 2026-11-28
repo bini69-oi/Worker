@@ -71,6 +71,7 @@ type state struct {
 	chat      *core.AdminChat
 	support   map[[2]int64]supportRow
 	bcs       map[int64]core.Broadcast
+	kv        map[string]string // строки настроек (s:ключ) и текстов (t:ключ|язык), записанные ядром
 	cab       cabState
 }
 
@@ -96,6 +97,7 @@ func (s *state) clone() *state {
 		chat:      cloneChat(s.chat),
 		support:   maps.Clone(s.support),
 		bcs:       maps.Clone(s.bcs),
+		kv:        maps.Clone(s.kv),
 		cab:       s.cab.clone(),
 		nextID:    s.nextID,
 	}
@@ -119,7 +121,7 @@ func NewStore() *Store {
 		subs: map[int64]core.Subscription{}, notices: map[string]bool{}, pays: map[int64]core.Payment{},
 		carts: map[int64]core.PendingBuy{}, promos: map[int64]core.Promo{}, limits: map[string]limitRow{},
 		promoUses: map[[2]int64]bool{}, admins: map[int64]core.Admin{}, confirms: map[int64]core.Confirm{},
-		sessions: map[string]sessionRow{},
+		sessions: map[string]sessionRow{}, kv: map[string]string{},
 	}}
 }
 

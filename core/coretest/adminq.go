@@ -247,3 +247,28 @@ func (s *Store) AdminSession(_ context.Context, tokenHash []byte) (core.Session,
 	defer s.mu.Unlock()
 	return (&tx{st: s.st}).Session(tokenHash)
 }
+
+// Строки настроек и текстов в памяти: настоящие кэши держат настройки и тексты, здесь то, что записала транзакция.
+func (t *tx) SaveSetting(key, value string, _ time.Time) error { t.st.kv["s:"+key] = value; return nil }
+func (t *tx) DeleteSetting(key string) error                   { delete(t.st.kv, "s:"+key); return nil }
+func (t *tx) SaveText(key, lang, value string, _ time.Time) error {
+	t.st.kv["t:"+key+"|"+lang] = value
+	return nil
+}
+func (t *tx) DeleteText(key, lang string) error { delete(t.st.kv, "t:"+key+"|"+lang); return nil }
+
+// StoredSetting отдаёт строку настройки, записанную транзакцией ядра, для проверок в тестах.
+func (s *Store) StoredSetting(key string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, ok := s.st.kv["s:"+key]
+	return v, ok
+}
+
+// StoredText отдаёт правку текста, записанную транзакцией ядра, для проверок в тестах.
+func (s *Store) StoredText(key, lang string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, ok := s.st.kv["t:"+key+"|"+lang]
+	return v, ok
+}

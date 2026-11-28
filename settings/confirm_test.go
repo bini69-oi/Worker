@@ -50,3 +50,41 @@ func TestValidateAndCurrent(t *testing.T) {
 		t.Errorf("секрет не должен отдаваться: %q %v", v, changed)
 	}
 }
+
+// Prepare проверяет и готовит запись, Apply применяет в памяти: пока Apply не позван, значение прежнее.
+func TestPrepareApply(t *testing.T) {
+	s, f := newSettings(t)
+	ch, err := s.PrepareSet("trial.days", "9")
+	if err != nil || ch.Delete || ch.Stored != "9" || ch.Key != "trial.days" {
+		t.Fatalf("%+v %v", ch, err)
+	}
+	if s.Int("trial.days") != 3 || len(f.rows) != 0 {
+		t.Fatal("Prepare изменил значение или базу")
+	}
+	s.Apply(ch)
+	if s.Int("trial.days") != 9 {
+		t.Error("Apply не применил")
+	}
+	if ch, _ := s.PrepareSet("trial.days", "3"); !ch.Delete {
+		t.Error("значение по умолчанию это удаление строки")
+	}
+	if _, err := s.PrepareSet("trial.days", "много"); err == nil {
+		t.Error("неверный тип принят")
+	}
+	if _, err := s.PrepareSet("yookassa.secret_key", "x"); err == nil {
+		t.Error("секрет обычной правкой")
+	}
+	sec, err := s.PrepareSecret("yookassa.secret_key", "live_0123456789abcdefXYZ1")
+	if err != nil || sec.Stored == "live_0123456789abcdefXYZ1" || !sec.Secret || sec.Value != "live_0123456789abcdefXYZ1" {
+		t.Fatalf("секрет: %+v %v", sec, err)
+	}
+	s.Apply(sec)
+	if s.Secret("yookassa.secret_key") != "live_0123456789abcdefXYZ1" {
+		t.Error("секрет не применился")
+	}
+	rs, _ := s.PrepareReset("trial.days")
+	s.Apply(rs)
+	if s.Int("trial.days") != 3 {
+		t.Error("сброс не применился")
+	}
+}

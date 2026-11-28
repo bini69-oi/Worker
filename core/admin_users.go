@@ -186,20 +186,20 @@ func (c *Core) SendToUser(ctx context.Context, actorTg, userID int64, text strin
 // AdminResetDevices отвязывает все устройства абонента от имени админа. Нужно право grant.
 // Работает и во время техработ: админ как раз помогает абоненту.
 func (c *Core) AdminResetDevices(ctx context.Context, actorTg, userID int64) error {
-	return c.adminPanelOp(ctx, actorTg, userID, "devices.reset", func(ref string) error {
-		return c.panel.ResetDevices(ctx, ref)
+	return c.adminPanelOp(ctx, actorTg, userID, "devices.reset", func(ref string) (func(Tx) error, error) {
+		return nil, c.panel.ResetDevices(ctx, ref)
 	})
 }
 
 // AdminRevokeLink перевыпускает ссылку подписки абонента от имени админа. Нужно право grant.
-// Новая ссылка сохраняется в базе, старая перестаёт работать.
+// Новая ссылка сохраняется в базе вместе с записью журнала, старая перестаёт работать.
 func (c *Core) AdminRevokeLink(ctx context.Context, actorTg, userID int64) error {
-	return c.adminPanelOp(ctx, actorTg, userID, "link.revoke", func(ref string) error {
+	return c.adminPanelOp(ctx, actorTg, userID, "link.revoke", func(ref string) (func(Tx) error, error) {
 		res, err := c.panel.RevokeLink(ctx, ref)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		return c.tx(ctx, func(tx Tx) error {
+		return func(tx Tx) error {
 			sub, err := tx.SubByUser(userID)
 			if err != nil {
 				return err
@@ -207,13 +207,15 @@ func (c *Core) AdminRevokeLink(ctx context.Context, actorTg, userID int64) error
 			sub.SubURL = res.SubURL
 			_, err = tx.SaveSub(sub)
 			return err
-		})
+		}, nil
 	})
 }
 
-// adminPanelOp проверяет право, делает действие в панели и пишет его в журнал. Панель внешняя и не живёт
-// в транзакции, поэтому порядок такой: право, панель, журнал. Не получилось в панели: журнала нет, ошибка ушла наверх.
-func (c *Core) adminPanelOp(ctx context.Context, actorTg, userID int64, action string, op func(ref string) error) error {
+// adminPanelOp делает действие админа в панели. Панель внешняя и в транзакцию не входит, поэтому порядок такой:
+// проверка права, запись «запрошено» в журнал, вызов панели, потом результат в базе вместе с записью об итоге
+// одной транзакцией. Если панель не ответила, в журнале остаётся запрос, а итога нет.
+func (c *Core) adminPanelOp(ctx context.Context, actorTg, userID int64, action string,
+	op func(ref string) (apply func(Tx) error, err error)) error {
 	if _, err := c.Require(ctx, actorTg, PermGrant, action); err != nil {
 		return err
 	}
@@ -224,10 +226,21 @@ func (c *Core) adminPanelOp(ctx context.Context, actorTg, userID int64, action s
 	if err != nil {
 		return err
 	}
-	if err := c.panelErr(action, op(sub.PanelUUID)); err != nil {
+	if err := c.asAdmin(ctx, actorTg, PermGrant, action+".request", func(Tx, Admin, time.Time) (string, map[string]string, error) {
+		return userTarget(userID), nil, nil
+	}); err != nil {
 		return err
 	}
-	return c.asAdmin(ctx, actorTg, PermGrant, action, func(Tx, Admin, time.Time) (string, map[string]string, error) {
+	apply, err := op(sub.PanelUUID)
+	if err := c.panelErr(action, err); err != nil {
+		return err
+	}
+	return c.asAdmin(ctx, actorTg, PermGrant, action, func(tx Tx, _ Admin, _ time.Time) (string, map[string]string, error) {
+		if apply != nil {
+			if err := apply(tx); err != nil {
+				return "", nil, err
+			}
+		}
 		return userTarget(userID), nil, nil
 	})
 }

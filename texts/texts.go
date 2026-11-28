@@ -89,8 +89,21 @@ func (t *Texts) Run(ctx context.Context, tick <-chan time.Time) {
 	}
 }
 
-// Set сохраняет правку. Подстановки вне списка ключа отклоняются, в ошибке перечислены допустимые.
+// Set сохраняет правку.
 func (t *Texts) Set(key, lang, value string) error {
+	if err := t.Check(key, lang, value); err != nil {
+		return err
+	}
+	if err := t.st.Save(key, lang, value, t.now().Unix()); err != nil {
+		return fmt.Errorf("запись текста %s: %w", key, err)
+	}
+	t.Apply(key, lang, value)
+	return nil
+}
+
+// Check проверяет правку, ничего не записывая: ключ, язык, пустой текст, подстановки. Подстановки вне списка
+// ключа отклоняются, в ошибке перечислены допустимые. Ядро пишет правку своей транзакцией и зовёт Apply.
+func (t *Texts) Check(key, lang, value string) error {
 	def, ok := find(key)
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
@@ -101,15 +114,28 @@ func (t *Texts) Set(key, lang, value string) error {
 	if strings.TrimSpace(value) == "" {
 		return ErrEmptyText
 	}
-	if err := checkParams(def, value); err != nil {
-		return err
-	}
-	if err := t.st.Save(key, lang, value, t.now().Unix()); err != nil {
-		return fmt.Errorf("запись текста %s: %w", key, err)
-	}
+	return checkParams(def, value)
+}
+
+// Apply применяет правку в кэше. Зовётся после того, как запись попала в базу.
+func (t *Texts) Apply(key, lang, value string) {
 	t.mu.Lock()
 	t.vals[cacheKey{key, lang}] = value
 	t.mu.Unlock()
+}
+
+// ApplyReset убирает правку из кэша. Зовётся после удаления строки из базы.
+func (t *Texts) ApplyReset(key, lang string) {
+	t.mu.Lock()
+	delete(t.vals, cacheKey{key, lang})
+	t.mu.Unlock()
+}
+
+// CheckKey говорит, есть ли такой текст.
+func (t *Texts) CheckKey(key string) error {
+	if _, ok := find(key); !ok {
+		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
+	}
 	return nil
 }
 

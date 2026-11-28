@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/bini69-oi/worker/texts"
@@ -11,8 +12,11 @@ import (
 
 // TextEditor это правка текстов бота. Реализует её пакет texts.
 type TextEditor interface {
-	Set(key, lang, value string) error
-	Reset(key, lang string) error
+	// Check проверяет правку, не записывая. Запись идёт транзакцией ядра, потом Apply или ApplyReset.
+	Check(key, lang, value string) error
+	CheckKey(key string) error
+	Apply(key, lang, value string)
+	ApplyReset(key, lang string)
 	// Override отдаёт правку админа. Правки нет: false, действует умолчание из кода.
 	Override(key, lang string) (string, bool)
 	Langs() []string
@@ -58,16 +62,21 @@ func (c *Core) SetText(ctx context.Context, actorTg int64, key, lang, value stri
 		}
 		return ErrTooLong
 	}
-	return c.ownerAction(ctx, actorTg, "text.set", func() (string, map[string]string, error) {
+	return c.ownerAction(ctx, actorTg, "text.set", func(tx Tx, now time.Time, res *ownerResult) error {
 		if sentAsHTML(key) && strings.TrimSpace(value) != "" {
 			if err := CheckMarkup(value); err != nil {
-				return "", nil, err
+				return err
 			}
 		}
-		if err := c.texts.Set(key, lang, value); err != nil {
-			return "", nil, textErr(err)
+		if err := c.texts.Check(key, lang, value); err != nil {
+			return textErr(err)
 		}
-		return key, map[string]string{"lang": lang, "len": itoa(int64(utf8.RuneCountInString(value)))}, nil
+		if err := tx.SaveText(key, lang, value, now); err != nil {
+			return err
+		}
+		res.Target, res.Details = key, map[string]string{"lang": lang, "len": itoa(int64(utf8.RuneCountInString(value)))}
+		res.After = append(res.After, func() { c.texts.Apply(key, lang, value) })
+		return nil
 	})
 }
 
@@ -76,11 +85,16 @@ func (c *Core) ResetText(ctx context.Context, actorTg int64, key, lang string) e
 	if c.texts == nil {
 		return ErrInternal
 	}
-	return c.ownerAction(ctx, actorTg, "text.reset", func() (string, map[string]string, error) {
-		if err := c.texts.Reset(key, lang); err != nil {
-			return "", nil, textErr(err)
+	return c.ownerAction(ctx, actorTg, "text.reset", func(tx Tx, _ time.Time, res *ownerResult) error {
+		if err := c.texts.CheckKey(key); err != nil {
+			return textErr(err)
 		}
-		return key, map[string]string{"lang": lang}, nil
+		if err := tx.DeleteText(key, lang); err != nil {
+			return err
+		}
+		res.Target, res.Details = key, map[string]string{"lang": lang}
+		res.After = append(res.After, func() { c.texts.ApplyReset(key, lang) })
+		return nil
 	})
 }
 

@@ -166,6 +166,12 @@ type AdminTx interface {
 	SegmentCount(segment string, now time.Time) (int, error)
 	// PromoByID отдаёт промокод. Нет такого: ErrNotFound.
 	PromoByID(id int64) (Promo, error)
+	// SaveSetting и DeleteSetting пишут строку настроек той же транзакцией, что и журнал. Секрет приходит шифротекстом.
+	SaveSetting(key, value string, at time.Time) error
+	DeleteSetting(key string) error
+	// SaveText и DeleteText делают то же для правок текстов.
+	SaveText(key, lang, value string, at time.Time) error
+	DeleteText(key, lang string) error
 	// MarkRefunded переводит оплаченный платёж в «возвращён» с временем возврата. false значит, что он уже не оплачен.
 	MarkRefunded(id int64, at time.Time) (bool, error)
 }

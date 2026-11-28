@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -43,22 +44,29 @@ func (c *Core) SetMaintenance(ctx context.Context, actorTg int64, on bool, text 
 		}
 		return ErrTooLong
 	}
-	return c.ownerAction(ctx, actorTg, action, func() (string, map[string]string, error) {
+	return c.ownerAction(ctx, actorTg, action, func(tx Tx, now time.Time, res *ownerResult) error {
 		if text != "" {
 			if err := CheckMarkup(text); err != nil {
-				return "", nil, err
+				return err
 			}
 		}
 		if text != "" && c.texts != nil {
 			for _, key := range []string{"bot.maintenance", "err.maintenance"} {
-				if err := c.texts.Set(key, "ru", text); err != nil {
-					return "", nil, textErr(err)
+				if err := c.texts.Check(key, "ru", text); err != nil {
+					return textErr(err)
 				}
+				if err := tx.SaveText(key, "ru", text, now); err != nil {
+					return err
+				}
+				res.After = append(res.After, func() { c.texts.Apply(key, "ru", text) })
 			}
 		}
-		if err := cfg.Set("maintenance.on", strconv.FormatBool(on)); err != nil {
-			return "", nil, settingErr(err)
+		ch, err := cfg.PrepareSet("maintenance.on", strconv.FormatBool(on))
+		if err != nil {
+			return settingErr(err)
 		}
-		return "maintenance.on", map[string]string{"on": strconv.FormatBool(on), "text_len": itoa(int64(utf8.RuneCountInString(text)))}, nil
+		res.Target = "maintenance.on"
+		res.Details = map[string]string{"on": strconv.FormatBool(on), "text_len": itoa(int64(utf8.RuneCountInString(text)))}
+		return c.writeChange(tx, cfg, ch, now, res)
 	})
 }

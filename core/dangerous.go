@@ -4,13 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/bini69-oi/worker/settings"
 	"slices"
 	"time"
 )
 
 // ConfigWriter это запись настроек. Нужна ядру только для опасных действий: смены ключей и токена.
 type ConfigWriter interface {
-	SetSecret(key, raw string) error
+	PrepareSecret(key, raw string) (settings.Change, error)
+	Apply(ch settings.Change)
 	IsSecret(key string) bool
 }
 
@@ -196,6 +198,27 @@ func (c *Core) runApproved(ctx context.Context, cf Confirm) error {
 	})
 }
 
+// saveSecret записывает подтверждённый секрет: строка в базе и запись в журнал одной транзакцией, потом кэш.
+// В журнале только имя ключа.
+func (c *Core) saveSecret(ctx context.Context, w ConfigWriter, key, value string) error {
+	ch, err := w.PrepareSecret(key, value)
+	if err != nil {
+		return settingErr(err)
+	}
+	err = c.asAdmin(ctx, c.owner, PermOwner, "secret.set", func(tx Tx, _ Admin, now time.Time) (string, map[string]string, error) {
+		if ch.Delete {
+			err = tx.DeleteSetting(ch.Key)
+		} else {
+			err = tx.SaveSetting(ch.Key, ch.Stored, now)
+		}
+		return key, nil, err
+	})
+	if err == nil {
+		w.Apply(ch)
+	}
+	return err
+}
+
 func (c *Core) execute(ctx context.Context, cf Confirm, now time.Time) error {
 	switch cf.Kind {
 	case "secret":
@@ -209,7 +232,7 @@ func (c *Core) execute(ctx context.Context, cf Confirm, now time.Time) error {
 			return ErrConfirmGone
 		}
 		c.rememberSecret(value)
-		return w.SetSecret(p.Key, value)
+		return c.saveSecret(ctx, w, p.Key, value)
 	case "bot_token":
 		token, ok := c.secrets.take(cf.ID, now)
 		w, can := c.cfg.(ConfigWriter)
@@ -222,7 +245,7 @@ func (c *Core) execute(ctx context.Context, cf Confirm, now time.Time) error {
 			c.log.Error("вебхук на новый токен не поставлен", "err", err)
 			return ErrBadToken
 		}
-		return w.SetSecret("bot.token", token)
+		return c.saveSecret(ctx, w, "bot.token", token)
 	case "add_admin", "remove_admin":
 		var p adminPayload
 		if err := json.Unmarshal(cf.Payload, &p); err != nil {

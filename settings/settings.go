@@ -110,32 +110,95 @@ func (s *Settings) SetSecret(key, raw string) error {
 }
 
 func (s *Settings) set(def Def, raw string) error {
+	ch, err := s.prepare(def, raw)
+	if err != nil {
+		return err
+	}
+	if ch.Delete {
+		return s.Reset(def.Key)
+	}
+	if err := s.st.Save(ch.Key, ch.Stored, s.now().Unix()); err != nil {
+		return fmt.Errorf("запись настройки %s: %w", ch.Key, err)
+	}
+	s.Apply(ch)
+	return nil
+}
+
+// Change это подготовленная правка настройки: проверена, нормализована, секрет зашифрован. Ядро пишет её в базу
+// своей транзакцией вместе с журналом (Stored под ключом Key, а Delete удаляет строку) и после коммита зовёт Apply.
+type Change struct {
+	Key    string
+	Value  string // нормализованное значение, то, что увидит код после Apply
+	Stored string // что лежит в базе: у секрета шифротекст
+	Delete bool   // строку надо удалить: значение равно умолчанию или это сброс
+	Secret bool
+}
+
+// PrepareSet проверяет значение и готовит запись, ничего не меняя. Секретную настройку так не меняют:
+// для неё PrepareSecret.
+func (s *Settings) PrepareSet(key, raw string) (Change, error) {
+	def, ok := find(key)
+	if !ok {
+		return Change{}, fmt.Errorf("%w: %s", ErrUnknownKey, key)
+	}
+	if def.Secret {
+		return Change{}, fmt.Errorf("%w: %s", ErrSecretNeedsConfirm, key)
+	}
+	return s.prepare(def, raw)
+}
+
+// PrepareSecret готовит запись секрета. Её зовёт только ядро после «Да» владельца.
+func (s *Settings) PrepareSecret(key, raw string) (Change, error) {
+	def, ok := find(key)
+	if !ok || !def.Secret {
+		return Change{}, fmt.Errorf("%w: %s", ErrUnknownKey, key)
+	}
+	return s.prepare(def, raw)
+}
+
+// PrepareReset готовит возврат к умолчанию.
+func (s *Settings) PrepareReset(key string) (Change, error) {
+	def, ok := find(key)
+	if !ok {
+		return Change{}, fmt.Errorf("%w: %s", ErrUnknownKey, key)
+	}
+	return Change{Key: key, Value: def.Default, Delete: true, Secret: def.Secret}, nil
+}
+
+func (s *Settings) prepare(def Def, raw string) (Change, error) {
 	key := def.Key
 	norm, err := normalize(def.Kind, raw)
 	if err != nil {
-		return fmt.Errorf("%s: %w", key, err)
+		return Change{}, fmt.Errorf("%s: %w", key, err)
 	}
 	if check := checks[key]; check != nil {
 		if err := check(norm); err != nil {
-			return fmt.Errorf("%s: %w: %w", key, ErrBadValue, err)
+			return Change{}, fmt.Errorf("%s: %w: %w", key, ErrBadValue, err)
 		}
 	}
+	ch := Change{Key: key, Value: norm, Secret: def.Secret}
 	if norm == def.Default {
-		return s.Reset(key)
+		ch.Delete = true
+		return ch, nil
 	}
-	stored := norm
+	ch.Stored = norm
 	if def.Secret {
-		if stored, err = seal(s.key, key, norm); err != nil {
-			return fmt.Errorf("шифрование настройки %s: %w", key, err)
+		if ch.Stored, err = seal(s.key, key, norm); err != nil {
+			return Change{}, fmt.Errorf("шифрование настройки %s: %w", key, err)
 		}
 	}
-	if err := s.st.Save(key, stored, s.now().Unix()); err != nil {
-		return fmt.Errorf("запись настройки %s: %w", key, err)
-	}
+	return ch, nil
+}
+
+// Apply применяет подготовленную правку в памяти. Зовётся после того, как запись попала в базу.
+func (s *Settings) Apply(ch Change) {
 	s.mu.Lock()
-	s.vals[key] = norm
-	s.mu.Unlock()
-	return nil
+	defer s.mu.Unlock()
+	if ch.Delete {
+		delete(s.vals, ch.Key)
+		return
+	}
+	s.vals[ch.Key] = ch.Value
 }
 
 // Reset удаляет строку из базы, дальше действует умолчание.

@@ -159,3 +159,28 @@ func (s *CoreStore) AdminByTg(ctx context.Context, tgID int64) (core.Admin, erro
 func (s *CoreStore) AdminSession(ctx context.Context, tokenHash []byte) (core.Session, error) {
 	return (&coreTx{ctx: ctx, q: s.db.R}).Session(tokenHash)
 }
+
+func (t *coreTx) SaveSetting(key, value string, at time.Time) error {
+	_, err := t.q.ExecContext(t.ctx,
+		`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+		 ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`, key, value, at.Unix())
+	return err
+}
+
+func (t *coreTx) DeleteSetting(key string) error {
+	_, err := t.q.ExecContext(t.ctx, "DELETE FROM settings WHERE key = ?", key)
+	return err
+}
+
+func (t *coreTx) SaveText(key, lang, value string, at time.Time) error {
+	_, err := t.q.ExecContext(t.ctx,
+		`INSERT INTO texts (key, lang, value, updated_at) VALUES (?, ?, ?, ?)
+		 ON CONFLICT (key, lang) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+		key, lang, value, at.Unix())
+	return err
+}
+
+func (t *coreTx) DeleteText(key, lang string) error {
+	_, err := t.q.ExecContext(t.ctx, "DELETE FROM texts WHERE key = ? AND lang = ?", key, lang)
+	return err
+}

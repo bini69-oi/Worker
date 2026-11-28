@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/bini69-oi/worker/settings"
 )
@@ -11,8 +12,12 @@ import (
 // ConfigAdmin это настройки глазами админки: список, проверка, запись и сброс. Реализует его пакет settings.
 type ConfigAdmin interface {
 	Validate(key, raw string) error
-	Set(key, raw string) error
-	Reset(key string) error
+	// PrepareSet, PrepareSecret и PrepareReset проверяют и готовят запись, ничего не меняя. Ядро пишет её своей
+	// транзакцией вместе с журналом, после коммита зовёт Apply.
+	PrepareSet(key, raw string) (settings.Change, error)
+	PrepareSecret(key, raw string) (settings.Change, error)
+	PrepareReset(key string) (settings.Change, error)
+	Apply(ch settings.Change)
 	Current(key string) (value string, changed bool)
 	Masked(key string) settings.Masked
 }
@@ -98,7 +103,9 @@ func (c *Core) changeSetting(ctx context.Context, actorTg int64, p settingPayloa
 		res.ConfirmID, err = c.RequestAction(ctx, actorTg, "setting", p)
 		res.Pending = true
 	default:
-		err = c.ownerAction(ctx, actorTg, "setting.set", func() (string, map[string]string, error) { return c.applySetting(cfg, p) })
+		err = c.ownerAction(ctx, actorTg, "setting.set", func(tx Tx, now time.Time, res *ownerResult) error {
+			return c.applySetting(tx, cfg, p, now, res)
+		})
 	}
 	return res, err
 }
@@ -113,28 +120,32 @@ func settingDef(key string) (settings.Def, bool) {
 	return settings.Def{}, false
 }
 
-// applySetting записывает настройку и отдаёт, что писать в журнал: прежнее и новое значение. Значение секрета
-// в журнал не попадает.
-func (c *Core) applySetting(cfg ConfigAdmin, p settingPayload) (string, map[string]string, error) {
+// applySetting пишет настройку в транзакцию и отдаёт, что писать в журнал: прежнее и новое значение. Значение
+// секрета в журнал не попадает.
+func (c *Core) applySetting(tx Tx, cfg ConfigAdmin, p settingPayload, now time.Time, res *ownerResult) error {
 	def, _ := settingDef(p.Key)
 	old, _ := cfg.Current(p.Key)
+	var ch settings.Change
 	var err error
-	if p.Reset {
-		err = cfg.Reset(p.Key)
-	} else if def.Secret {
-		return "", nil, ErrInvalid // секрет меняет только RequestSecret
-	} else {
-		err = cfg.Set(p.Key, p.Value)
+	switch {
+	case p.Reset:
+		ch, err = cfg.PrepareReset(p.Key)
+	case def.Secret:
+		return ErrInvalid // секрет меняет только RequestSecret
+	default:
+		ch, err = cfg.PrepareSet(p.Key, p.Value)
 	}
 	if err != nil {
-		return "", nil, settingErr(err)
+		return settingErr(err)
 	}
-	cur, _ := cfg.Current(p.Key)
-	details := map[string]string{"old": old, "new": cur}
+	if err := c.writeChange(tx, cfg, ch, now, res); err != nil {
+		return err
+	}
+	res.Target, res.Details = p.Key, map[string]string{"old": old, "new": ch.Value}
 	if def.Secret {
-		details = map[string]string{"reset": "true"}
+		res.Details = map[string]string{"reset": "true"}
 	}
-	return p.Key, details, nil
+	return nil
 }
 
 // onSettingApproved выполняет настройку, которую владелец подтвердил кнопкой «Да».
@@ -147,7 +158,9 @@ func (c *Core) onSettingApproved(ctx context.Context, payload []byte) error {
 	if err != nil {
 		return err
 	}
-	return c.ownerAction(ctx, c.owner, "setting.set", func() (string, map[string]string, error) { return c.applySetting(cfg, p) })
+	return c.ownerAction(ctx, c.owner, "setting.set", func(tx Tx, now time.Time, res *ownerResult) error {
+		return c.applySetting(tx, cfg, p, now, res)
+	})
 }
 
 // SettingInfo это настройка для экрана: описание, умолчание, текущее значение (у секрета маска).
@@ -200,11 +213,13 @@ func (c *Core) AllowAllAdminIPs(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.ownerAction(ctx, c.owner, "admin.allow_all", func() (string, map[string]string, error) {
+	return c.ownerAction(ctx, c.owner, "admin.allow_all", func(tx Tx, now time.Time, res *ownerResult) error {
 		old, _ := cfg.Current("admin.allow_ips")
-		if err := cfg.Reset("admin.allow_ips"); err != nil {
-			return "", nil, err
+		ch, err := cfg.PrepareReset("admin.allow_ips")
+		if err != nil {
+			return err
 		}
-		return "admin.allow_ips", map[string]string{"old": old}, nil
+		res.Target, res.Details = "admin.allow_ips", map[string]string{"old": old}
+		return c.writeChange(tx, cfg, ch, now, res)
 	})
 }
