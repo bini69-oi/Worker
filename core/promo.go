@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -34,20 +35,47 @@ func (c *Core) SavePromo(ctx context.Context, actorTg int64, p Promo) (Promo, er
 	if p.ID == 0 {
 		p.CreatedAt = c.clock.Now()
 	}
-	err := c.asAdmin(ctx, actorTg, PermPromo, "promo.save", func(tx Tx, _ Admin, _ time.Time) (string, map[string]string, error) {
-		if p.TariffID != 0 {
-			if _, err := tx.Tariff(p.TariffID); err != nil {
-				return "", nil, err
-			}
+	err := c.asAdmin(ctx, actorTg, PermPromo, "promo.save", func(tx Tx, a Admin, now time.Time) (string, map[string]string, error) {
+		return c.savePromoTx(tx, a, &p, now)
+	})
+	if errors.Is(err, errNeedGrant) {
+		c.deny(ctx, actorTg, "promo.save.money")
+		return p, ErrForbidden
+	}
+	return p, err
+}
+
+// maxPromoMoney это самая большая сумма денежного промокода: 10 000 ₽ в копейках.
+const maxPromoMoney = 1_000_000
+
+// errNeedGrant значит, что денежный промокод хочет сохранить админ без права grant. Наружу не выходит.
+var errNeedGrant = errors.New("денежный промокод требует права grant")
+
+// savePromoTx сохраняет промокод внутри транзакции действия админа. Денежный промокод это деньги абонентам,
+// поэтому его заводит и включает только админ с правом grant, а помощник так начисляющий деньги шлёт владельцу тревогу.
+func (c *Core) savePromoTx(tx Tx, a Admin, p *Promo, now time.Time) (string, map[string]string, error) {
+	if p.Kind == PromoMoney {
+		if !a.Owner && !slices.Contains(a.Perms, PermGrant) {
+			return "", nil, errNeedGrant
 		}
-		var err error
-		if p.ID, err = tx.SavePromo(p); err != nil {
+		if err := c.helperMoney(tx, a, "promo.save", 0, p.Value, now); err != nil {
 			return "", nil, err
 		}
-		return p.Code, map[string]string{"kind": string(p.Kind), "value": itoa(p.Value), "max_uses": itoa(int64(p.MaxUses)),
-			"active": strconv.FormatBool(p.Active)}, nil
-	})
-	return p, err
+	}
+	if p.Kind == PromoMoney && p.Value > maxPromoMoney || p.Kind == PromoDays && p.Value > maxGrantDays {
+		return "", nil, ErrInvalid
+	}
+	if p.TariffID != 0 {
+		if _, err := tx.Tariff(p.TariffID); err != nil {
+			return "", nil, err
+		}
+	}
+	var err error
+	if p.ID, err = tx.SavePromo(*p); err != nil {
+		return "", nil, err
+	}
+	return p.Code, map[string]string{"kind": string(p.Kind), "value": itoa(p.Value), "max_uses": itoa(int64(p.MaxUses)),
+		"active": strconv.FormatBool(p.Active)}, nil
 }
 
 // ApplyPromo активирует промокод. Регистр и пробелы по краям не важны. Каждая попытка засчитывается заранее,

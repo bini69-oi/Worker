@@ -1,6 +1,10 @@
 package core
 
-import "context"
+import (
+	"context"
+	"errors"
+	"time"
+)
 
 // Promos отдаёт промокоды с числом активаций страницами по PageSize, новые первыми. Нужно право promo.
 func (c *Core) Promos(ctx context.Context, actorTg, cursor int64) (Page[Promo], error) {
@@ -20,18 +24,24 @@ func (c *Core) Promos(ctx context.Context, actorTg, cursor int64) (Page[Promo], 
 	return page, nil
 }
 
-// SetPromoActive включает или выключает промокод. Нужно право promo. Выключенный код не работает,
-// число активаций остаётся.
+// SetPromoActive включает или выключает промокод. Нужно право promo (для денежного ещё grant). Чтение и запись
+// идут одной транзакцией. Выключенный код не работает, число активаций остаётся.
 func (c *Core) SetPromoActive(ctx context.Context, actorTg, id int64, active bool) (Promo, error) {
-	if _, err := c.Require(ctx, actorTg, PermPromo, "promo.save"); err != nil {
-		return Promo{}, err
+	var out Promo
+	err := c.asAdmin(ctx, actorTg, PermPromo, "promo.save", func(tx Tx, a Admin, now time.Time) (string, map[string]string, error) {
+		p, err := tx.PromoByID(id)
+		if err != nil {
+			return "", nil, err
+		}
+		p.Active = active
+		out = p
+		return c.savePromoTx(tx, a, &out, now)
+	})
+	if errors.Is(err, errNeedGrant) {
+		c.deny(ctx, actorTg, "promo.save.money")
+		return out, ErrForbidden
 	}
-	p, err := c.store.PromoByID(ctx, id)
-	if err != nil {
-		return p, err
-	}
-	p.Active = active
-	return c.SavePromo(ctx, actorTg, p)
+	return out, err
 }
 
 // PanelSquad это сквад панели: группа серверов, которую выдаёт тариф.

@@ -227,3 +227,11 @@ func (s *Store) taskUser(t core.Task) int64 {
 	}
 	return 0
 }
+
+func (t *tx) PromoByID(id int64) (core.Promo, error) {
+	p, ok := t.st.promos[id]
+	if !ok {
+		return p, core.ErrNotFound
+	}
+	return p, nil
+}

@@ -160,6 +160,8 @@ type AdminTx interface {
 	FinishBroadcast(id int64, at time.Time) (bool, error)
 	// SegmentCount считает получателей сегмента: без забаненных и недоступных.
 	SegmentCount(segment string, now time.Time) (int, error)
+	// PromoByID отдаёт промокод. Нет такого: ErrNotFound.
+	PromoByID(id int64) (Promo, error)
 	// MarkRefunded переводит оплаченный платёж в «возвращён» с временем возврата. false значит, что он уже не оплачен.
 	MarkRefunded(id int64, at time.Time) (bool, error)
 }

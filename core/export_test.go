@@ -10,3 +10,6 @@ func (c *Core) SyncSub(ctx context.Context, subID int64) error { return c.syncSu
 
 // Backoff открывает backoff.
 var Backoff = backoff
+
+// MaxPromoMoney открывает предел суммы денежного промокода для тестов.
+const MaxPromoMoney = maxPromoMoney

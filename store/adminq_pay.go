@@ -132,3 +132,11 @@ func (s *CoreStore) GatewayStats(ctx context.Context) (map[string]core.GatewaySt
 	}
 	return out, rows.Err()
 }
+
+func (t *coreTx) PromoByID(id int64) (core.Promo, error) {
+	p, err := scanPromo(t.q.QueryRowContext(t.ctx, "SELECT "+promoCols+" FROM promo_codes WHERE id = ?", id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return p, core.ErrNotFound
+	}
+	return p, err
+}
