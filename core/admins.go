@@ -128,6 +128,11 @@ func (c *Core) deny(ctx context.Context, actorTg int64, action string) {
 		if err := c.audit(ctx, tx, actorTg, "denied:"+action, "", nil, now); err != nil {
 			return err
 		}
+		// Журнал пишет каждую попытку, а тревога по паре «админ и действие» уходит раз в час: поток запросов не завалит владельца.
+		first, err := tx.AddNotice(0, "denied", itoa(actorTg)+"|"+action+"|"+now.Truncate(time.Hour).Format(time.RFC3339), now)
+		if err != nil || !first {
+			return err
+		}
 		return c.alert(tx, "admin.denied", map[string]string{"admin": itoa(actorTg), "action": action}, now)
 	})
 }

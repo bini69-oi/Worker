@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/bini69-oi/worker/core"
 )
@@ -59,5 +60,46 @@ func TestRequire(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("тревоги об отказе нет")
+	}
+}
+
+// Журнал пишет каждый отказ, а тревога по паре «админ и действие» уходит раз в час.
+func TestDeniedAlertOncePerHour(t *testing.T) {
+	ctx := context.Background()
+	e := newEnv(t)
+	helperWith(t, e, 50, core.PermUsers)
+	alerts := func() int {
+		n := 0
+		for _, a := range adminTasks(t, e) {
+			if a.Key == "admin.denied" {
+				n++
+			}
+		}
+		return n
+	}
+	for range 5 {
+		if _, err := e.c.Require(ctx, 50, core.PermTariffs, "tariff.save"); !errors.Is(err, core.ErrForbidden) {
+			t.Fatal(err)
+		}
+	}
+	denied := 0
+	for _, a := range e.st.Audit() {
+		if a.Action == "denied:tariff.save" {
+			denied++
+		}
+	}
+	if denied != 5 || alerts() != 1 {
+		t.Fatalf("записей %d, задач тревоги %d", denied, alerts())
+	}
+	if _, err := e.c.Require(ctx, 50, core.PermPromo, "promo.save"); err == nil {
+		t.Fatal()
+	}
+	if alerts() != 2 {
+		t.Errorf("другое действие должно дать свою тревогу: %d", alerts())
+	}
+	e.clock.Add(time.Hour)
+	_, _ = e.c.Require(ctx, 50, core.PermTariffs, "tariff.save")
+	if alerts() != 3 {
+		t.Errorf("через час тревога снова: %d", alerts())
 	}
 }
