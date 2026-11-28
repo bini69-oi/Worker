@@ -18,7 +18,7 @@ export async function runLogin(
   onCode(started.code)
   for (let i = 0; i < tries; i++) {
     await sleep(delayMs)
-    const st = await api<AdminLoginState>('GET', '/login/' + encodeURIComponent(started.id))
+    const st = await api<AdminLoginState>('POST', '/login/poll', { id: started.id })
     if (st.status === 'ok' || st.status === 'denied' || st.status === 'expired') return st.status
   }
   return 'expired'

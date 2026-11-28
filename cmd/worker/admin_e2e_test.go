@@ -143,7 +143,7 @@ func TestAdminEndToEnd(t *testing.T) {
 	if err := a.core.AnswerLogin(ctx, confirmID, 1, started.Code); err != nil {
 		t.Fatal(err)
 	}
-	code, raw, hdr := c.do("GET", "/api/admin/login/"+started.ID, "")
+	code, raw, hdr := c.do("POST", "/api/admin/login/poll", fmt.Sprintf(`{"id":%q}`, started.ID))
 	if code != 200 || !strings.Contains(raw, `"ok"`) {
 		t.Fatalf("опрос входа: %d %s", code, raw)
 	}
@@ -233,7 +233,7 @@ func TestAdminEndToEnd(t *testing.T) {
 	if err := a.cfg.Set("admin.allow_ips", "203.0.113.5"); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/api/admin/me", "/admin/", "/api/admin/login/1.x"} {
+	for _, path := range []string{"/api/admin/me", "/admin/"} {
 		if code, _, _ := c.do("GET", path, ""); code != 404 {
 			t.Fatalf("%s с чужого адреса: %d", path, code)
 		}

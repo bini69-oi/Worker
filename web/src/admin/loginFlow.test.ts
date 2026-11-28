@@ -20,7 +20,7 @@ describe('вход с кодом', () => {
     const res = await runLogin(api, 1, 'pw', (c) => codes.push(c), async () => {})
     expect(res).toBe('ok')
     expect(codes).toEqual(['42'])
-    expect(calls).toEqual(['POST /login', 'GET /login/7.nonce', 'GET /login/7.nonce', 'GET /login/7.nonce'])
+    expect(calls).toEqual(['POST /login', 'POST /login/poll', 'POST /login/poll', 'POST /login/poll'])
   })
 
   it('отказ в Telegram', async () => {

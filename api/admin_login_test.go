@@ -32,14 +32,14 @@ func TestAdminLoginSuccess(t *testing.T) {
 	e := newAdminEnv(t)
 	st, cid := startLoginAPI(t, e)
 
-	rec := e.get("", "/api/admin/login/"+st.ID)
+	rec := e.post("", "/api/admin/login/poll", pollBody(st.ID))
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"pending"`) || rec.Header().Get("Set-Cookie") != "" {
 		t.Fatalf("до нажатия: %d %s %q", rec.Code, rec.Body, rec.Header().Get("Set-Cookie"))
 	}
 	if err := e.c.AnswerLogin(context.Background(), cid, adminOwner, st.Code); err != nil {
 		t.Fatal(err)
 	}
-	rec = e.get("", "/api/admin/login/"+st.ID)
+	rec = e.post("", "/api/admin/login/poll", pollBody(st.ID))
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"ok"`) {
 		t.Fatalf("после нажатия: %d %s", rec.Code, rec.Body)
 	}
@@ -82,7 +82,7 @@ func TestAdminLoginDenied(t *testing.T) {
 	if err := e.c.AnswerLogin(context.Background(), cid, adminOwner, "00"); err != nil {
 		t.Fatal(err)
 	}
-	rec := e.get("", "/api/admin/login/"+st.ID)
+	rec := e.post("", "/api/admin/login/poll", pollBody(st.ID))
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"denied"`) || rec.Header().Get("Set-Cookie") != "" {
 		t.Errorf("%d %s", rec.Code, rec.Body)
 	}
@@ -91,7 +91,7 @@ func TestAdminLoginDenied(t *testing.T) {
 func TestAdminLoginBadID(t *testing.T) {
 	e := newAdminEnv(t)
 	for _, id := range []string{"abc", "1.", ".x", "1.чужой", "99999.xx"} {
-		rec := e.get("", "/api/admin/login/"+id)
+		rec := e.post("", "/api/admin/login/poll", pollBody(id))
 		if rec.Code != 401 && rec.Code != 400 {
 			t.Errorf("id %q: %d %s", id, rec.Code, rec.Body)
 		}
@@ -115,5 +115,16 @@ func TestAdminLoginNeedsOrigin(t *testing.T) {
 	rec := e.post("", "/api/admin/login", `{`)
 	if rec.Code != 400 {
 		t.Errorf("битое тело: %d", rec.Code)
+	}
+}
+
+func pollBody(id string) string { return fmt.Sprintf(`{"id":%q}`, id) }
+
+// Ключ входа ходит в теле запроса: в адресе его нет, старый адрес с ключом не существует.
+func TestAdminLoginPollNotInURL(t *testing.T) {
+	e := newAdminEnv(t)
+	st, _ := startLoginAPI(t, e)
+	if rec := e.get("", "/api/admin/login/"+st.ID); rec.Code != 404 && rec.Code != 405 {
+		t.Errorf("опрос по адресу с ключом: %d", rec.Code)
 	}
 }

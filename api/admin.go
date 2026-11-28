@@ -32,7 +32,7 @@ type adminAPI struct {
 func RegisterAdmin(s *Server, d AdminDeps) {
 	a := &adminAPI{s: s, d: d}
 	s.Handle("POST /api/admin/login", a.login)
-	s.Handle("GET /api/admin/login/{id}", a.loginPoll)
+	s.Handle("POST /api/admin/login/poll", a.loginPoll)
 	for _, rt := range a.routes() {
 		s.Handle(rt.Pattern, a.guarded(rt))
 	}
@@ -111,7 +111,14 @@ func (a *adminAPI) login(w http.ResponseWriter, r *http.Request) (any, error) {
 }
 
 func (a *adminAPI) loginPoll(w http.ResponseWriter, r *http.Request) (any, error) {
-	num, nonce, ok := strings.Cut(r.PathValue("id"), ".")
+	// Ключ браузера идёт в теле, а не в адресе: адреса попадают в журналы прокси и истории браузера.
+	var in struct {
+		ID string `json:"id"`
+	}
+	if err := Decode(w, r, &in); err != nil {
+		return nil, err
+	}
+	num, nonce, ok := strings.Cut(in.ID, ".")
 	id, err := strconv.ParseInt(num, 10, 64)
 	if !ok || err != nil || nonce == "" {
 		return nil, core.ErrNotConfirmed
