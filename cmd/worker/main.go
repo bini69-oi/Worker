@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	_ "time/tzdata" // часовые пояса без системной базы: сводка считает дни по summary.tz
 
 	"github.com/bini69-oi/worker/redact"
 )

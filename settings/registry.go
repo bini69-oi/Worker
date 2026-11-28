@@ -138,6 +138,8 @@ var base = []Def{
 		Desc: "Бонус приглашённому после его первой оплаты, копейки"},
 	{Key: "summary.hour", Kind: KindInt, Default: "9", Group: "notify",
 		Desc: "В котором часу (0-23, по времени сервера) слать в тему «Сводка» итог вчерашнего дня"},
+	{Key: "summary.tz", Kind: KindString, Default: "Europe/Moscow", Group: "notify",
+		Desc: "Часовой пояс дней в сводке и итоге дня, например Europe/Moscow или UTC"},
 	{Key: "remind.days", Kind: KindString, Default: "3,1", Group: "notify",
 		Desc: "За сколько дней до окончания напоминать, через запятую"},
 	{Key: "addons.traffic", Kind: KindString, Default: "", Group: "pay", Money: true,

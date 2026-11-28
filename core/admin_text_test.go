@@ -21,6 +21,9 @@ type cfgEnv struct {
 func newCfgEnv(t *testing.T) *cfgEnv {
 	t.Helper()
 	e := newEnv(t)
+	if err := e.cfg.Set("summary.tz", "UTC"); err != nil {
+		t.Fatal(err)
+	}
 	tx := coretest.NewTexts(t)
 	c := core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes, OwnerID: owner, Texts: tx})
 	return &cfgEnv{env: e, c: c, tx: tx}

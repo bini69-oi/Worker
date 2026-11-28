@@ -38,12 +38,7 @@ type AdminStats struct {
 
 const dayLayout = "2006-01-02"
 
-func (a *adminAPI) loc() *time.Location {
-	if a.d.Loc != nil {
-		return a.d.Loc
-	}
-	return time.Local
-}
+func (a *adminAPI) loc() *time.Location { return a.d.Core.Location() }
 
 func (a *adminAPI) statsGet(_ http.ResponseWriter, r *http.Request, ad adminCtx) (any, error) {
 	loc := a.loc()

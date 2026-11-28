@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/bini69-oi/worker/core"
 	"github.com/bini69-oi/worker/guard"
@@ -22,8 +21,6 @@ type AdminDeps struct {
 	Core *core.Core
 	// Bot отдаёт имя бота без @ для ссылок вида t.me/<бот>?start=promo_<код>. Пока Telegram не ответил, пусто.
 	Bot func() string
-	// Loc это часовой пояс дней в сводке. Пусто: время сервера.
-	Loc *time.Location
 }
 
 type adminAPI struct {

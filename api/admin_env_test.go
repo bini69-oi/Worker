@@ -51,6 +51,9 @@ func newAdminEnv(t *testing.T) *adminEnv {
 			t.Fatal(err)
 		}
 	}
+	if err := e.cfg.Set("summary.tz", "UTC"); err != nil {
+		t.Fatal(err)
+	}
 	e.stars = stars.New(e.cfg)
 	e.sender = &coretest.Sender{}
 	e.c = core.New(core.Deps{Store: e.st, Clock: e.clock, Config: e.cfg, Panel: e.panel, Notifier: e.notes, OwnerID: adminOwner, Sender: e.sender, Texts: coretest.NewTexts(t),
@@ -59,7 +62,7 @@ func newAdminEnv(t *testing.T) *adminEnv {
 	// Часы лимита запросов идут вперёд сами: тесты шлют много запросов подряд, а часы ядра стоят на месте.
 	var tick atomic.Int64
 	e.s = New(Deps{Text: fakeTexts, Log: log, Now: func() time.Time { return adminT0.Add(time.Duration(tick.Add(1)) * time.Second) }})
-	RegisterAdmin(e.s, AdminDeps{Core: e.c, Bot: func() string { return "test_bot" }, Loc: time.UTC})
+	RegisterAdmin(e.s, AdminDeps{Core: e.c, Bot: func() string { return "test_bot" }})
 	if err := e.c.SetOwnerPassword(context.Background(), ownerPass); err != nil {
 		t.Fatal(err)
 	}
