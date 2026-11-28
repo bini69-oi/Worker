@@ -44,6 +44,11 @@ func (c *Core) SetMaintenance(ctx context.Context, actorTg int64, on bool, text 
 		return ErrTooLong
 	}
 	return c.ownerAction(ctx, actorTg, action, func() (string, map[string]string, error) {
+		if text != "" {
+			if err := CheckMarkup(text); err != nil {
+				return "", nil, err
+			}
+		}
 		if text != "" && c.texts != nil {
 			for _, key := range []string{"bot.maintenance", "err.maintenance"} {
 				if err := c.texts.Set(key, "ru", text); err != nil {

@@ -148,3 +148,29 @@ func TestTextList(t *testing.T) {
 	}
 	t.Error("нет ключа buy.success")
 }
+
+// Текст, который бот шлёт как разметку Telegram, проходит проверку разметки; тексты кабинета и подписи кнопок нет.
+func TestSetTextMarkupCheck(t *testing.T) {
+	ctx := context.Background()
+	e := newCfgEnv(t)
+	for _, bad := range []string{"<script>x</script> {days}", "<b>не закрыт {days}", `<a href="javascript:alert(1)">x</a> {days}`, "a < b {days}"} {
+		if err := e.c.SetText(ctx, owner, "buy.success", "ru", bad); !errors.Is(err, core.ErrBadMarkup) {
+			t.Errorf("%q: %v", bad, err)
+		}
+	}
+	if e.tx.Raw("buy.success", "ru") != e.tx.Raw("buy.success", "en") && strings.Contains(e.tx.Raw("buy.success", "ru"), "script") {
+		t.Error("плохой текст сохранён")
+	}
+	if err := e.c.SetText(ctx, owner, "buy.success", "ru", "<b>Готово</b>, ещё {days} дн."); err != nil {
+		t.Errorf("верная разметка: %v", err)
+	}
+	if err := e.c.SetText(ctx, owner, "btn.ban", "ru", "A < B"); err != nil {
+		t.Errorf("подпись кнопки это простой текст: %v", err)
+	}
+	if err := e.c.SetMaintenance(ctx, owner, true, "<script>x</script>"); !errors.Is(err, core.ErrBadMarkup) || e.c.Maintenance() {
+		t.Errorf("техработы с чужим тегом: %v", err)
+	}
+	if err := e.c.SetMaintenance(ctx, owner, true, "Вернёмся в <b>15:00</b>"); err != nil {
+		t.Errorf("техработы с разметкой: %v", err)
+	}
+}

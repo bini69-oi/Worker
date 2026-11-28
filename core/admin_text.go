@@ -59,6 +59,11 @@ func (c *Core) SetText(ctx context.Context, actorTg int64, key, lang, value stri
 		return ErrTooLong
 	}
 	return c.ownerAction(ctx, actorTg, "text.set", func() (string, map[string]string, error) {
+		if sentAsHTML(key) && strings.TrimSpace(value) != "" {
+			if err := CheckMarkup(value); err != nil {
+				return "", nil, err
+			}
+		}
 		if err := c.texts.Set(key, lang, value); err != nil {
 			return "", nil, textErr(err)
 		}
@@ -110,4 +115,10 @@ func (c *Core) TextList(ctx context.Context, actorTg int64) ([]TextInfo, error) 
 		out = append(out, info)
 	}
 	return out, nil
+}
+
+// sentAsHTML говорит, что текст бот шлёт с разметкой Telegram HTML: тогда он проходит ту же проверку разметки, что
+// и рассылка. Тексты кабинета (app.*) идут в JSON, подписи кнопок (btn.*) это простой текст.
+func sentAsHTML(key string) bool {
+	return !strings.HasPrefix(key, "app.") && !strings.HasPrefix(key, "btn.")
 }
