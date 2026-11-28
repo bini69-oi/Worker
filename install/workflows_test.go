@@ -13,7 +13,7 @@ var envLine = regexp.MustCompile(`^[A-Z_]+: \$\{\{ [^}]+ \}\}$`)
 
 var pinned = regexp.MustCompile(`^[\w.-]+/[\w./-]+@[0-9a-f]{40}( #.*)?$`)
 
-// Действия в workflow закреплены по хэшу коммита, как сказано в docs/decisions.md.
+// Действия в workflow закреплены по хэшу коммита: тег можно перевесить, коммит нельзя.
 func TestWorkflowActionsPinned(t *testing.T) {
 	files, _ := filepath.Glob("../.github/workflows/*.yml")
 	if len(files) == 0 {

@@ -8,3 +8,14 @@
 *.db-shm
 *.newkey
 *.db.lock
+
+# планы и документы разработки живут только у владельца
+/openspec/
+/.claude/
+/AGENTS.md
+/CLAUDE.md
+/docs/roadmap.md
+/docs/features.md
+/docs/development.md
+/docs/decisions.md
+/docs/bot-check.md
