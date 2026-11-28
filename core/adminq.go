@@ -134,6 +134,10 @@ type AdminStore interface {
 	PromoByID(ctx context.Context, id int64) (Promo, error)
 	// Payments отдаёт платежи всех касс с абонентами, новые первыми.
 	Payments(ctx context.Context, f PaymentFilter, limit int) ([]PaymentRow, error)
+	// AdminByTg читает строку админа без транзакции записи. Нет такого: ErrNotFound.
+	AdminByTg(ctx context.Context, tgID int64) (Admin, error)
+	// AdminSession читает сессию админки по хэшу токена без транзакции записи. Нет такой: ErrNotFound.
+	AdminSession(ctx context.Context, tokenHash []byte) (Session, error)
 	// UserPayments отдаёт платежи абонента, новые первыми.
 	UserPayments(ctx context.Context, userID int64, limit int) ([]Payment, error)
 	// AuditLog отдаёт записи журнала, новые первыми.

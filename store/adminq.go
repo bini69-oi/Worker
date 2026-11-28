@@ -151,3 +151,11 @@ func parseDetails(raw string) (map[string]string, error) {
 	}
 	return m, nil
 }
+
+func (s *CoreStore) AdminByTg(ctx context.Context, tgID int64) (core.Admin, error) {
+	return (&coreTx{ctx: ctx, q: s.db.R}).Admin(tgID)
+}
+
+func (s *CoreStore) AdminSession(ctx context.Context, tokenHash []byte) (core.Session, error) {
+	return (&coreTx{ctx: ctx, q: s.db.R}).Session(tokenHash)
+}

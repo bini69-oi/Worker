@@ -235,3 +235,15 @@ func (t *tx) PromoByID(id int64) (core.Promo, error) {
 	}
 	return p, nil
 }
+
+func (s *Store) AdminByTg(_ context.Context, tgID int64) (core.Admin, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return (&tx{st: s.st}).Admin(tgID)
+}
+
+func (s *Store) AdminSession(_ context.Context, tokenHash []byte) (core.Session, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return (&tx{st: s.st}).Session(tokenHash)
+}

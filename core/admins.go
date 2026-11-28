@@ -62,6 +62,11 @@ func (c *Core) isOwner(tgID int64) bool { return c.owner > 0 && tgID == c.owner 
 // admin берёт админа. Владелец всегда админ со всеми правами, даже без строки в таблице.
 func (c *Core) admin(tx Tx, tgID int64) (Admin, error) {
 	a, err := tx.Admin(tgID)
+	return c.resolveAdmin(a, err, tgID)
+}
+
+// resolveAdmin решает по строке таблицы (или её отсутствию), админ ли это и с какими правами.
+func (c *Core) resolveAdmin(a Admin, err error, tgID int64) (Admin, error) {
 	if c.isOwner(tgID) {
 		a.TgID, a.Owner, a.Perms = tgID, true, HelperPerms
 		return a, nil

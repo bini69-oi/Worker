@@ -274,6 +274,11 @@ func (c *Core) LoginFinish(ctx context.Context, confirmID int64, nonce string, i
 // но владелец получает тревогу: так видна украденная cookie.
 func (c *Core) SessionAdmin(ctx context.Context, token string, info LoginInfo) (Admin, Session, error) {
 	info = cleanInfo(info)
+	// Быстрый путь: сессия живая, виделась меньше минуты назад и пришла с того же адреса. Тогда ничего писать не надо,
+	// и обычный запрос страницы идёт чтением без транзакции записи.
+	if a, s, ok := c.liveSession(ctx, token, info); ok {
+		return a, s, nil
+	}
 	var a Admin
 	var s Session
 	err := c.tx(ctx, func(tx Tx) error {
@@ -342,4 +347,18 @@ func (c *Core) CloseSession(ctx context.Context, actorTg int64, id string) error
 		})
 	}
 	return ErrNotFound
+}
+
+// liveSession проверяет сессию чтением. ok ложно, если надо идти длинным путём с записью: время обновить,
+// адрес сменился или сессия не годится (тогда длинный путь отдаст нужную ошибку).
+func (c *Core) liveSession(ctx context.Context, token string, info LoginInfo) (Admin, Session, bool) {
+	now := c.clock.Now()
+	s, err := c.store.AdminSession(ctx, sha(token))
+	if err != nil || !s.ClosedAt.IsZero() || !now.Before(s.ExpiresAt) || now.Sub(s.SeenAt) >= time.Minute ||
+		(info.IP != "" && info.IP != s.IP) {
+		return Admin{}, Session{}, false
+	}
+	row, err := c.store.AdminByTg(ctx, s.AdminTg)
+	a, err := c.resolveAdmin(row, err, s.AdminTg)
+	return a, s, err == nil
 }
