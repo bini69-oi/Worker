@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -218,6 +219,8 @@ type Core struct {
 	telegram TelegramAPI
 	sender   BroadcastSender
 	texts    TextEditor
+	importMu sync.Mutex
+	importAt atomic.Value // time.Time: когда был последний пробный прогон импорта
 	bcNext   atomic.Value // time.Time: раньше этого момента пачка рассылки не уходит
 	channels Channels
 	owner    int64

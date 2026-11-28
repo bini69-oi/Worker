@@ -26,7 +26,7 @@ type AdminImportReport struct {
 }
 
 func (a *adminAPI) importPreview(_ http.ResponseWriter, r *http.Request, ad adminCtx) (any, error) {
-	rep, err := a.d.Core.ImportPanel(r.Context(), ad.Admin.TgID, false)
+	rep, err := a.d.Core.PreviewImport(r.Context(), ad.Admin.TgID)
 	if err != nil {
 		return nil, err
 	}

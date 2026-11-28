@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/bini69-oi/worker/core"
 )
@@ -72,5 +73,26 @@ func TestImportButtonRejected(t *testing.T) {
 	confirmLast(t, e, false)
 	if _, err := e.c.UserByTg(ctx, 2001); !errors.Is(err, core.ErrNotFound) {
 		t.Errorf("после «Нет» абонент заведён: %v", err)
+	}
+}
+
+// Пробный прогон читает всю панель: не чаще раза в минуту.
+func TestPreviewImportRateLimited(t *testing.T) {
+	ctx := context.Background()
+	e := newCfgEnv(t)
+	e.listed("r1", "old_one", 2001, 0)
+	if _, err := e.c.PreviewImport(ctx, owner); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.c.PreviewImport(ctx, owner); !errors.Is(err, core.ErrTooManyTries) {
+		t.Fatalf("второй прогон сразу: %v", err)
+	}
+	e.clock.Add(time.Minute)
+	if _, err := e.c.PreviewImport(ctx, owner); err != nil {
+		t.Errorf("через минуту: %v", err)
+	}
+	helperWith(t, e.env, 50, core.PermUsers)
+	if _, err := e.c.PreviewImport(ctx, 50); !errors.Is(err, core.ErrOwnerOnly) {
+		t.Errorf("помощник: %v", err)
 	}
 }
